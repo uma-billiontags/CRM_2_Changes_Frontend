@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import {
   LayoutDashboard, Megaphone, Building2, Wallet,
-  Users, FileText, Settings, LogOut, Bell,
+   FileText, Settings, LogOut, Bell,
   Plus, ChevronRight,
   History, Radio, FileEdit, Layers,
 } from 'lucide-react';
@@ -18,7 +18,6 @@ const BLUE_MID   = '#BFDBFE';
 const GREEN  = '#16A34A';
 const GREEN_LIGHT = '#DCFCE7';
 const RED    = '#DC2626';
-const RED_LIGHT   = '#FEE2E2';
 const AMBER  = '#D97706';
 const AMBER_LIGHT = '#FEF3C7';
 const SLATE  = '#0F172A';
@@ -315,7 +314,7 @@ function Topbar({ title, subtitle, actions }: { title: string; subtitle?: string
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, delta, icon, accent, accentLight }: {
+function KpiCard({ label, value, delta, icon, accentLight }: {
   label: string; value: string | number; delta: string;
   icon: string; accent: string; accentLight: string;
 }) {
