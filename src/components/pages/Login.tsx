@@ -13,67 +13,70 @@ export default function Login() {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
-
+  
   const handleSignIn = async () => {
-    setError("");
+    navigate("/user_dashboard");
+  }
+  // const handleSignIn = async () => {
+  //   setError("");
 
-    // Basic client-side validation
-    if (!email.trim()) {
-      setError("Please enter your email address.");
-      return;
-    }
-    if (!password.trim()) {
-      setError("Please enter your password.");
-      return;
-    }
+  //   // Basic client-side validation
+  //   if (!email.trim()) {
+  //     setError("Please enter your email address.");
+  //     return;
+  //   }
+  //   if (!password.trim()) {
+  //     setError("Please enter your password.");
+  //     return;
+  //   }
 
-    setLoading(true);
-    try {
-      const fd = new FormData();
-      fd.append("user_email", email.trim());    // ✅ matches Django: request.data.get("user_email")
-      fd.append("user_password", password);     // ✅ matches Django: request.data.get("user_password")
+  //   setLoading(true);
+  //   try {
+  //     const fd = new FormData();
+  //     fd.append("user_email", email.trim());    // ✅ matches Django: request.data.get("user_email")
+  //     fd.append("user_password", password);     // ✅ matches Django: request.data.get("user_password")
 
-      const res = await fetch(LOGIN_URL, {
-        method: "POST",
-        body: fd,
-      });
+  //     const res = await fetch(LOGIN_URL, {
+  //       method: "POST",
+  //       body: fd,
+  //     });
 
-      if (res.ok) {
-        // ✅ FIXED: only navigate on successful login
-        if (remember) {
-          localStorage.setItem("remembered_email", email.trim());
-        } else {
-          localStorage.removeItem("remembered_email");
-        }
-        navigate("/user_dashboard");
-      } else {
-        // Parse backend response: { status: false, message: "Invalid Email" | "Invalid Password" }
-        let msg = `Login failed (${res.status})`;
-        try {
-          const data = await res.json();
-          // Your Django view returns { status: false, message: "..." }
-          if (data.message) {
-            msg = data.message;
-          } else {
-            msg = data.error || data.detail || data.non_field_errors?.[0] || msg;
-          }
-        } catch {
-          const text = await res.text().catch(() => "");
-          if (text) msg = text;
-        }
-        setError(msg);
-      }
-    } catch (err: unknown) {
-      // Network/connection error
-      setError(
-        err instanceof Error
-          ? `Connection error: ${err.message}`
-          : "Network error — please check your connection and try again."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     if (res.ok) {
+  //       // ✅ FIXED: only navigate on successful login
+  //       if (remember) {
+  //         localStorage.setItem("remembered_email", email.trim());
+  //       } else {
+  //         localStorage.removeItem("remembered_email");
+  //       }
+  //       navigate("/user_dashboard");
+  //     } else {
+  //       // Parse backend response: { status: false, message: "Invalid Email" | "Invalid Password" }
+  //       let msg = `Login failed (${res.status})`;
+  //       try {
+  //         const data = await res.json();
+  //         // Your Django view returns { status: false, message: "..." }
+  //         if (data.message) {
+  //           msg = data.message;
+  //         } else {
+  //           msg = data.error || data.detail || data.non_field_errors?.[0] || msg;
+  //         }
+  //       } catch {
+  //         const text = await res.text().catch(() => "");
+  //         if (text) msg = text;
+  //       }
+  //       setError(msg);
+  //     }
+  //   } catch (err: unknown) {
+  //     // Network/connection error
+  //     setError(
+  //       err instanceof Error
+  //         ? `Connection error: ${err.message}`
+  //         : "Network error — please check your connection and try again."
+  //     );
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   // Submit on Enter key
   const handleKeyDown = (e: React.KeyboardEvent) => {

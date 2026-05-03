@@ -1,0 +1,176 @@
+/* ── Ant Design overrides to match Billion Tags design system ── */
+
+/* Form item labels — small, muted, medium weight */
+.onboarding-form .ant-form-item-label > label {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+  height: auto !important;
+}
+
+
+
+/* Compact form item spacing */
+.onboarding-form .ant-form-item {
+  margin-bottom: 0 !important;
+}
+
+/* Input & Select height */
+.onboarding-form .ant-input,
+.onboarding-form .ant-input-affix-wrapper,
+.onboarding-form .ant-select .ant-select-selector,
+.onboarding-form .ant-input-number,
+.onboarding-form .ant-input-number-input {
+  height: 38px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  border-color: #e5e7eb !important;
+}
+
+.onboarding-form .ant-select .ant-select-selector {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Focus ring */
+.onboarding-form .ant-input:focus,
+.onboarding-form .ant-input-focused,
+.onboarding-form .ant-input-affix-wrapper:focus,
+.onboarding-form .ant-input-affix-wrapper-focused,
+.onboarding-form .ant-select-focused .ant-select-selector {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Disabled input */
+.onboarding-form .ant-input[disabled],
+.onboarding-form .ant-input-affix-wrapper-disabled {
+  background-color: #f3f4f6 !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+}
+
+/* addonBefore (phone code) */
+.onboarding-form .ant-input-group-addon {
+  border-radius: 6px 0 0 6px !important;
+  background: #f9fafb !important;
+  border-color: #e5e7eb !important;
+  padding: 0 !important;
+}
+
+.onboarding-form .ant-input-group-addon .ant-select .ant-select-selector {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  height: 38px !important;
+}
+
+/* TextArea */
+.onboarding-form .ant-input-textarea textarea {
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Upload button */
+.onboarding-form .ant-upload .ant-btn {
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  height: 38px !important;
+  border-style: dashed !important;
+  border-color: #d1d5db !important;
+  color: #6b7280 !important;
+  width: 100% !important;
+}
+
+.onboarding-form .ant-upload .ant-btn:hover {
+  border-color: #6366f1 !important;
+  color: #6366f1 !important;
+}
+
+/* Ant Design Tabs — match existing design */
+.onboarding-tabs .ant-tabs-nav {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: white !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.onboarding-tabs .ant-tabs-tab {
+  padding: 14px 20px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+  margin: 0 !important;
+}
+
+.onboarding-tabs .ant-tabs-tab:hover {
+  color: #111827 !important;
+}
+
+.onboarding-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #6366f1 !important;
+  font-weight: 600 !important;
+}
+
+.onboarding-tabs .ant-tabs-ink-bar {
+  background: #6366f1 !important;
+  height: 2px !important;
+}
+
+.onboarding-tabs .ant-tabs-content-holder {
+  display: none !important; /* We render tab content manually */
+}
+
+.onboarding-tabs .ant-tabs-nav::before {
+  border-bottom: none !important;
+}
+
+/* Switch */
+.onboarding-form .ant-switch-checked {
+  background-color: #6366f1 !important;
+}
+
+/* Button primary */
+.ant-btn-primary.ob-primary-btn {
+  background-color: #6366f1 !important;
+  border-color: #6366f1 !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  height: 36px !important;
+}
+
+.ant-btn-primary.ob-primary-btn:hover {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+/* Button default */
+.ant-btn.ob-default-btn {
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  height: 36px !important;
+  border-color: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+/* Ant Alert */
+.ob-alert-success {
+  border-radius: 8px !important;
+  margin-bottom: 16px !important;
+}
+
+.ob-alert-error {
+  border-radius: 8px !important;
+  margin-bottom: 16px !important;
+}
+
+/* Select dropdown arrow fix */
+.onboarding-form .ant-select-arrow {
+  color: #9ca3af !important;
+}
+
+/* Password input eye icon */
+.onboarding-form .ant-input-password .ant-input {
+  height: 36px !important;
+}

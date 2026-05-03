@@ -1,0 +1,1106 @@
+/* ── CampaignCreate.css ───────────────────────────────────────────────────── */
+
+/* ── Root Variables ── */
+:root {
+  --blue: #2563eb;
+  --blue-light: #eff6ff;
+  --blue-mid: #bfdbfe;
+  --slate: #0f172a;
+  --slate-700: #334155;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --white: #ffffff;
+  --bg: #f8fafc;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --amber: #d97706;
+  --amber-light: #fef3c7;
+  --purple: #7c3aed;
+  --red: #dc2626;
+}
+
+/* ── Global Reset ── */
+* {
+  box-sizing: border-box;
+}
+
+/* ── Layout ── */
+.cc-root {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.cc-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Sidebar ── */
+.cc-sidebar {
+  background: var(--slate);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cc-sidebar-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  padding: 0 16px;
+  justify-content: space-between;
+}
+
+.cc-sidebar-logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--white);
+  flex-shrink: 0;
+}
+
+.cc-sidebar-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.cc-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+
+.cc-nav-group-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.12em;
+  padding: 10px 10px 4px;
+  text-transform: uppercase;
+}
+
+.cc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 1px;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.cc-nav-item.active {
+  font-weight: 600;
+  color: var(--white);
+  background: rgba(37, 99, 235, 0.85);
+}
+
+.cc-nav-item.collapsed {
+  justify-content: center;
+  padding: 10px;
+}
+
+.cc-sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.cc-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 6px;
+}
+
+.cc-sidebar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* ── Topbar ── */
+.cc-topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.cc-topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--slate-500);
+}
+
+.cc-topbar-bell {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-300);
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cc-topbar-bell-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.cc-topbar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ── Page Header ── */
+.cc-page-header {
+  padding: 24px 28px 0;
+}
+
+.cc-page-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate);
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.cc-page-sub {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin-top: 4px;
+}
+
+/* ── Status Banners ── */
+.cc-banner {
+  margin: 16px 28px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cc-banner-success {
+  background: var(--green-light);
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+
+.cc-banner-error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+}
+
+/* ── Stepper ── */
+.cc-stepper-wrap {
+  padding: 20px 28px 0;
+}
+
+.cc-stepper {
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.cc-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.cc-step.active {
+  background: var(--blue-light);
+}
+
+.cc-step.done {
+  cursor: pointer;
+}
+
+.cc-step-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  transition: all 0.25s;
+}
+
+.cc-step-circle.inactive {
+  background: var(--slate-200);
+  color: var(--slate-400);
+  border: 2px solid var(--slate-300);
+}
+
+.cc-step-circle.is-active {
+  background: var(--blue);
+  color: var(--white);
+  border: 2px solid var(--blue);
+}
+
+.cc-step-circle.is-done {
+  background: var(--green);
+  color: var(--white);
+  border: 2px solid var(--green);
+}
+
+.cc-step-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--slate-400);
+  white-space: nowrap;
+}
+
+.cc-step-label.active {
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.cc-step-label.done {
+  color: var(--slate-700);
+}
+
+.cc-step-sub {
+  font-size: 10px;
+  color: var(--slate-400);
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.cc-step-sub.active {
+  color: #60a5fa;
+}
+
+.cc-step-connector {
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--slate-200);
+  min-width: 12px;
+  transition: background 0.35s;
+}
+
+.cc-step-connector.done {
+  background: var(--green);
+}
+
+/* ── Step Content Card ── */
+.cc-content-wrap {
+  flex: 1;
+  padding: 24px 28px 0;
+  animation: stepIn 0.28s ease both;
+}
+
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cc-card {
+  background: var(--white);
+  border-radius: 12px;
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.cc-card-header {
+  padding: 20px 28px 18px;
+  border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cc-card-step-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--blue-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.cc-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate);
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.cc-card-sub {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  margin-top: 2px;
+}
+
+.cc-card-step-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--slate-400);
+  font-weight: 500;
+}
+
+.cc-card-body {
+  padding: 24px 28px;
+}
+
+/* ── Form Section ── */
+.cc-form-section {
+  max-width: 640px;
+}
+
+.cc-form-section-sm {
+  max-width: 600px;
+}
+
+/* ── Ant Design Form Overrides ── */
+.cc-form .ant-form-item-label > label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--slate-700);
+}
+
+.cc-form .ant-input,
+.cc-form .ant-input-number,
+.cc-form .ant-picker,
+.cc-form .ant-select-selector {
+  border-radius: 8px !important;
+  border-color: var(--slate-300) !important;
+  font-size: 13px !important;
+  color: var(--slate) !important;
+  height: 38px !important;
+}
+
+.cc-form .ant-input:focus,
+.cc-form .ant-input-focused,
+.cc-form .ant-select-focused .ant-select-selector,
+.cc-form .ant-picker-focused {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px var(--blue-light) !important;
+}
+
+.cc-form .ant-input[disabled] {
+  background: var(--slate-100) !important;
+  color: var(--slate-400) !important;
+  cursor: not-allowed !important;
+}
+
+.cc-form .ant-select-selector {
+  align-items: center !important;
+}
+
+.cc-form textarea.ant-input {
+  height: auto !important;
+  padding-top: 10px !important;
+  line-height: 1.6 !important;
+  resize: vertical;
+}
+
+.cc-form .ant-form-item {
+  margin-bottom: 18px;
+}
+
+.cc-form .ant-form-item-explain-error {
+  font-size: 11px;
+}
+
+/* ── Row Grid ── */
+.cc-row-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.cc-row-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* ── Tag Input ── */
+.cc-tag-input {
+  min-height: 38px;
+  padding: 5px 10px;
+  border: 1.5px solid var(--slate-300);
+  border-radius: 8px;
+  background: var(--white);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  cursor: pointer;
+  align-items: center;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.cc-tag-input:hover {
+  border-color: var(--blue);
+}
+
+.cc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--blue-mid);
+}
+
+.cc-tag-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  color: var(--blue);
+}
+
+.cc-tag-placeholder {
+  font-size: 13px;
+  color: var(--slate-400);
+}
+
+.cc-tag-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  border: 1.5px solid var(--slate-300);
+  border-radius: 8px;
+  margin-top: 4px;
+  background: var(--white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.cc-tag-option {
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--slate-700);
+  transition: background 0.1s;
+}
+
+.cc-tag-option:hover {
+  background: var(--slate-100);
+}
+
+/* ── Info Box ── */
+.cc-info-box {
+  padding: 11px 14px;
+  border-radius: 8px;
+  display: flex;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.cc-info-box p {
+  font-size: 12px;
+  color: var(--slate-700);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.cc-info-box.blue {
+  background: var(--blue-light);
+  border: 1px solid var(--blue-mid);
+}
+
+.cc-info-box.amber {
+  background: var(--amber-light);
+  border: 1px solid #fde68a;
+}
+
+/* ── Budget Type Radio Cards ── */
+.cc-budget-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cc-budget-card {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1.5px solid var(--slate-300);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.15s;
+}
+
+.cc-budget-card.selected {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+
+.cc-budget-card-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--slate-300);
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cc-budget-card-radio.selected {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.cc-budget-card-radio-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--white);
+}
+
+.cc-budget-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700);
+  transition: color 0.15s;
+}
+
+.cc-budget-card-label.selected {
+  color: var(--blue);
+}
+
+.cc-budget-card-hint {
+  font-size: 11px;
+  color: var(--slate-400);
+  margin-top: 1px;
+}
+
+/* ── Budget Input with prefix ── */
+.cc-budget-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--slate-300);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cc-budget-input-wrap:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-light);
+}
+
+.cc-budget-prefix {
+  padding: 0 12px;
+  background: var(--slate-100);
+  height: 38px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--slate-500);
+  font-weight: 700;
+  border-right: 1.5px solid var(--slate-300);
+  flex-shrink: 0;
+}
+
+/* ── Duration Summary Box ── */
+.cc-duration-box {
+  border-radius: 10px;
+  border: 1.5px solid var(--slate-200);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.cc-duration-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 16px;
+}
+
+.cc-duration-row:first-child {
+  border-bottom: 1px solid var(--slate-200);
+  background: var(--slate-100);
+}
+
+.cc-duration-row:last-child {
+  background: var(--white);
+}
+
+.cc-duration-label {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  font-weight: 500;
+}
+
+.cc-duration-value-blue {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.cc-duration-value-green {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+/* ── Geo Targeting ── */
+.cc-geo-wrap {
+  border: 1.5px solid var(--slate-200);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--slate-100);
+}
+
+.cc-geo-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.cc-geo-icon-wrap {
+
+  border-radius: 7px;
+  background: var(--blue-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-geo-count-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue);
+  background: var(--blue-light);
+  border: 1px solid var(--blue-mid);
+  border-radius: 20px;
+  padding: 2px 9px;
+}
+
+.cc-geo-mode-toggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cc-geo-mode-btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cc-geo-mode-btn.active {
+  border: 1.5px solid var(--blue);
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.cc-geo-mode-btn.inactive {
+  border: 1.5px solid var(--slate-300);
+  background: var(--white);
+  color: var(--slate-500);
+}
+
+.cc-geo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.cc-geo-sub-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-geo-custom-box {
+  border: 1.5px dashed var(--blue-mid);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--blue-light);
+  margin-bottom: 12px;
+}
+
+.cc-geo-custom-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--blue);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cc-geo-helper {
+  font-size: 11px;
+  color: var(--slate-400);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-geo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cc-geo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--blue-mid);
+}
+
+.cc-geo-empty {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--slate-300);
+  font-size: 12px;
+  color: var(--slate-400);
+  text-align: center;
+}
+
+/* ── Freq Cap / Viewability ── */
+.cc-unit-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-unit-label {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+
+/* ── Step 5 Review ── */
+.cc-review-ready {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--green-light);
+  border-radius: 10px;
+  border: 1.5px solid #86efac;
+  margin-bottom: 22px;
+}
+
+.cc-review-ready-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cc-review-ready-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.cc-review-ready-sub {
+  font-size: 12px;
+  color: #16a34a;
+  margin-top: 2px;
+}
+
+.cc-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cc-review-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slate-400);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cc-review-edit-btn {
+  font-size: 12px;
+  color: var(--blue);
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cc-review-table {
+  border: 1.5px solid var(--slate-200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cc-review-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.cc-review-row:last-child {
+  border-bottom: none;
+}
+
+.cc-review-row-key {
+  font-size: 12px;
+  color: var(--slate-500);
+  font-weight: 500;
+  width: 140px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.cc-review-row-val {
+  font-size: 13px;
+  color: var(--slate);
+  font-weight: 600;
+  word-break: break-word;
+  flex: 1;
+}
+
+/* ── Bottom Bar ── */
+.cc-bottom-bar {
+  background: var(--white);
+  border-top: 1px solid var(--slate-200);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  margin-top: 24px;
+}
+
+.cc-bottom-bar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Ant Button Overrides ── */
+.cc-btn-cancel.ant-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-color: var(--slate-300);
+  color: var(--slate-700);
+}
+
+.cc-btn-back.ant-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-color: var(--slate-300);
+  color: var(--slate-700);
+}
+
+.cc-btn-next.ant-btn {
+  height: 38px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.cc-btn-next.ant-btn:hover {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
+
+.cc-btn-submit.ant-btn {
+  height: 38px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  border: none;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.cc-btn-submit.ant-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #6d28d9) !important;
+  border: none !important;
+}
+
+.cc-btn-submit.ant-btn:disabled {
+  background: var(--slate-400) !important;
+  box-shadow: none !important;
+}
+
+/* ── Ant Select / Datepicker height fix ── */
+.cc-form .ant-select {
+  height: 38px;
+}
+
+.cc-form .ant-picker {
+  width: 100%;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--slate-300);
+  border-radius: 4px;
+}
+
+/* ── Disabled company name input ── */
+.cc-company-name-input.ant-input[disabled] {
+  background: var(--slate-100) !important;
+  color: var(--slate) !important;
+  cursor: not-allowed !important;
+  border-color: var(--slate-200) !important;
+  font-weight: 600;
+}

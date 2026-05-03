@@ -13,8 +13,8 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 // API
-const BASE_URL = "http://127.0.0.1:8000/";
-const SUBMIT_URL = "https://grinch-revocable-cornflake.ngrok-free.dev/create_client/";
+const BASE_URL = "https://grinch-revocable-cornflake.ngrok-free.dev/";
+const SUBMIT_URL = `${BASE_URL}/create_client/`;
 const CHOICES_URL = `${BASE_URL}/get_choices/`;
 
 // Fallback choices
@@ -161,7 +161,6 @@ function PhoneInput({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -173,7 +172,6 @@ function PhoneInput({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Auto-focus search when dropdown opens
   useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 50);
   }, [open]);
@@ -189,31 +187,19 @@ function PhoneInput({
 
   return (
     <div style={{ display: "flex" }}>
-      {/* ── Flag trigger button ── */}
       <div ref={dropdownRef} style={{ position: "relative", flexShrink: 0 }}>
         <button
           type="button"
           onClick={() => { setOpen((o) => !o); setSearch(""); }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            height: 38,
-            padding: "0 8px",
-            border: "1px solid #d9d9d9",
-            borderRight: "none",
-            borderRadius: "6px 0 0 6px",
-            background: "#fafafa",
-            cursor: "pointer",
-            fontSize: 14,
+            display: "flex", alignItems: "center", gap: 6, height: 38,
+            padding: "0 8px", border: "1px solid #d9d9d9", borderRight: "none",
+            borderRadius: "6px 0 0 6px", background: "#fafafa", cursor: "pointer", fontSize: 14,
           }}
         >
           {selectedCountry ? (
-            <img
-              src={selectedCountry.flagUrl}
-              alt={selectedCountry.name}
-              style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }}
-            />
+            <img src={selectedCountry.flagUrl} alt={selectedCountry.name}
+              style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
           ) : (
             <span style={{ fontSize: 16 }}>🌐</span>
           )}
@@ -221,80 +207,40 @@ function PhoneInput({
           <span style={{ fontSize: 10, color: "#999", marginLeft: 2 }}>▼</span>
         </button>
 
-        {/* ── Dropdown ── */}
         {open && (
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(100% + 4px)",
-              left: 0,
-              zIndex: 9999,
-              width: 300,
-              background: "#fff",
-              border: "1px solid #e0e0e0",
-              borderRadius: 8,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-              overflow: "hidden",
-            }}
-          >
-            {/* Search — inside dropdown only, never leaks into trigger */}
+          <div style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 9999,
+            width: 300, background: "#fff", border: "1px solid #e0e0e0",
+            borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", overflow: "hidden",
+          }}>
             <div style={{ padding: "8px 10px", borderBottom: "1px solid #f0f0f0" }}>
               <input
-                ref={searchRef}
-                type="text"
-                placeholder="Search country or code..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                ref={searchRef} type="text" placeholder="Search country or code..."
+                value={search} onChange={(e) => setSearch(e.target.value)}
                 style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  border: "1px solid #d9d9d9",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box",
+                  width: "100%", padding: "6px 10px", border: "1px solid #d9d9d9",
+                  borderRadius: 6, fontSize: 13, outline: "none", boxSizing: "border-box",
                 }}
               />
             </div>
-
-            {/* Country list */}
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
               {filtered.length === 0 ? (
-                <div style={{ padding: "12px 16px", color: "#999", fontSize: 13 }}>
-                  No results found
-                </div>
+                <div style={{ padding: "12px 16px", color: "#999", fontSize: 13 }}>No results found</div>
               ) : (
                 filtered.map((c) => (
                   <div
                     key={c.cca2}
-                    onClick={() => {
-                      onCountryChange(c.code, c.cca2);
-                      setOpen(false);
-                      setSearch("");
-                    }}
+                    onClick={() => { onCountryChange(c.code, c.cca2); setOpen(false); setSearch(""); }}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      fontSize: 13,
+                      display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
+                      cursor: "pointer", fontSize: 13,
                       background: c.cca2 === phone_cca2 ? "#f0f7ff" : "transparent",
                     }}
-                    onMouseEnter={(e) =>
-                    (e.currentTarget.style.background =
-                      c.cca2 === phone_cca2 ? "#e0f0ff" : "#f5f5f5")
-                    }
-                    onMouseLeave={(e) =>
-                    (e.currentTarget.style.background =
-                      c.cca2 === phone_cca2 ? "#f0f7ff" : "transparent")
-                    }
+                    onMouseEnter={(e) => (e.currentTarget.style.background = c.cca2 === phone_cca2 ? "#e0f0ff" : "#f5f5f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = c.cca2 === phone_cca2 ? "#f0f7ff" : "transparent")}
                   >
-                    <img
-                      src={c.flagUrl}
-                      alt={c.name}
-                      style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }}
-                    />
+                    <img src={c.flagUrl} alt={c.name}
+                      style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
                     <span style={{ flex: 1 }}>{c.name}</span>
                     <span style={{ color: "#888", fontWeight: 500 }}>{c.code}</span>
                   </div>
@@ -305,22 +251,12 @@ function PhoneInput({
         )}
       </div>
 
-      {/* ── Phone number text input ── */}
       <input
-        type="tel"
-        placeholder="Enter phone number"
-        value={phone}
+        type="tel" placeholder="Enter phone number" value={phone}
         onChange={(e) => onPhoneChange(e.target.value)}
         style={{
-          flex: 1,
-          height: 38,
-          padding: "0 8px",
-          border: "1px solid #d9d9d9",
-          borderRadius: "0 6px 6px 0",
-          fontSize: 14,
-          outline: "none",
-          background: "#fff",
-          color: "#000",
+          flex: 1, height: 38, padding: "0 8px", border: "1px solid #d9d9d9",
+          borderRadius: "0 6px 6px 0", fontSize: 14, outline: "none", background: "#fff", color: "#000",
         }}
       />
     </div>
@@ -351,7 +287,6 @@ function makeAddress(): AddressRow {
 const TABS = [
   { id: "basic", label: "Basic Information", emoji: "🪪" },
   { id: "billing", label: "Billing & Commercials", emoji: "💳" },
-  // { id: "operational", label: "Operational Setup", emoji: "⚙️" },
   { id: "contacts", label: "Contacts & Addresses", emoji: "👤" },
   { id: "review", label: "Review & Summary", emoji: "✅" },
 ];
@@ -383,9 +318,7 @@ function AddNewSelect({ value, onChange, options, setOptions, placeholder }: Add
   if (isAdding) {
     return (
       <Input
-        autoFocus
-        placeholder="Type and press Enter to save"
-        value={newValue}
+        autoFocus placeholder="Type and press Enter to save" value={newValue}
         suffix={<span style={{ fontSize: 11, color: "#aaa" }}>↵ Enter</span>}
         onChange={(e) => setNewValue(e.target.value)}
         onKeyDown={(e) => {
@@ -399,11 +332,8 @@ function AddNewSelect({ value, onChange, options, setOptions, placeholder }: Add
 
   return (
     <Select
-      placeholder={placeholder}
-      allowClear
-      style={{ width: "100%" }}
-      value={value || undefined}
-      onChange={(v) => onChange(v ?? "")}
+      placeholder={placeholder} allowClear style={{ width: "100%" }}
+      value={value || undefined} onChange={(v) => onChange(v ?? "")}
       dropdownRender={(menu) => (
         <>
           {menu}
@@ -412,17 +342,11 @@ function AddNewSelect({ value, onChange, options, setOptions, placeholder }: Add
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setIsAdding(true)}
             style={{
-              padding: "8px 12px",
-              cursor: "pointer",
-              color: "#4f46e5",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
+              padding: "8px 12px", cursor: "pointer", color: "#4f46e5",
+              fontSize: 13, display: "flex", alignItems: "center", gap: 6,
             }}
           >
-            <PlusOutlined />
-            Add new
+            <PlusOutlined /> Add new
           </div>
         </>
       )}
@@ -443,7 +367,6 @@ export default function Onboarding() {
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // ── Country list for phone picker ──
   const [countries, setCountries] = useState<Country[]>([]);
 
   useEffect(() => {
@@ -453,10 +376,8 @@ export default function Onboarding() {
         const seen = new Set<string>();
         const list: Country[] = data
           .map((c: any) => ({
-            name: c.name.common,
-            cca2: c.cca2,
-            flagUrl: c.flags?.png ?? "",
-            code: getDialCode(c.idd),
+            name: c.name.common, cca2: c.cca2,
+            flagUrl: c.flags?.png ?? "", code: getDialCode(c.idd),
           }))
           .filter((c: Country) => {
             if (!c.code) return false;
@@ -472,15 +393,7 @@ export default function Onboarding() {
   // ── "Add new" option lists ──
   const [agencyTypes, setAgencyTypes] = useState<string[]>(DEFAULT_CHOICES.agency_types);
   const [placesOfSupply, setPlacesOfSupply] = useState<string[]>(DEFAULT_CHOICES.place_of_supply);
-  // const [paymentTermsList, setPaymentTermsList] = useState<string[]>(DEFAULT_CHOICES.payment_terms);
   const [taxTypes, setTaxTypes] = useState<string[]>(DEFAULT_CHOICES.tax_types);
-  // const [markets, setMarkets] = useState<string[]>(DEFAULT_CHOICES.markets);
-  // const [platforms, setPlatforms] = useState<string[]>(DEFAULT_CHOICES.platforms);
-  // const [inventoryTypes, setInventoryTypes] = useState<string[]>(DEFAULT_CHOICES.inventory_types);
-  // const [campaignObjectives, setCampaignObjectives] = useState<string[]>(DEFAULT_CHOICES.campaign_objectives);
-  // const [languages, setLanguages] = useState<string[]>(DEFAULT_CHOICES.languages);
-  // const [adFormats, setAdFormats] = useState<string[]>(DEFAULT_CHOICES.ad_formats);
-  // const [timezones, setTimezones] = useState<string[]>(DEFAULT_CHOICES.timezones);
   const [clientTypes, setClientTypes] = useState<string[]>(DEFAULT_CHOICES.client_types);
   const [priorityLevels, setPriorityLevels] = useState<string[]>(DEFAULT_CHOICES.priority_levels);
   const [riskLevels, setRiskLevels] = useState<string[]>(DEFAULT_CHOICES.risk_levels);
@@ -498,7 +411,7 @@ export default function Onboarding() {
     country: "", state: "", city: "", zipcode: "", cin_number: "", vast_number: "",
     place_of_supply: "", is_active: true,
     credit_period_days: "",
-    payment_terms: "15 Days", payment_type: "Prepaid", tax_type: "", tds_applicable: "",
+    payment_terms: "Net 0 day", payment_type: "Prepaid", tax_type: "", tds_applicable: "",
     tds_section: "", advance_amount: "", credit_limit: "", outstanding_limit: "",
     billing_contact: "",
     default_market: "", default_platform: "", inventory_type: "",
@@ -518,15 +431,7 @@ export default function Onboarding() {
         setChoices((p) => ({ ...p, ...data }));
         if (data.agency_types) setAgencyTypes(data.agency_types);
         if (data.place_of_supply) setPlacesOfSupply(data.place_of_supply);
-        // if (data.payment_terms) setPaymentTermsList(data.payment_terms);
         if (data.tax_types) setTaxTypes(data.tax_types);
-        // if (data.markets) setMarkets(data.markets);
-        // if (data.platforms) setPlatforms(data.platforms);
-        // if (data.inventory_types) setInventoryTypes(data.inventory_types);
-        // if (data.campaign_objectives) setCampaignObjectives(data.campaign_objectives);
-        // if (data.languages) setLanguages(data.languages);
-        // if (data.ad_formats) setAdFormats(data.ad_formats);
-        //         if (data.timezones) setTimezones(data.timezones);
         if (data.client_types) setClientTypes(data.client_types);
         if (data.priority_levels) setPriorityLevels(data.priority_levels);
         if (data.risk_levels) setRiskLevels(data.risk_levels);
@@ -554,6 +459,7 @@ export default function Onboarding() {
   const updateAddress = (id: number, k: keyof AddressRow, v: string) =>
     setAddresses((p) => p.map((a) => (a.id === id ? { ...a, [k]: v } : a)));
 
+  // ✅ FIXED: buildPayload — contacts & addresses sent as arrays, no naming conflict
   const buildPayload = () => {
     const clientFields = {
       reporting_id: company.reporting_id,
@@ -582,25 +488,14 @@ export default function Onboarding() {
       payment_terms: company.payment_terms,
       payment_type: company.payment_type,
       tax_type: company.tax_type,
-      tds_applicable: company.tds_applicable === "Yes" ? true : false,
+      tds_applicable: company.tds_applicable === "Yes",
       tds_section: company.tds_section,
       billing_currency: company.billing_currency,
-      advance_amount: company.advance_amount,
-      credit_limit: company.credit_limit,
-      outstanding_limit: company.outstanding_limit,
+      advance_amount: parseFloat(company.advance_amount) || null,
+      credit_limit: parseFloat(company.credit_limit) || null,
+      outstanding_limit: parseFloat(company.outstanding_limit) || null,
       billing_contact: company.billing_contact,
     };
-
-    // const operational = {
-    //   default_market: company.default_market,
-    //   default_platform: company.default_platform,
-    //   inventory_type: company.inventory_type,
-    //   campaign_objective: company.campaign_objective,
-    //   language: company.language,
-    //   audience_focus: company.audience_focus,
-    //   ad_formats: company.ad_formats,
-    //   timezone: company.timezone,
-    // };
 
     const ownership = {
       account_manager: company.account_manager,
@@ -620,9 +515,10 @@ export default function Onboarding() {
       additional_tags: company.additional_tags,
     };
 
+    // ✅ FIX 1: Renamed to contactsPayload to avoid clash with state variable
     const contactsPayload = contacts.map((c) => ({
       name: c.contact_name,
-      phone: `${company.phone_code}${c.contact_phone}`,
+      phone: c.contact_phone,
       email: c.contact_email,
       designation: c.contact_designation,
       country: c.contact_country,
@@ -631,6 +527,7 @@ export default function Onboarding() {
       address_line2: c.contact_address_2,
     }));
 
+    // ✅ FIX 2: Renamed to addressesPayload to avoid clash with state variable
     const addressesPayload = addresses.map((a, idx) => ({
       address_line1: a.company_address_line1,
       address_line2: a.company_address_line2,
@@ -638,7 +535,6 @@ export default function Onboarding() {
       zipcode: a.company_zipcode,
       is_primary: idx === 0, // ✅ first address is primary
     }));
-
 
     const jsonBody = {
       ...clientFields,
@@ -649,17 +545,12 @@ export default function Onboarding() {
       addresses: addressesPayload, // ✅ FIX 4: sent as array
     };
 
+    // ✅ FIX 5: Read digital_signature from contacts state (not from contactsPayload)
     const signatureFile = contacts[0]?.digital_signature;
     if (signatureFile) {
       const fd = new FormData();
       fd.append("data", JSON.stringify(jsonBody));
-      // ✅ Loop all contacts and append signatures with correct keys
-      contacts.forEach((contact, index) => {
-        if (contact.digital_signature) {
-          fd.append(`contact_signature_${index}`, contact.digital_signature);
-        }
-      });
-
+      fd.append("digital", signatureFile);
       return { body: fd, headers: {} as Record<string, string> };
     }
 
@@ -713,19 +604,11 @@ export default function Onboarding() {
       if (v === "Prepaid") {
         sf("payment_terms", "Net 0 day");
         sf("credit_period_days", "0");
-        // ✅ Also update Ant Design form internal state
-        form.setFieldsValue({
-          payment_terms: "Net 0 day",
-          credit_period_days: "0"
-        });
+        form.setFieldsValue({ payment_terms: "Net 0 day", credit_period_days: "0" });
       } else if (v === "Postpaid") {
         sf("payment_terms", "");
         sf("credit_period_days", "");
-        // ✅ Clear Ant Design form internal state
-        form.setFieldsValue({
-          payment_terms: undefined,
-          credit_period_days: ""
-        });
+        form.setFieldsValue({ payment_terms: undefined, credit_period_days: "" });
       }
     };
 
@@ -735,7 +618,6 @@ export default function Onboarding() {
         const match = v.match(/\d+/);
         const days = match ? match[0] : "0";
         sf("credit_period_days", days);
-        // ✅ Also update Ant Design form internal state
         form.setFieldsValue({ credit_period_days: days });
       }
     };
@@ -746,58 +628,35 @@ export default function Onboarding() {
 
           <Form.Item label="Payment Type" name="payment_type"
             rules={[{ required: true, message: "Payment type is required" }]}>
-            <Select
-              placeholder="Select"
-              allowClear
-              style={{ width: "100%" }}
+            <Select placeholder="Select" allowClear style={{ width: "100%" }}
               value={company.payment_type || undefined}
               onChange={handlePaymentTypeChange}
-              options={toOpts(choices.payment_types)}
-            />
+              options={toOpts(choices.payment_types)} />
           </Form.Item>
 
           <Form.Item label="Payment Terms" name="payment_terms"
             rules={[{ required: true, message: "Payment terms is required" }]}>
             <Select
               placeholder={!company.payment_type ? "Select payment type first" : "Select"}
-              allowClear
-              style={{ width: "100%" }}
+              allowClear style={{ width: "100%" }}
               value={company.payment_terms || undefined}
               onChange={handlePaymentTermsChange}
               disabled={!isPostpaid}
-              options={
-                isPostpaid
-                  ? toOpts(choices.payment_terms)
-                  : [{ value: "Net 0 day", label: "Net 0 day" }]
-              }
+              options={isPostpaid ? toOpts(choices.payment_terms) : [{ value: "Net 0 day", label: "Net 0 day" }]}
             />
           </Form.Item>
 
           <Form.Item label="Credit Period (Days)" name="credit_period_days"
             rules={[{ required: true, message: "Credit period is required" }]}>
-            <Input
-              type="number"
-              placeholder="Auto-filled"
-              value={company.credit_period_days}
-              disabled={true}
-              style={{
-                backgroundColor: "#f5f5f5",
-                color: "#333",
-                cursor: "not-allowed",
-                fontWeight: 500
-              }}
-            />
+            <Input type="number" placeholder="Auto-filled"
+              value={company.credit_period_days} disabled={true}
+              style={{ backgroundColor: "#f5f5f5", color: "#333", cursor: "not-allowed", fontWeight: 500 }} />
           </Form.Item>
 
           <Form.Item label="Tax Type" name="tax_type"
             rules={[{ required: true, message: "Tax type is required" }]}>
-            <AddNewSelect
-              value={company.tax_type}
-              onChange={(v) => sf("tax_type", v)}
-              options={taxTypes}
-              setOptions={setTaxTypes}
-              placeholder="Select tax type"
-            />
+            <AddNewSelect value={company.tax_type} onChange={(v) => sf("tax_type", v)}
+              options={taxTypes} setOptions={setTaxTypes} placeholder="Select tax type" />
           </Form.Item>
 
           <Form.Item label="TDS Applicable" name="tds_applicable"
@@ -810,14 +669,12 @@ export default function Onboarding() {
 
           <Form.Item label="TDS Section" name="tds_section"
             rules={[{ required: true, message: "TDS section is required" }]}>
-            <Input placeholder="e.g. 194J"
-              value={company.tds_section}
+            <Input placeholder="e.g. 194J" value={company.tds_section}
               onChange={(e) => sf("tds_section", e.target.value)} />
           </Form.Item>
 
           <Form.Item label="Currency">
-            <Select style={{ width: "100%" }}
-              value={company.billing_currency}
+            <Select style={{ width: "100%" }} value={company.billing_currency}
               onChange={(v) => sf("billing_currency", v)}
               options={choices.billing_currencies.map((c) => ({
                 value: c, label: c === "INR" ? "INR (₹)" : c,
@@ -826,34 +683,26 @@ export default function Onboarding() {
 
           <Form.Item label="Advance / Security Deposit" name="advance_amount"
             rules={[{ required: true, message: "Advance amount is required" }]}>
-            <Input type="number" placeholder="Enter amount"
-              value={company.advance_amount}
+            <Input type="number" placeholder="Enter amount" value={company.advance_amount}
               onChange={(e) => sf("advance_amount", e.target.value)} />
           </Form.Item>
 
           <Form.Item label="Credit Limit" name="credit_limit"
             rules={[{ required: true, message: "Credit limit is required" }]}>
-            <Input type="number" placeholder="Enter credit limit"
-              value={company.credit_limit}
+            <Input type="number" placeholder="Enter credit limit" value={company.credit_limit}
               onChange={(e) => sf("credit_limit", e.target.value)} />
           </Form.Item>
 
           <Form.Item label="Outstanding Limit Allowed" name="outstanding_limit"
             rules={[{ required: true, message: "Outstanding limit is required" }]}>
-            <Input type="number" placeholder="Enter outstanding limit"
-              value={company.outstanding_limit}
+            <Input type="number" placeholder="Enter outstanding limit" value={company.outstanding_limit}
               onChange={(e) => sf("outstanding_limit", e.target.value)} />
           </Form.Item>
 
           <Form.Item label="Billing Contact (Finance)" name="billing_contact"
             rules={[{ required: true, message: "Billing contact is required" }]}>
-            <AddNewSelect
-              value={company.billing_contact}
-              onChange={(v) => sf("billing_contact", v)}
-              options={billingContacts}
-              setOptions={setBillingContacts}
-              placeholder="Select contact"
-            />
+            <AddNewSelect value={company.billing_contact} onChange={(v) => sf("billing_contact", v)}
+              options={billingContacts} setOptions={setBillingContacts} placeholder="Select contact" />
           </Form.Item>
 
         </div>
@@ -861,101 +710,9 @@ export default function Onboarding() {
     );
   };
 
-  // const OperationalForm = () => (
-  //   <Form form={form} layout="vertical" className="onboarding-form">
-  //     <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
-
-  //       <Form.Item label="Default Markets (Geo)" name="default_market"
-  //         rules={[{ required: true, message: "Default market is required" }]}>
-  //         <AddNewSelect
-  //           value={company.default_market}
-  //           onChange={(v) => sf("default_market", v)}
-  //           options={markets}
-  //           setOptions={setMarkets}
-  //           placeholder="Select markets"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Default Platforms" name="default_platform"
-  //         rules={[{ required: true, message: "Default platform is required" }]}>
-  //         <AddNewSelect
-  //           value={company.default_platform}
-  //           onChange={(v) => sf("default_platform", v)}
-  //           options={platforms}
-  //           setOptions={setPlatforms}
-  //           placeholder="Select platforms"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Preferred Inventory Type" name="inventory_type"
-  //         rules={[{ required: true, message: "Inventory type is required" }]}>
-  //         <AddNewSelect
-  //           value={company.inventory_type}
-  //           onChange={(v) => sf("inventory_type", v)}
-  //           options={inventoryTypes}
-  //           setOptions={setInventoryTypes}
-  //           placeholder="Select inventory type"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Default Campaign Objective" name="campaign_objective"
-  //         rules={[{ required: true, message: "Campaign objective is required" }]}>
-  //         <AddNewSelect
-  //           value={company.campaign_objective}
-  //           onChange={(v) => sf("campaign_objective", v)}
-  //           options={campaignObjectives}
-  //           setOptions={setCampaignObjectives}
-  //           placeholder="Select objective"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Default Language" name="language"
-  //         rules={[{ required: true, message: "Language is required" }]}>
-  //         <AddNewSelect
-  //           value={company.language}
-  //           onChange={(v) => sf("language", v)}
-  //           options={languages}
-  //           setOptions={setLanguages}
-  //           placeholder="Select language"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Ethnicity / Audience Focus" name="audience_focus"
-  //         rules={[{ required: true, message: "Audience focus is required" }]}>
-  //         <Input placeholder="Enter audience focus"
-  //           value={company.audience_focus}
-  //           onChange={(e) => sf("audience_focus", e.target.value)} />
-  //       </Form.Item>
-
-  //       <Form.Item label="Default Ad Formats" name="ad_formats"
-  //         rules={[{ required: true, message: "Ad formats is required" }]}>
-  //         <AddNewSelect
-  //           value={company.ad_formats}
-  //           onChange={(v) => sf("ad_formats", v)}
-  //           options={adFormats}
-  //           setOptions={setAdFormats}
-  //           placeholder="Select formats"
-  //         />
-  //       </Form.Item>
-
-  //       <Form.Item label="Time Zone" name="timezone"
-  //         rules={[{ required: true, message: "Timezone is required" }]}>
-  //         <AddNewSelect
-  //           value={company.timezone}
-  //           onChange={(v) => sf("timezone", v)}
-  //           options={timezones}
-  //           setOptions={setTimezones}
-  //           placeholder="Select time zone"
-  //         />
-  //       </Form.Item>
-
-  //     </div>
-  //   </Form>
-  // );
-
   const ContactsSection = () => (
     <FormCard icon="👤" title="Company Contacts"
-      subtitle="Add one or more contacts (first contact submitted to server)"
+      subtitle="Add one or more contacts (all contacts submitted to server)"
       action={
         <Button type="primary" icon={<PlusOutlined />} onClick={addContact}
           className="ob-btn-default text-indigo-600 border-indigo-300"
@@ -972,7 +729,7 @@ export default function Onboarding() {
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Contact #{idx + 1}
-              {idx > 0 && <span className="ml-2 text-amber-500 font-normal normal-case">(client-side only)</span>}
+              {idx === 0 && <span className="ml-2 text-green-500 font-normal normal-case">(Primary)</span>}
             </span>
             <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeContact(c.id)} />
           </div>
@@ -982,21 +739,15 @@ export default function Onboarding() {
                 <Input placeholder="Full name" value={c.contact_name}
                   onChange={(e) => updateContact(c.id, "contact_name", e.target.value)} />
               </Form.Item>
-              <Form.Item
-                label="Phone Number"
-                name="phone"
-                rules={[{ required: true, message: "Phone number is required" }]}
-                getValueProps={() => ({ value: company.phone })}  // ← tell form the current value
-              >
+
+              {/* ✅ FIX: Contact phone bound to contact state, not company state */}
+              <Form.Item label="Phone Number" required>
                 <PhoneInput
-                  phone={company.phone}
+                  phone={c.contact_phone}
                   phone_code={company.phone_code}
                   phone_cca2={company.phone_cca2}
                   countries={countries}
-                  onPhoneChange={(v) => {
-                    sf("phone", v);
-                    form.setFieldValue("phone", v);  // ← sync to Ant Design form
-                  }}
+                  onPhoneChange={(v) => updateContact(c.id, "contact_phone", v)}
                   onCountryChange={(code, cca2) => {
                     sf("phone_code", code);
                     sf("phone_cca2", cca2);
@@ -1049,7 +800,7 @@ export default function Onboarding() {
 
   const AddressesSection = () => (
     <FormCard icon="📍" title="Company Addresses"
-      subtitle="Billing, shipping or registered locations (first address submitted to server)"
+      subtitle="Billing, shipping or registered locations (all addresses submitted to server)"
       action={
         <Button type="primary" icon={<PlusOutlined />} onClick={addAddress}
           className="ob-btn-default text-indigo-600 border-indigo-300"
@@ -1066,7 +817,7 @@ export default function Onboarding() {
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Address #{idx + 1} · Registered
-              {idx > 0 && <span className="ml-2 text-amber-500 font-normal normal-case">(client-side only)</span>}
+              {idx === 0 && <span className="ml-2 text-green-500 font-normal normal-case">(Primary)</span>}
             </span>
             <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeAddress(a.id)} />
           </div>
@@ -1165,63 +916,53 @@ export default function Onboarding() {
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
 
                         <Form.Item label="Client ID (Auto)">
-                          <Input disabled value="CLT-2024-00001" />
+                          <Input disabled value="CLT-2026-00001" />
                         </Form.Item>
 
                         <Form.Item label="Reporting ID (Internal)" name="reporting_id"
                           rules={[{ required: true, message: "Reporting ID is required" }]}>
-                          <Input placeholder="Enter reporting ID"
-                            value={company.reporting_id}
+                          <Input placeholder="Enter reporting ID" value={company.reporting_id}
                             onChange={(e) => sf("reporting_id", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Company Name" name="company_name"
                           rules={[{ required: true, message: "Company name is required" }]}>
-                          <Input placeholder="Enter company name"
-                            value={company.company_name}
+                          <Input placeholder="Enter company name" value={company.company_name}
                             onChange={(e) => sf("company_name", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Company Type" name="company_type"
                           rules={[{ required: true, message: "Company type is required" }]}>
-                          <Input placeholder="Enter company type"
-                            value={company.company_type}
+                          <Input placeholder="Enter company type" value={company.company_type}
                             onChange={(e) => sf("company_type", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Agency Type" name="agency_type"
                           rules={[{ required: true, message: "Agency type is required" }]}>
-                          <AddNewSelect
-                            value={company.agency_type}
-                            onChange={(v) => sf("agency_type", v)}
-                            options={agencyTypes}
-                            setOptions={setAgencyTypes}
-                            placeholder="Select agency type"
-                          />
+                          <AddNewSelect value={company.agency_type} onChange={(v) => sf("agency_type", v)}
+                            options={agencyTypes} setOptions={setAgencyTypes} placeholder="Select agency type" />
                         </Form.Item>
 
                         <Form.Item label="Brand / Parent Company">
-                          <Input placeholder="Enter brand / parent company"
-                            value={company.brand}
+                          <Input placeholder="Enter brand / parent company" value={company.brand}
                             onChange={(e) => sf("brand", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Website" name="website"
-                          rules={[{
-                            required: true, message: "Website is required",
-                          }, {
-                            pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/,
-                            message: "Enter a valid URL starting with http:// or https://",
-                          }]}>
-                          <Input placeholder="https://"
-                            value={company.website}
+                          rules={[
+                            { required: true, message: "Website is required" },
+                            {
+                              pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/,
+                              message: "Enter a valid URL starting with http:// or https://",
+                            },
+                          ]}>
+                          <Input placeholder="https://" value={company.website}
                             onChange={(e) => sf("website", e.target.value)} />
                         </Form.Item>
 
-                        {/* ✅ UPDATED: Custom phone picker — flag + dial code, no text leak in trigger */}
+                        {/* ✅ FIX: form.setFieldValue syncs AntD form state so validation clears */}
                         <Form.Item label="Phone Number" name="phone"
-                          rules={[{ required: true, message: "Phone number is required" }]}
-                          getValueProps={() => ({ value: company.phone })} >
+                          rules={[{ required: true, message: "Phone number is required" }]}>
                           <PhoneInput
                             phone={company.phone}
                             phone_code={company.phone_code}
@@ -1229,7 +970,7 @@ export default function Onboarding() {
                             countries={countries}
                             onPhoneChange={(v) => {
                               sf("phone", v);
-                              form.setFieldValue("phone", v);  // ← ADD THIS LINE
+                              form.setFieldValue("phone", v); // ✅ syncs AntD validation
                             }}
                             onCountryChange={(code, cca2) => {
                               sf("phone_code", code);
@@ -1243,14 +984,12 @@ export default function Onboarding() {
                             { required: true, message: "Email is required" },
                             { type: "email", message: "Enter a valid email address" },
                           ]}>
-                          <Input placeholder="Enter email address"
-                            value={company.email}
+                          <Input placeholder="Enter email address" value={company.email}
                             onChange={(e) => sf("email", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Billing Currency">
-                          <Select style={{ width: "100%" }}
-                            value={company.billing_currency}
+                          <Select style={{ width: "100%" }} value={company.billing_currency}
                             onChange={(v) => sf("billing_currency", v)}
                             options={choices.billing_currencies.map((c) => ({
                               value: c, label: c === "INR" ? "INR (₹)" : c,
@@ -1260,14 +999,12 @@ export default function Onboarding() {
                         <Form.Item label="Address Line 1" name="address_line1"
                           className="md:col-span-2"
                           rules={[{ required: true, message: "Address line 1 is required" }]}>
-                          <Input placeholder="Enter address line 1"
-                            value={company.address_line1}
+                          <Input placeholder="Enter address line 1" value={company.address_line1}
                             onChange={(e) => sf("address_line1", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Address Line 2" className="md:col-span-2">
-                          <Input placeholder="Enter address line 2"
-                            value={company.address_line2}
+                          <Input placeholder="Enter address line 2" value={company.address_line2}
                             onChange={(e) => sf("address_line2", e.target.value)} />
                         </Form.Item>
 
@@ -1289,41 +1026,34 @@ export default function Onboarding() {
 
                         <Form.Item label="City" name="city"
                           rules={[{ required: true, message: "City is required" }]}>
-                          <Input placeholder="Enter city"
-                            value={company.city}
+                          <Input placeholder="Enter city" value={company.city}
                             onChange={(e) => sf("city", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Zip Code" name="zipcode"
                           rules={[{ required: true, message: "Zip code is required" }]}>
-                          <Input type="number" placeholder="Enter pin / zip code"
-                            value={company.zipcode}
+                          <Input type="number" placeholder="Enter pin / zip code" value={company.zipcode}
                             onChange={(e) => sf("zipcode", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="CIN Number" name="cin_number"
                           rules={[{ required: true, message: "CIN number is required" }]}>
-                          <Input placeholder="Enter CIN number"
-                            value={company.cin_number}
+                          <Input placeholder="Enter CIN number" value={company.cin_number}
                             onChange={(e) => sf("cin_number", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Vast Number" name="vast_number"
                           rules={[{ required: true, message: "Vast number is required" }]}>
-                          <Input placeholder="Enter vast number"
-                            value={company.vast_number}
+                          <Input placeholder="Enter vast number" value={company.vast_number}
                             onChange={(e) => sf("vast_number", e.target.value)} />
                         </Form.Item>
 
                         <Form.Item label="Place of Supply" name="place_of_supply"
                           rules={[{ required: true, message: "Place of supply is required" }]}>
-                          <AddNewSelect
-                            value={company.place_of_supply}
+                          <AddNewSelect value={company.place_of_supply}
                             onChange={(v) => sf("place_of_supply", v)}
-                            options={placesOfSupply}
-                            setOptions={setPlacesOfSupply}
-                            placeholder="Select place of supply"
-                          />
+                            options={placesOfSupply} setOptions={setPlacesOfSupply}
+                            placeholder="Select place of supply" />
                         </Form.Item>
 
                         <Form.Item label="Is Active">
@@ -1344,10 +1074,6 @@ export default function Onboarding() {
                     <BillingForm />
                   </FormCard>
 
-                  {/* <FormCard icon="⚙️" title="Operational Setup">
-                    <OperationalForm />
-                  </FormCard> */}
-
                   <ContactsSection />
                   <AddressesSection />
 
@@ -1357,46 +1083,34 @@ export default function Onboarding() {
 
                         <Form.Item label="Account Manager" name="account_manager"
                           rules={[{ required: true, message: "Account manager is required" }]}>
-                          <AddNewSelect
-                            value={company.account_manager}
+                          <AddNewSelect value={company.account_manager}
                             onChange={(v) => sf("account_manager", v)}
-                            options={accountManagers}
-                            setOptions={setAccountManagers}
-                            placeholder="Select account manager"
-                          />
+                            options={accountManagers} setOptions={setAccountManagers}
+                            placeholder="Select account manager" />
                         </Form.Item>
 
                         <Form.Item label="Sales Owner" name="sales_owner"
                           rules={[{ required: true, message: "Sales owner is required" }]}>
-                          <AddNewSelect
-                            value={company.sales_owner}
+                          <AddNewSelect value={company.sales_owner}
                             onChange={(v) => sf("sales_owner", v)}
-                            options={salesOwners}
-                            setOptions={setSalesOwners}
-                            placeholder="Select sales owner"
-                          />
+                            options={salesOwners} setOptions={setSalesOwners}
+                            placeholder="Select sales owner" />
                         </Form.Item>
 
                         <Form.Item label="Campaign Manager" name="campaign_manager"
                           rules={[{ required: true, message: "Campaign manager is required" }]}>
-                          <AddNewSelect
-                            value={company.campaign_manager}
+                          <AddNewSelect value={company.campaign_manager}
                             onChange={(v) => sf("campaign_manager", v)}
-                            options={campaignManagers}
-                            setOptions={setCampaignManagers}
-                            placeholder="Select campaign manager"
-                          />
+                            options={campaignManagers} setOptions={setCampaignManagers}
+                            placeholder="Select campaign manager" />
                         </Form.Item>
 
                         <Form.Item label="Finance Owner" name="finance_owner"
                           rules={[{ required: true, message: "Finance owner is required" }]}>
-                          <AddNewSelect
-                            value={company.finance_owner}
+                          <AddNewSelect value={company.finance_owner}
                             onChange={(v) => sf("finance_owner", v)}
-                            options={financeOwners}
-                            setOptions={setFinanceOwners}
-                            placeholder="Select finance owner"
-                          />
+                            options={financeOwners} setOptions={setFinanceOwners}
+                            placeholder="Select finance owner" />
                         </Form.Item>
 
                       </div>
@@ -1409,52 +1123,39 @@ export default function Onboarding() {
 
                         <Form.Item label="Client Type" name="client_type"
                           rules={[{ required: true, message: "Client type is required" }]}>
-                          <AddNewSelect
-                            value={company.client_type}
+                          <AddNewSelect value={company.client_type}
                             onChange={(v) => sf("client_type", v)}
-                            options={clientTypes}
-                            setOptions={setClientTypes}
-                            placeholder="Select type"
-                          />
+                            options={clientTypes} setOptions={setClientTypes}
+                            placeholder="Select type" />
                         </Form.Item>
 
                         <Form.Item label="Priority Level" name="priority"
                           rules={[{ required: true, message: "Priority level is required" }]}>
-                          <AddNewSelect
-                            value={company.priority}
+                          <AddNewSelect value={company.priority}
                             onChange={(v) => sf("priority", v)}
-                            options={priorityLevels}
-                            setOptions={setPriorityLevels}
-                            placeholder="Select priority"
-                          />
+                            options={priorityLevels} setOptions={setPriorityLevels}
+                            placeholder="Select priority" />
                         </Form.Item>
 
                         <Form.Item label="Risk Level" name="risk_level"
                           rules={[{ required: true, message: "Risk level is required" }]}>
-                          <AddNewSelect
-                            value={company.risk_level}
+                          <AddNewSelect value={company.risk_level}
                             onChange={(v) => sf("risk_level", v)}
-                            options={riskLevels}
-                            setOptions={setRiskLevels}
-                            placeholder="Select risk level"
-                          />
+                            options={riskLevels} setOptions={setRiskLevels}
+                            placeholder="Select risk level" />
                         </Form.Item>
 
                         <Form.Item label="Payment Behavior" name="payment_behavior"
                           rules={[{ required: true, message: "Payment behavior is required" }]}>
-                          <AddNewSelect
-                            value={company.payment_behavior}
+                          <AddNewSelect value={company.payment_behavior}
                             onChange={(v) => sf("payment_behavior", v)}
-                            options={paymentBehaviors}
-                            setOptions={setPaymentBehaviors}
-                            placeholder="Select behavior"
-                          />
+                            options={paymentBehaviors} setOptions={setPaymentBehaviors}
+                            placeholder="Select behavior" />
                         </Form.Item>
 
                         <Form.Item label="Avg Response Time (Days)" name="avg_response_time"
                           rules={[{ required: true, message: "Avg response time is required" }]}>
-                          <Input placeholder="Enter average days"
-                            value={company.avg_response_time}
+                          <Input placeholder="Enter average days" value={company.avg_response_time}
                             onChange={(e) => sf("avg_response_time", e.target.value)} />
                         </Form.Item>
 
@@ -1465,8 +1166,7 @@ export default function Onboarding() {
                         <Form.Item label="Notes" name="notes"
                           className="md:col-span-2"
                           rules={[{ required: true, message: "Notes is required" }]}>
-                          <Input placeholder="Enter notes about client"
-                            value={company.notes}
+                          <Input placeholder="Enter notes about client" value={company.notes}
                             onChange={(e) => sf("notes", e.target.value)} />
                         </Form.Item>
 
@@ -1542,16 +1242,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* ── TAB 3: OPERATIONAL SETUP ── */}
-              {/* {activeTab === "operational" && (
-                <div className="space-y-5">
-                  <FormCard icon="⚙️" title="Operational Setup">
-                    <OperationalForm />
-                  </FormCard>
-                </div>
-              )} */}
-
-              {/* ── TAB 4: CONTACTS & ADDRESSES ── */}
+              {/* ── TAB 3: CONTACTS & ADDRESSES ── */}
               {activeTab === "contacts" && (
                 <div className="space-y-5">
                   <ContactsSection />
@@ -1559,7 +1250,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* ── TAB 5: REVIEW & SUMMARY ── */}
+              {/* ── TAB 4: REVIEW & SUMMARY ── */}
               {activeTab === "review" && (
                 <div className="space-y-5">
                   <FormCard icon="✅" title="Review & Summary" subtitle="Confirm all details before final submission">
