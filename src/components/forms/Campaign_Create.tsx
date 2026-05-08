@@ -1,23 +1,21 @@
-// Campaign form
+// Campaign form — Fixed: allLineItemCreatives preserved across navigation
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Form, Input, Select, Button, DatePicker, InputNumber, Divider, message
 } from 'antd';
 import {
   ArrowRightOutlined, CheckOutlined,
-  LayoutOutlined, NotificationOutlined, PlusOutlined,
-  FileTextOutlined, SettingOutlined, LogoutOutlined,
-  BellOutlined, RightOutlined, HistoryOutlined,
-  WifiOutlined, EditOutlined, AppstoreOutlined,
+  PlusOutlined, BellOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
-  EnvironmentOutlined, CreditCardOutlined,
-  DeleteOutlined, FileImageOutlined, VideoCameraOutlined, PaperClipOutlined,
+  EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import '../styles/Campaign_Create.css';
+import Sidebar from '../shared/Sidebar';
+import type { LineItem, GeoLocation, LineItemCardProps, CreativeData } from '../types/campaign.form.types';
 
 dayjs.extend(isBetween);
 
@@ -25,54 +23,72 @@ const { TextArea } = Input;
 
 const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
 const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 
-// Static data for dropdowns
-const GEO_COUNTRIES = ['India', 'USA', 'UK', 'UAE', 'Singapore', 'Australia'];
-const GEO_STATES: Record<string, string[]> = {
-  India: ['Karnataka', 'Maharashtra', 'Tamil Nadu', 'Delhi', 'Gujarat', 'Telangana', 'Rajasthan'],
-  USA: ['California', 'New York', 'Texas', 'Florida', 'Illinois'],
-  UK: ['England', 'Scotland', 'Wales', 'Northern Ireland'],
-  UAE: ['Dubai', 'Abu Dhabi', 'Sharjah'],
-  Singapore: ['Central', 'East', 'West', 'North'],
-  Australia: ['New South Wales', 'Victoria', 'Queensland', 'Western Australia'],
-};
-const GEO_CITIES: Record<string, string[]> = {
-  Karnataka: ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubli'],
-  Maharashtra: ['Mumbai', 'Pune', 'Nagpur', 'Nashik'],
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem'],
-  Delhi: ['New Delhi', 'Dwarka', 'Rohini', 'Saket'],
-  Gujarat: ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot'],
-  California: ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose'],
-  'New York': ['New York City', 'Buffalo', 'Rochester', 'Yonkers'],
-  England: ['London', 'Manchester', 'Birmingham', 'Leeds'],
-  Dubai: ['Downtown Dubai', 'Deira', 'Jumeirah', 'Marina'],
-};
+const DRAFT_KEY = 'campaign_create_draft';
+const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
 
-// ── Line Item type ────────────────────────────────────────────────────────────
-interface LineItem {
-  id: string;
-  lineItemName: string;
-  ethnicity: string[];
-  startDate: string;
-  endDate: string;
-  adFormat: string[];
-  impressions: string;
-  creatives: File[];
-  landingPage: string;
+// ── Types ─────────────────────────────────────────────────────────────────────
+type LineItemCreativesMap = Record<string, CreativeData[]>;
+
+// ── Line Item ID generator ────────────────────────────────────────────────────
+function generateLineItemId(index: number, offset: number = 1): string {
+  const userPrefix = 'USER';
+  const paddedIndex = String(offset + index - 1).padStart(3, '0');
+  return `LI${userPrefix}${paddedIndex}`;
 }
 
-function emptyLineItem(): LineItem {
+function emptyLineItem(index: number, offset: number = 1): LineItem {
   return {
-    id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    id: generateLineItemId(index, offset),
     lineItemName: '',
     ethnicity: [],
     startDate: '',
     endDate: '',
     adFormat: [],
     impressions: '',
+    units: [],
     creatives: [],
-    landingPage: '',
+    ctr: '',
+    viewability: '',
+    vcr: '',
   };
+}
+
+// ── Draft helpers ─────────────────────────────────────────────────────────────
+function saveDraft(data: object) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+  } catch (e) { /* ignore */ }
+}
+
+function loadDraft(): Record<string, any> | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch { /* ignore */ }
+}
+
+function setNavFlag() {
+  try { sessionStorage.setItem(NAV_FLAG_KEY, '1'); } catch { /* ignore */ }
+}
+
+function consumeNavFlag(): boolean {
+  try {
+    const val = sessionStorage.getItem(NAV_FLAG_KEY);
+    sessionStorage.removeItem(NAV_FLAG_KEY);
+    return val === '1';
+  } catch {
+    return false;
+  }
 }
 
 // ── Line Item helpers ─────────────────────────────────────────────────────────
@@ -81,238 +97,55 @@ const ETHNICITY_OPTIONS = [
   'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
 ];
 
+const UNITS_OPTIONS = ['CTR', 'CPC', 'CPM'];
+
 const AD_FORMAT_OPTIONS = [
-  { value: 'image', label: 'Image' },
+  { value: 'banner', label: 'Banner' },
   { value: 'video', label: 'Video' },
+  { value: 'youtube', label: 'Youtube' },
+  { value: 'intertitial', label: 'Intertitial' },
 ];
 
-function getAccept(adFormats: string[]): string {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return 'image/*,video/*';
-  if (hasImage) return 'image/jpeg,image/png,image/gif,image/webp,image/svg+xml';
-  if (hasVideo) return 'video/mp4,video/webm,video/ogg,video/quicktime';
-  return '*';
-}
-
-function getFormatLabel(adFormats: string[]): string {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return 'images or videos';
-  if (hasImage) return 'images (JPG, PNG, GIF, WebP)';
-  if (hasVideo) return 'videos (MP4, WebM, MOV)';
-  return 'files';
-}
-
-function isFileAllowed(file: File, adFormats: string[]): boolean {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return file.type.startsWith('image/') || file.type.startsWith('video/');
-  if (hasImage) return file.type.startsWith('image/');
-  if (hasVideo) return file.type.startsWith('video/');
-  return false;
-}
-
-
-// Reuse AddNewSelect from Onboarding — inline version for GeoTargeting
-interface GeoAddNewSelectProps {
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  setOptions: (opts: string[]) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}
-
-function GeoAddNewSelect({ value, onChange, options, setOptions, placeholder, disabled }: GeoAddNewSelectProps) {
-  const [isAdding, setIsAdding] = useState(false);
-  const [newValue, setNewValue] = useState('');
-
-  const handleAdd = () => {
-    const trimmed = newValue.trim();
-    if (trimmed && !options.includes(trimmed)) {
-      setOptions([...options, trimmed]);
-      onChange(trimmed);
-    } else if (trimmed) {
-      onChange(trimmed);
-    }
-    setNewValue('');
-    setIsAdding(false);
-  };
-
-  if (isAdding) {
-    return (
-      <Input
-        autoFocus
-        placeholder="Type and press Enter"
-        value={newValue}
-        suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵</span>}
-        onChange={e => setNewValue(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') handleAdd();
-          if (e.key === 'Escape') { setNewValue(''); setIsAdding(false); }
-        }}
-        onBlur={() => { setNewValue(''); setIsAdding(false); }}
-        style={{ height: 38 }}
-      />
-    );
-  }
-
-  return (
-    <Select
-      placeholder={placeholder}
-      allowClear
-      disabled={disabled}
-      style={{ width: '100%', height: 38 }}
-      value={value || undefined}
-      onChange={v => onChange(v ?? '')}
-      dropdownRender={menu => (
-        <>
-          {menu}
-          <Divider style={{ margin: '4px 0' }} />
-          <div
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => !disabled && setIsAdding(true)}
-            style={{
-              padding: '8px 12px',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              color: disabled ? '#ccc' : '#4f46e5',
-              fontSize: 13,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <PlusOutlined />
-            Add new
-          </div>
-        </>
-      )}
-      options={options.map(s => ({ value: s, label: s }))}
-    />
-  );
-}
+const IMAGE_FORMATS = ['banner', 'intertitial'];
+const VIDEO_FORMATS = ['video', 'youtube'];
 
 const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
 
-// ── Nav ───────────────────────────────────────────────────────────────────────
-const NAV = [
-  {
-    g: 'WORKSPACE',
-    items: [
-      { label: 'Dashboard', icon: <LayoutOutlined />, to: '/user_dashboard' },
-      { label: 'My Campaigns', icon: <NotificationOutlined />, to: '/user_campaigns' },
-      { label: 'Create Campaign', icon: <PlusOutlined />, to: '/campaign_create' },
-      { label: 'Brief Capture', icon: <EditOutlined />, to: '/user_brief' },
-      { label: 'My Drafts', icon: <AppstoreOutlined />, to: '/user_drafts' },
-    ],
-  },
-  {
-    g: 'AD OPS',
-    items: [
-      { label: 'Insertion Orders', icon: <FileTextOutlined />, to: '/user_io' },
-      { label: 'Line Items', icon: <AppstoreOutlined />, to: '/user_lineitems' },
-      { label: 'Creatives', icon: <LayoutOutlined />, to: '/user_creatives' },
-      { label: 'Setup Tasks', icon: <SettingOutlined />, to: '/user_tasks' },
-    ],
-  },
-  {
-    g: 'MONITOR',
-    items: [
-      { label: 'Live Status', icon: <WifiOutlined />, to: '/user_live' },
-      { label: 'Change History', icon: <HistoryOutlined />, to: '/user_history' },
-      { label: 'Approvals', icon: <FileTextOutlined />, to: '/user_approvals' },
-    ],
-  },
-  {
-    g: 'INSIGHTS',
-    items: [
-      { label: 'Reports', icon: <FileTextOutlined />, to: '/user_reports' },
-      { label: 'Billing', icon: <CreditCardOutlined />, to: '/user_billing' },
-    ],
-  },
-];
-
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const location = useLocation();
-  return (
-    <aside className="cc-sidebar" style={{ width: collapsed ? 64 : 240 }}>
-      <div className="cc-sidebar-logo" style={{ padding: collapsed ? '0 14px' : '0 16px', justifyContent: collapsed ? 'center' : 'space-between' }}>
-        {!collapsed && (
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <div className="cc-sidebar-logo-icon">N</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>
-                Billion <span style={{ color: '#60A5FA' }}>Tags</span>
-              </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
-                CAMPAIGN PLATFORM
-              </div>
-            </div>
-          </Link>
-        )}
-        {collapsed && <div className="cc-sidebar-logo-icon">N</div>}
-        <button
-          onClick={onToggle}
-          className="cc-sidebar-toggle"
-          style={collapsed ? { position: 'absolute', right: 8, top: 20 } : {}}
-        >
-          {collapsed ? '›' : '‹'}
-        </button>
-      </div>
-
-      <nav className="cc-nav">
-        {NAV.map(({ g, items }) => (
-          <div key={g} style={{ marginBottom: 2 }}>
-            {!collapsed && <div className="cc-nav-group-label">{g}</div>}
-            {items.map(({ label, icon, to }) => {
-              const active = location.pathname === to;
-              return (
-                <Link key={to} to={to} style={{ textDecoration: 'none' }}>
-                  <div className={`cc-nav-item ${active ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}>
-                    {icon}
-                    {!collapsed && <span>{label}</span>}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div className="cc-sidebar-footer" style={{ padding: collapsed ? '10px 8px' : '10px' }}>
-        {!collapsed && (
-          <div className="cc-sidebar-user">
-            <div className="cc-sidebar-avatar">AS</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Aarav Shah</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CAMPAIGN MANAGER</div>
-            </div>
-          </div>
-        )}
-        <Link to="/portal_settings" style={{ textDecoration: 'none' }}>
-          <div className={`cc-nav-item ${collapsed ? 'collapsed' : ''}`} style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 3 }}>
-            <SettingOutlined />{!collapsed && 'Settings'}
-          </div>
-        </Link>
-        <Link to="/login" style={{ textDecoration: 'none' }}>
-          <div className={`cc-nav-item ${collapsed ? 'collapsed' : ''}`} style={{ color: 'rgba(248,113,113,0.85)', fontSize: 12, fontWeight: 600 }}>
-            <LogoutOutlined />{!collapsed && 'Sign Out'}
-          </div>
-        </Link>
-      </div>
-    </aside>
+function isLineItemComplete(item: LineItem): boolean {
+  return !!(
+    item.lineItemName.trim() &&
+    item.startDate &&
+    item.endDate &&
+    item.adFormat.length > 0
   );
 }
 
-// ── Geo Location ──────────────────────────────────────────────────────────────
-interface GeoLocation {
-  country: string;
-  state: string;
-  city: string;
-  zipcode: string;
-  range: string;
+async function fetchLastLineItemOffset(): Promise<number> {
+  try {
+    const res = await fetch(GET_CAMPAIGNS_URL, {
+      headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
+    });
+    if (!res.ok) return 1;
+    const data = await res.json();
+
+    const allIds: string[] = [];
+    (data || []).forEach((campaign: any) => {
+      (campaign.line_items || []).forEach((li: any) => {
+        if (li.line_item_id && li.line_item_id.startsWith('LIUSER')) {
+          allIds.push(li.line_item_id);
+        }
+      });
+    });
+
+    if (allIds.length === 0) return 1;
+    const nums = allIds
+      .map(id => parseInt(id.replace('LIUSER', ''), 10))
+      .filter(n => !isNaN(n));
+    if (nums.length === 0) return 1;
+    return Math.max(...nums) + 1;
+  } catch {
+    return 1;
+  }
 }
 
 // ── GeoTargeting ─────────────────────────────────────────────────────────────
@@ -325,54 +158,301 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [zipcode, setZipcode] = useState('');
+  const [address, setAddress] = useState('');
   const [range, setRange] = useState('');
-  const [countryOpts, setCountryOpts] = useState<string[]>(GEO_COUNTRIES);
+
+  const [countryOpts, setCountryOpts] = useState<string[]>([]);
   const [stateOpts, setStateOpts] = useState<string[]>([]);
   const [cityOpts, setCityOpts] = useState<string[]>([]);
 
-  const rangeEnabled = !!(country || state || city || zipcode.trim());
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+
+  const [addingCountry, setAddingCountry] = useState(false);
+  const [addingState, setAddingState] = useState(false);
+  const [addingCity, setAddingCity] = useState(false);
+  const [newCountry, setNewCountry] = useState('');
+  const [newState, setNewState] = useState('');
+  const [newCity, setNewCity] = useState('');
+
+  const allStatesRef = useRef<string[]>([]);
+  const allCitiesRef = useRef<string[]>([]);
+
+  const rangeEnabled = !!city || !!address;
+  const canAdd = !!(country || state || city || zipcode.trim() || address.trim());
+
+  useEffect(() => {
+    setLoadingCountries(true);
+    fetch('https://countriesnow.space/api/v0.1/countries/positions')
+      .then(r => r.json())
+      .then(data => {
+        const names = (data.data || []).map((c: any) => c.name).sort();
+        setCountryOpts(names);
+      })
+      .catch(() => console.warn('Failed to load countries'))
+      .finally(() => setLoadingCountries(false));
+  }, []);
+
+  useEffect(() => {
+    setLoadingStates(true);
+    fetch('https://countriesnow.space/api/v0.1/countries/states')
+      .then(r => r.json())
+      .then(data => {
+        const allStates = (data.data || [])
+          .flatMap((c: any) => (c.states || []).map((s: any) => s.name))
+          .filter(Boolean)
+          .sort();
+        const unique = [...new Set<string>(allStates)];
+        allStatesRef.current = unique;
+        setStateOpts(unique);
+      })
+      .catch(() => console.warn('Failed to load states'))
+      .finally(() => setLoadingStates(false));
+  }, []);
+
+  useEffect(() => {
+    setLoadingCities(true);
+    fetch('https://countriesnow.space/api/v0.1/countries')
+      .then(r => r.json())
+      .then(data => {
+        const allCities = (data.data || [])
+          .flatMap((c: any) => c.cities || [])
+          .sort();
+        const unique = [...new Set<string>(allCities)];
+        allCitiesRef.current = unique;
+        setCityOpts(unique);
+      })
+      .catch(() => console.warn('Failed to load cities'))
+      .finally(() => setLoadingCities(false));
+  }, []);
+
+  const fetchCitiesForCountry = (countryName: string): Promise<string[]> => {
+    return fetch('https://countriesnow.space/api/v0.1/countries/cities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country: countryName }),
+    })
+      .then(r => r.json())
+      .then(data => (data.data || []).sort())
+      .catch(() => []);
+  };
+
+  const fetchCitiesForState = async (countryName: string, stateName: string): Promise<string[]> => {
+    try {
+      const res = await fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country: countryName, state: stateName }),
+      });
+      const data = await res.json();
+      const cities = (data.data || []).sort();
+      if (cities.length > 0) return cities;
+    } catch { }
+    if (countryName) {
+      const countryCities = await fetchCitiesForCountry(countryName);
+      if (countryCities.length > 0) return countryCities;
+    }
+    return allCitiesRef.current;
+  };
 
   const handleCountryChange = (v: string) => {
     setCountry(v); setState(''); setCity('');
-    setStateOpts(GEO_STATES[v] || []); setCityOpts([]);
+    if (!v) {
+      setStateOpts(allStatesRef.current);
+      setCityOpts(allCitiesRef.current);
+      return;
+    }
+    setLoadingStates(true);
+    fetch('https://countriesnow.space/api/v0.1/countries/states', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country: v }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const states = (data.data?.states || []).map((s: any) => s.name).sort();
+        setStateOpts(states.length > 0 ? states : allStatesRef.current);
+      })
+      .catch(() => setStateOpts(allStatesRef.current))
+      .finally(() => setLoadingStates(false));
+    setLoadingCities(true);
+    fetchCitiesForCountry(v)
+      .then(cities => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
+      .finally(() => setLoadingCities(false));
   };
 
   const handleStateChange = (v: string) => {
     setState(v); setCity('');
-    setCityOpts(GEO_CITIES[v] || []);
+    if (!v) {
+      if (country) {
+        setLoadingCities(true);
+        fetchCitiesForCountry(country)
+          .then(cities => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
+          .finally(() => setLoadingCities(false));
+      } else {
+        setCityOpts(allCitiesRef.current);
+      }
+      return;
+    }
+    setLoadingCities(true);
+    fetchCitiesForState(country, v)
+      .then(cities => setCityOpts(cities))
+      .finally(() => setLoadingCities(false));
+  };
+
+  const commitNew = (
+    val: string,
+    opts: string[],
+    setOpts: (o: string[]) => void,
+    setValue: (v: string) => void,
+    setAdding: (b: boolean) => void,
+    setNew: (s: string) => void,
+    extra?: () => void,
+  ) => {
+    const trimmed = val.trim();
+    if (trimmed && !opts.includes(trimmed)) setOpts([...opts, trimmed].sort());
+    if (trimmed) setValue(trimmed);
+    extra?.();
+    setNew('');
+    setAdding(false);
   };
 
   const handleAdd = () => {
-    if (!country && !state && !city && !zipcode.trim()) return;
-    onAdd({ country, state, city, zipcode: zipcode.trim(), range: range.trim() });
-    setCountry(''); setState(''); setCity(''); setZipcode(''); setRange('');
-    setStateOpts([]); setCityOpts([]);
+    if (!canAdd) return;
+    onAdd({ country, state, city, address, zipcode: zipcode.trim(), range: range.trim() });
+    setCountry(''); setState(''); setCity(''); setAddress(''); setZipcode(''); setRange('');
   };
 
-  const canAdd = !!(country || state || city || zipcode.trim());
+  const fmt = (l: any) => [l.country, l.state, l.city, l.address, l.zipcode, l.range].filter(Boolean).join(' › ');
 
-  const fmt = (l: any) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ');
+  const dropdownFooter = (setAdding: (b: boolean) => void, menu: React.ReactNode) => (
+    <>
+      {menu}
+      <Divider style={{ margin: '4px 0' }} />
+      <div
+        onMouseDown={e => e.preventDefault()}
+        onClick={() => setAdding(true)}
+        style={{ padding: '8px 12px', cursor: 'pointer', color: '#4f46e5', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        <PlusOutlined /> Add new
+      </div>
+    </>
+  );
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, alignItems: 'end', marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+        {/* Country */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Country
           </div>
-          <GeoAddNewSelect value={country} onChange={handleCountryChange} options={countryOpts} setOptions={setCountryOpts} placeholder="Select country…" />
+          {addingCountry ? (
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newCountry}
+              suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
+              style={{ height: 38 }}
+              onChange={e => setNewCountry(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitNew(newCountry, countryOpts, setCountryOpts, setCountry, setAddingCountry, setNewCountry, () => { setState(''); setCity(''); });
+                if (e.key === 'Escape') { setNewCountry(''); setAddingCountry(false); }
+              }}
+              onBlur={() => { setNewCountry(''); setAddingCountry(false); }}
+            />
+          ) : (
+            <Select
+              showSearch allowClear
+              placeholder={loadingCountries ? 'Loading…' : 'Select country…'}
+              loading={loadingCountries}
+              style={{ width: '100%', height: 38 }}
+              value={country || undefined}
+              onChange={v => handleCountryChange(v ?? '')}
+              filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+              dropdownRender={menu => dropdownFooter(setAddingCountry, menu)}
+              options={countryOpts.map(c => ({ value: c, label: c }))}
+            />
+          )}
         </div>
+
+        {/* State */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />State
           </div>
-          <GeoAddNewSelect value={state} onChange={handleStateChange} options={stateOpts.length > 0 ? stateOpts : (GEO_STATES[country] || [])} setOptions={setStateOpts} placeholder="Select state…" />
+          {addingState ? (
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newState}
+              suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
+              style={{ height: 38 }}
+              onChange={e => setNewState(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitNew(newState, stateOpts, setStateOpts, setState, setAddingState, setNewState, () => setCity(''));
+                if (e.key === 'Escape') { setNewState(''); setAddingState(false); }
+              }}
+              onBlur={() => { setNewState(''); setAddingState(false); }}
+            />
+          ) : (
+            <Select
+              showSearch allowClear
+              placeholder={loadingStates ? 'Loading…' : 'Select state…'}
+              loading={loadingStates}
+              style={{ width: '100%', height: 38 }}
+              value={state || undefined}
+              onChange={v => handleStateChange(v ?? '')}
+              filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+              dropdownRender={menu => dropdownFooter(setAddingState, menu)}
+              options={stateOpts.map(s => ({ value: s, label: s }))}
+            />
+          )}
         </div>
+
+        {/* City */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />City
           </div>
-          <GeoAddNewSelect value={city} onChange={setCity} options={cityOpts.length > 0 ? cityOpts : (GEO_CITIES[state] || [])} setOptions={setCityOpts} placeholder="Select city…" />
+          {addingCity ? (
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newCity}
+              suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
+              style={{ height: 38 }}
+              onChange={e => setNewCity(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitNew(newCity, cityOpts, setCityOpts, setCity, setAddingCity, setNewCity);
+                if (e.key === 'Escape') { setNewCity(''); setAddingCity(false); }
+              }}
+              onBlur={() => { setNewCity(''); setAddingCity(false); }}
+            />
+          ) : (
+            <Select
+              showSearch allowClear
+              placeholder={loadingCities ? 'Loading…' : 'Select city…'}
+              loading={loadingCities}
+              style={{ width: '100%', height: 38 }}
+              value={city || undefined}
+              onChange={v => setCity(v ?? '')}
+              filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+              dropdownRender={menu => dropdownFooter(setAddingCity, menu)}
+              options={cityOpts.map(c => ({ value: c, label: c }))}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Row 2: Address, Zip, Range, Add */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 8 }}>
+        <div>
+          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
+            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Address
+          </div>
+          <Input placeholder="e.g. 123 Main St" value={address} onChange={e => setAddress(e.target.value)} style={{ height: 38, width: 300 }} />
         </div>
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
@@ -385,18 +465,24 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
             <EnvironmentOutlined style={{ color: rangeEnabled ? 'var(--blue)' : 'var(--slate-300)', marginRight: 4 }} />Range
           </div>
           <Input
-            placeholder="e.g. 10 km" value={range} disabled={!rangeEnabled}
+            placeholder="e.g. 10 km"
+            value={range}
+            disabled={!rangeEnabled}
             onChange={e => setRange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && rangeEnabled) handleAdd(); }}
-            style={{ height: 38, backgroundColor: rangeEnabled ? '#fff' : '#f5f5f5', cursor: rangeEnabled ? 'text' : 'not-allowed' }}
+            style={{ width: 100, height: 38, backgroundColor: rangeEnabled ? '#fff' : '#f5f5f5', cursor: rangeEnabled ? 'text' : 'not-allowed' }}
           />
         </div>
-        <Button type="primary" disabled={!canAdd} onClick={handleAdd} icon={<PlusOutlined />} style={{ height: 38 }}>Add</Button>
+        <Button type="primary" disabled={!canAdd} onClick={handleAdd} icon={<PlusOutlined />} style={{ height: 38 }}>
+          Add
+        </Button>
       </div>
+
       <div className="cc-geo-helper" style={{ marginBottom: 8 }}>
         <InfoCircleOutlined style={{ marginRight: 4 }} />
-        Select at least one of Country, State, City or enter a Zip Code. Range is enabled after any selection.
+        Select at least one field or enter a Zip Code. Range enables after city is selected.
       </div>
+
       {locations.length > 0 ? (
         <div className="cc-geo-tags">
           {locations.map((loc: any, idx: number) => (
@@ -410,7 +496,7 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
           ))}
         </div>
       ) : (
-        <div className="cc-geo-empty">No geo targets added yet. Fill at least one field above to begin.</div>
+        <div className="cc-geo-empty">No geo targets added yet.</div>
       )}
     </div>
   );
@@ -530,7 +616,6 @@ function Step2({
               onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')}
             />
           </Form.Item>
-          
           <Form.Item label="Buying Type" required>
             <Select
               mode="multiple"
@@ -690,26 +775,35 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
   );
 }
 
-// ── Line Item Card ────────────────────────────────────────────────────────────
-interface LineItemCardProps {
-  item: LineItem;
-  index: number;
-  campaignStart: string;
-  campaignEnd: string;
-  onChange: (id: string, field: keyof LineItem, value: any) => void;
-  onRemove: (id: string) => void;
-  canRemove: boolean;
+// ── LineItemCard ──────────────────────────────────────────────────────────────
+interface ExtendedLineItemCardProps extends LineItemCardProps {
+  lineItemCreatives: LineItemCreativesMap;
+  allLineItemCreatives: LineItemCreativesMap;
+  idConfirmed: boolean;
 }
 
-function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove }: LineItemCardProps) {
+function LineItemCard({
+  item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove,
+  lineItemCreatives, allLineItemCreatives, idConfirmed,
+}: ExtendedLineItemCardProps) {
   const [dateError, setDateError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  const hasImageFormat = item.adFormat.some((f: string) => IMAGE_FORMATS.includes(f));
+  const hasVideoFormat = item.adFormat.some((f: string) => VIDEO_FORMATS.includes(f));
+
+  const showCTR = hasImageFormat || hasVideoFormat;
+  const showViewability = hasImageFormat || hasVideoFormat;
+  const showVCR = hasVideoFormat;
+
+  // ── Separate creative lists by type ──────────────────────────────────────
+  const uploadedImageCreatives = lineItemCreatives[item.id + '_image'] || [];
+  const uploadedVideoCreatives = lineItemCreatives[item.id + '_video'] || [];
 
   function validateDates(start: string, end: string): string {
     if (!campaignStart || !campaignEnd) return '';
     const cStart = dayjs(campaignStart);
     const cEnd = dayjs(campaignEnd);
-
     if (start) {
       const s = dayjs(start);
       if (s.isBefore(cStart, 'day') || s.isAfter(cEnd, 'day')) {
@@ -729,13 +823,13 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
   }
 
   function handleStartDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
+    const val = typeof ds === 'string' ? ds : '';
     onChange(item.id, 'startDate', val);
     setDateError(validateDates(val, item.endDate));
   }
 
   function handleEndDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
+    const val = typeof ds === 'string' ? ds : '';
     onChange(item.id, 'endDate', val);
     setDateError(validateDates(item.startDate, val));
   }
@@ -747,13 +841,19 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
 
   function handleAdFormatChange(vals: string[]) {
     onChange(item.id, 'adFormat', vals);
-    // Remove incompatible creatives
-    const compatible = item.creatives.filter(f => {
-      const hasImage = vals.includes('image');
-      const hasVideo = vals.includes('video');
-      if (hasImage && hasVideo) return true;
-      if (hasImage) return f.type.startsWith('image/');
-      if (hasVideo) return f.type.startsWith('video/');
+    const hasVideo = vals.some((f: string) => VIDEO_FORMATS.includes(f));
+    if (!hasVideo) onChange(item.id, 'vcr', '');
+    if (vals.length === 0) {
+      onChange(item.id, 'ctr', '');
+      onChange(item.id, 'viewability', '');
+      onChange(item.id, 'vcr', '');
+    }
+    const compatible = item.creatives.filter((f: File) => {
+      const hasImg = vals.includes('image');
+      const hasVid = vals.includes('video');
+      if (hasImg && hasVid) return true;
+      if (hasImg) return f.type.startsWith('image/');
+      if (hasVid) return f.type.startsWith('video/');
       return false;
     });
     if (compatible.length !== item.creatives.length) {
@@ -762,61 +862,38 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    if (item.adFormat.length === 0) {
-      message.warning('Please select an Ad Format before uploading creatives.');
-      return;
-    }
-    const invalid = files.filter(f => !isFileAllowed(f, item.adFormat));
-    const valid = files.filter(f => isFileAllowed(f, item.adFormat));
-    if (invalid.length > 0) {
-      message.error(`Invalid file(s): ${invalid.map(f => f.name).join(', ')}. Only ${getFormatLabel(item.adFormat)} allowed.`);
-    }
-    if (valid.length > 0) {
-      onChange(item.id, 'creatives', [...item.creatives, ...valid]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
+  // ── Navigate to image upload page ────────────────────────────────────────
+  const handleUploadCreatives = () => {
+    setNavFlag();
+    navigate('/creative_upload', {
+      state: {
+        lineItemId: item.id + '_image',
+        returnTo: '/campaign_create',
+        existingCreatives: uploadedImageCreatives,
+        allLineItemCreatives,
+      }
+    });
+  };
 
-  function removeCreative(idx: number) {
-    onChange(item.id, 'creatives', item.creatives.filter((_, i) => i !== idx));
-  }
-
-  function fileIcon(file: File) {
-    if (file.type.startsWith('image/')) return <FileImageOutlined style={{ color: '#4f46e5', fontSize: 14 }} />;
-    if (file.type.startsWith('video/')) return <VideoCameraOutlined style={{ color: '#0ea5e9', fontSize: 14 }} />;
-    return <PaperClipOutlined style={{ fontSize: 14 }} />;
-  }
-
-  const accept = item.adFormat.length > 0 ? getAccept(item.adFormat) : '*';
-  const formatLabel = item.adFormat.length > 0 ? getFormatLabel(item.adFormat) : 'files';
-
-  // Badge colors per format
-  const badgeBg = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#ede9fe' : item.adFormat.includes('image') ? '#dbeafe' : '#e0f2fe';
-  const badgeColor = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#6d28d9' : item.adFormat.includes('image') ? '#1d4ed8' : '#0369a1';
-  const badgeText = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? 'Image + Video' : item.adFormat.includes('image') ? 'Images only' : 'Videos only';
+  // ── Navigate to video upload page ────────────────────────────────────────
+  const handleUploadVideoCreatives = () => {
+    setNavFlag();
+    navigate('/creative_video_upload', {
+      state: {
+        lineItemId: item.id + '_video',
+        returnTo: '/campaign_create',
+        existingCreatives: uploadedVideoCreatives,
+        allLineItemCreatives,
+      }
+    });
+  };
 
   return (
-    <div style={{
-      border: '0.5px solid var(--color-border-secondary, #e2e8f0)',
-      borderRadius: 12,
-      background: '#fff',
-      padding: '20px 24px',
-      marginBottom: 16,
-    }}>
-      {/* Card header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+    <div style={{ border: '0.5px solid var(--color-border-secondary, #e2e8f0)', borderRadius: 12, background: '#fff', padding: '20px 24px', marginBottom: 16 }}>
+      {/* ── Card Header ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%', background: '#4f46e5',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 600, flexShrink: 0,
-          }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
             {index + 1}
           </div>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--slate-800, #1e293b)' }}>
@@ -826,40 +903,48 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
         {canRemove && (
           <button
             onClick={() => onRemove(item.id)}
-            style={{
-              background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6,
-              padding: '4px 10px', cursor: 'pointer', color: '#ef4444',
-              fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
-            }}
+            style={{ background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <DeleteOutlined style={{ fontSize: 12 }} /> Remove
           </button>
         )}
       </div>
 
+      {/* ── Line Item ID Badge ── */}
+      {idConfirmed && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '4px 10px' }}>
+            <div>
+              <span style={{ fontSize: 10.5, color: '#15803d', fontWeight: 500, letterSpacing: '0.05em', marginRight: 8 }}>Line Item ID:</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#14532d', fontFamily: 'monospace', letterSpacing: '0.03em' }}>{item.id}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Incomplete hint ── */}
+      {!idConfirmed && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fffbeb', border: '1px dashed #fcd34d', borderRadius: 8, padding: '4px 10px' }}>
+            <InfoCircleOutlined style={{ fontSize: 11, color: '#d97706' }} />
+            <span style={{ fontSize: 11.5, color: '#92400e' }}>
+              Fill all required fields and click <strong>Next Step</strong> to generate Line Item ID
+            </span>
+          </div>
+        </div>
+      )}
+
       <Form layout="vertical">
         {/* Row: Line Item Name + Ethnicity */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Line Item Name <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Input
-              placeholder="e.g. Mumbai Display — 18-34"
-              value={item.lineItemName}
-              onChange={e => onChange(item.id, 'lineItemName', e.target.value)}
-              style={{ height: 38 }}
-            />
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Line Item Name <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
+            <Input placeholder="e.g. Mumbai Display — 18-34" value={item.lineItemName} onChange={e => onChange(item.id, 'lineItemName', e.target.value)} style={{ height: 38 }} />
           </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ethnicity</span>}
-            style={{ marginBottom: 14 }}
-          >
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ethnicity</span>} style={{ marginBottom: 14 }}>
             <Select
               mode="multiple"
               value={item.ethnicity}
-              onChange={vals => onChange(item.id, 'ethnicity', vals)}
+              onChange={(vals: string[]) => onChange(item.id, 'ethnicity', vals)}
               placeholder="Select ethnicity…"
               maxTagCount="responsive"
               style={{ width: '100%' }}
@@ -883,7 +968,6 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
               placeholder={campaignStart ? `From ${dayjs(campaignStart).format('DD MMM YYYY')}` : 'Select date'}
             />
           </Form.Item>
-
           <Form.Item
             label={<span style={{ fontSize: 12.5, color: '#64748b' }}>End Date <span style={{ color: '#ef4444' }}>*</span></span>}
             style={{ marginBottom: dateError ? 4 : 14 }}
@@ -899,35 +983,21 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </Form.Item>
         </div>
 
-        {/* Date error banner */}
         {dateError && (
-          <div style={{
-            background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: 6,
-            padding: '7px 12px', marginBottom: 14, fontSize: 12.5, color: '#dc2626',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
+          <div style={{ background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: 6, padding: '7px 12px', marginBottom: 14, fontSize: 12.5, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
             ⚠ {dateError}
           </div>
         )}
 
-        {/* Campaign flight reference pill */}
         {campaignStart && campaignEnd && (
-          <div style={{
-            fontSize: 11.5, color: '#64748b', marginBottom: 14,
-            background: '#f8fafc', borderRadius: 6, padding: '4px 10px',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            border: '0.5px solid #e2e8f0',
-          }}>
+          <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 14, background: '#f8fafc', borderRadius: 6, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, border: '0.5px solid #e2e8f0' }}>
             Campaign flight: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
           </div>
         )}
 
         {/* Row: Ad Format + Impressions */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
             <Select
               mode="multiple"
               value={item.adFormat}
@@ -938,11 +1008,7 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
               options={AD_FORMAT_OPTIONS}
             />
           </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>}
-            style={{ marginBottom: 14 }}
-          >
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
             <Input
               placeholder="e.g. 1000000"
               value={item.impressions}
@@ -955,135 +1021,222 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
 
         {/* Creatives Upload */}
         <Form.Item
-          label={
-            <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-              Creatives
-              {item.adFormat.length > 0 && (
-                <span style={{
-                  background: badgeBg, color: badgeColor,
-                  fontSize: 10.5, fontWeight: 500, padding: '1px 8px',
-                  borderRadius: 10,
-                }}>
-                  {badgeText}
-                </span>
-              )}
-            </span>
-          }
+          label={<span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>Creatives</span>}
           style={{ marginBottom: 14 }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={accept}
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
-
-          {/* Upload trigger */}
-          <div
-            onClick={() => {
-              if (item.adFormat.length === 0) {
-                message.warning('Please select an Ad Format first.');
-                return;
-              }
-              fileInputRef.current?.click();
-            }}
-            style={{
-              border: `1px dashed ${item.adFormat.length === 0 ? '#d1d5db' : '#4f46e5'}`,
-              borderRadius: 8,
-              padding: '14px 16px',
-              cursor: item.adFormat.length === 0 ? 'not-allowed' : 'pointer',
-              background: item.adFormat.length === 0 ? '#f9fafb' : '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <PlusOutlined style={{ fontSize: 16, color: item.adFormat.length === 0 ? '#d1d5db' : '#4f46e5' }} />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: item.adFormat.length === 0 ? '#9ca3af' : '#1e293b' }}>
-                {item.adFormat.length === 0 ? 'Select an Ad Format above to enable upload' : `Upload ${formatLabel}`}
-              </div>
-              {item.adFormat.length > 0 && (
-                <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Click to browse — multiple files supported</div>
-              )}
-            </div>
-          </div>
-
-          {/* File list */}
-          {item.creatives.length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {item.creatives.map((file, idx) => (
-                <div key={idx} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 10px', background: '#f8fafc',
-                  borderRadius: 6, border: '0.5px solid #e2e8f0',
-                }}>
-                  {fileIcon(file)}
-                  <span style={{ flex: 1, fontSize: 12.5, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {file.name}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
-                    {(file.size / 1024).toFixed(1)} KB
-                  </span>
-                  <button
-                    onClick={() => removeCreative(idx)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444', display: 'flex', alignItems: 'center' }}
-                  >
-                    <CloseOutlined style={{ fontSize: 11 }} />
-                  </button>
-                </div>
-              ))}
+          {item.adFormat.length === 0 && (
+            <div style={{ border: '1px dashed #d1d5db', borderRadius: 8, padding: '14px 16px', background: '#f9fafb', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <PlusOutlined style={{ fontSize: 16, color: '#d1d5db' }} />
+              <div style={{ fontSize: 13, color: '#9ca3af' }}>Select an Ad Format above to enable upload</div>
             </div>
           )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* ── BANNER / IMAGE ZONE ── */}
+            {item.adFormat.includes('banner') && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <FileImageOutlined /> Images
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUploadCreatives}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    height: 38, padding: '0 16px',
+                    border: '1px solid #93c5fd', borderRadius: 6,
+                    background: '#eff6ff', color: '#1d4ed8',
+                    fontWeight: 500, fontSize: 13, cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#dbeafe';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#3b82f6';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#93c5fd';
+                  }}
+                >
+                  <FileImageOutlined style={{ fontSize: 14 }} />
+                  Upload Image Creatives
+                  {uploadedImageCreatives.length > 0 && (
+                    <span style={{ marginLeft: 6, background: '#16a34a', color: '#fff', borderRadius: 10, fontSize: 11, fontWeight: 700, padding: '1px 7px' }}>
+                      {uploadedImageCreatives.length} added
+                    </span>
+                  )}
+                </button>
+
+                {uploadedImageCreatives.length > 0 && (
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {uploadedImageCreatives.map((creative: CreativeData, idx: number) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '5px 10px', background: '#f0fdf4',
+                        borderRadius: 6, border: '0.5px solid #86efac',
+                        maxWidth: 260,
+                      }}>
+                        {creative.main_asset && creative.main_asset.type?.startsWith('image/') ? (
+                          <img
+                            src={URL.createObjectURL(creative.main_asset)}
+                            alt={creative.creative_name}
+                            style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid #d1fae5' }}
+                          />
+                        ) : (
+                          <FileImageOutlined style={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
+                        )}
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: '#14532d', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {creative.creative_name || `Creative ${idx + 1}`}
+                          </div>
+                          {creative.dimensions && (
+                            <div style={{ fontSize: 10.5, color: '#4ade80' }}>{creative.dimensions}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── VIDEO ZONE ── */}
+            {item.adFormat.includes('video') && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <VideoCameraOutlined /> Videos
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUploadVideoCreatives}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    height: 38, padding: '0 16px',
+                    border: '1px solid #ddd6fe', borderRadius: 6,
+                    background: '#eff6ff', color: '#1d4ed8',
+                    fontWeight: 500, fontSize: 13, cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#ede9fe';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#7c3aed';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#ddd6fe';
+                  }}
+                >
+                  <VideoCameraOutlined style={{ fontSize: 14 }} />
+                  Upload Video Creatives
+                  {uploadedVideoCreatives.length > 0 && (
+                    <span style={{ marginLeft: 6, background: '#16a34a', color: '#fff', borderRadius: 10, fontSize: 11, fontWeight: 700, padding: '1px 7px' }}>
+                      {uploadedVideoCreatives.length} added
+                    </span>
+                  )}
+                </button>
+
+                {uploadedVideoCreatives.length > 0 && (
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {uploadedVideoCreatives.map((creative: CreativeData, idx: number) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '5px 10px', background: '#f0fdf4',
+                        borderRadius: 6, border: '0.5px solid #86efac',
+                        maxWidth: 260,
+                      }}>
+                        <VideoCameraOutlined style={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: '#14532d', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {creative.creative_name || `Video ${idx + 1}`}
+                          </div>
+                          {creative.dimensions && (
+                            <div style={{ fontSize: 10.5, color: '#4ade80' }}>{creative.dimensions}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
         </Form.Item>
 
-        {/* Landing Page */}
-        <Form.Item
-          label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Landing Page</span>}
-          style={{ marginBottom: 0 }}
-        >
-          <Input
-            placeholder="https://example.com/landing"
-            value={item.landingPage}
-            onChange={e => onChange(item.id, 'landingPage', e.target.value)}
-            style={{ height: 38 }}
-          />
-        </Form.Item>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
+            <Select
+              mode="multiple"
+              value={item.units}
+              onChange={(vals: string[]) => onChange(item.id, 'units', vals)}
+              placeholder="Select units…"
+              maxTagCount="responsive"
+              style={{ width: '100%' }}
+              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
+            />
+          </Form.Item>
+        </div>
+
+        {(showCTR || showVCR) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 14 }}>
+            {showCTR && (
+              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>CTR</span>} style={{ marginBottom: 0 }}>
+                <Input placeholder="e.g. 0.5" value={item.ctr} onChange={e => onChange(item.id, 'ctr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
+              </Form.Item>
+            )}
+            {showViewability && (
+              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability</span>} style={{ marginBottom: 0 }}>
+                <Input placeholder="e.g. 70" value={item.viewability} onChange={e => onChange(item.id, 'viewability', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
+              </Form.Item>
+            )}
+            {showVCR && (
+              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>VCR</span>} style={{ marginBottom: 0 }}>
+                <Input placeholder="e.g. 60" value={item.vcr} onChange={e => onChange(item.id, 'vcr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
+              </Form.Item>
+            )}
+          </div>
+        )}
       </Form>
     </div>
   );
 }
 
-// ── Step 5 — Line Item Details ────────────────────────────────────────────────
-function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLineItems }: {
+// ── Step 4 — Line Item Details ────────────────────────────────────────────────
+interface Step4Props {
   campaignStartDate: string;
   campaignEndDate: string;
   lineItems: LineItem[];
   setLineItems: React.Dispatch<React.SetStateAction<LineItem[]>>;
-}) {
+  lineItemCreatives: LineItemCreativesMap;
+  lineItemOffset: number;
+  confirmedLineItemIds: Set<string>;
+}
+
+function Step4LineItems({
+  campaignStartDate, campaignEndDate, lineItems, setLineItems,
+  lineItemCreatives, lineItemOffset, confirmedLineItemIds,
+}: Step4Props) {
   function handleChange(id: string, field: keyof LineItem, value: any) {
     setLineItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   }
 
   function handleAdd() {
-    setLineItems(prev => [...prev, emptyLineItem()]);
+    const nextIndex = lineItems.length + 1;
+    setLineItems(prev => [...prev, emptyLineItem(nextIndex, lineItemOffset)]);
   }
 
   function handleRemove(id: string) {
-    setLineItems(prev => prev.filter(item => item.id !== id));
+    setLineItems(prev => {
+      const filtered = prev.filter(item => item.id !== id);
+      return filtered.map((item, idx) => ({ ...item, id: generateLineItemId(idx + 1, lineItemOffset) }));
+    });
   }
 
   return (
     <div className="cc-form-section">
-      {/* Campaign flight hint */}
       {(!campaignStartDate || !campaignEndDate) && (
-        <div style={{
-          background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: 8,
-          padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
+        <div style={{ background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
           <InfoCircleOutlined style={{ color: '#d97706' }} />
           No campaign dates set. Go back to Step 2 to set them — line item dates will be validated against those dates.
         </div>
@@ -1099,18 +1252,15 @@ function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLine
           onChange={handleChange}
           onRemove={handleRemove}
           canRemove={lineItems.length > 1}
+          lineItemCreatives={lineItemCreatives}
+          allLineItemCreatives={lineItemCreatives}
+          idConfirmed={confirmedLineItemIds.has(item.id)}
         />
       ))}
 
       <button
         onClick={handleAdd}
-        style={{
-          width: '100%', padding: '12px',
-          border: '1px dashed #4f46e5', borderRadius: 8,
-          background: 'none', cursor: 'pointer',
-          color: '#4f46e5', fontWeight: 500, fontSize: 13,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}
+        style={{ width: '100%', padding: '12px', border: '1px dashed #4f46e5', borderRadius: 8, background: 'none', cursor: 'pointer', color: '#4f46e5', fontWeight: 500, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
         <PlusOutlined /> Add Another Line Item
       </button>
@@ -1118,7 +1268,7 @@ function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLine
   );
 }
 
-// ── Step 6 — Review & Confirm ─────────────────────────────────────────────────
+// ── Step 5 — Review & Confirm ─────────────────────────────────────────────────
 function Step5Review({
   client, advertiser, websiteUrl,
   campaignName, clientCampaignId, purchaseOrderId,
@@ -1128,6 +1278,7 @@ function Step5Review({
   budgetType, totalBudget, startDate, endDate, durationDays,
   pacing, dayParting, timezone,
   lineItems,
+  lineItemCreatives,
   onEdit,
 }: any) {
   const geoString = geoLocations.length > 0
@@ -1171,7 +1322,6 @@ function Step5Review({
         </div>
       </div>
 
-      {/* Campaign Summary */}
       <div className="cc-review-header">
         <span className="cc-review-label">Campaign Summary</span>
         <button className="cc-review-edit-btn" onClick={onEdit}>← Edit Details</button>
@@ -1185,48 +1335,55 @@ function Step5Review({
         ))}
       </div>
 
-      {/* Line Items Summary */}
       {lineItems.length > 0 && (
         <>
           <div className="cc-review-header" style={{ marginTop: 20 }}>
             <span className="cc-review-label">Line Items ({lineItems.length})</span>
           </div>
-          {lineItems.map((li: LineItem, i: number) => (
-            <div key={li.id} style={{
-              border: '0.5px solid #e2e8f0', borderRadius: 10,
-              marginBottom: 12, overflow: 'hidden',
-            }}>
-              <div style={{
-                background: '#f8fafc', padding: '8px 14px',
-                fontSize: 12.5, fontWeight: 600, color: '#1e293b',
-                borderBottom: '0.5px solid #e2e8f0',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%', background: '#4f46e5',
-                  color: '#fff', fontSize: 11, display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>{i + 1}</span>
-                {li.lineItemName || `Line Item ${i + 1}`}
+          {lineItems.map((li: LineItem, i: number) => {
+            const imgCreatives = lineItemCreatives?.[li.id + '_image'] || [];
+            const vidCreatives = lineItemCreatives?.[li.id + '_video'] || [];
+            const totalCreatives = imgCreatives.length + vidCreatives.length;
+            return (
+              <div key={li.id} style={{ border: '0.5px solid #e2e8f0', borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
+                <div style={{ background: '#f8fafc', padding: '8px 14px', fontSize: 12.5, fontWeight: 600, color: '#1e293b', borderBottom: '0.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#4f46e5', color: '#fff', fontSize: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                  {li.lineItemName || `Line Item ${i + 1}`}
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, fontFamily: 'monospace', background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>
+                    {li.id}
+                  </span>
+                </div>
+                <div className="cc-review-table">
+                  {[
+                    { label: 'Line Item ID', value: li.id },
+                    { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
+                    { label: 'Start Date', value: li.startDate || '—' },
+                    { label: 'End Date', value: li.endDate || '—' },
+                    { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
+                    { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
+                    {
+                      label: 'Image Creatives',
+                      value: imgCreatives.length > 0
+                        ? `${imgCreatives.length} file(s): ${imgCreatives.map((c: CreativeData) => c.creative_name).join(', ')}`
+                        : '—'
+                    },
+                    {
+                      label: 'Video Creatives',
+                      value: vidCreatives.length > 0
+                        ? `${vidCreatives.length} file(s): ${vidCreatives.map((c: CreativeData) => c.creative_name).join(', ')}`
+                        : '—'
+                    },
+                    { label: 'Total Creatives', value: totalCreatives > 0 ? `${totalCreatives} file(s)` : '—' },
+                  ].map((row, j) => (
+                    <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
+                      <span className="cc-review-row-key">{row.label}</span>
+                      <span className="cc-review-row-val">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="cc-review-table">
-                {[
-                  { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
-                  { label: 'Start Date', value: li.startDate || '—' },
-                  { label: 'End Date', value: li.endDate || '—' },
-                  { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
-                  { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
-                  { label: 'Creatives', value: li.creatives.length > 0 ? `${li.creatives.length} file(s): ${li.creatives.map(f => f.name).join(', ')}` : '—' },
-                  { label: 'Landing Page', value: li.landingPage || '—' },
-                ].map((row, j) => (
-                  <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
-                    <span className="cc-review-row-key">{row.label}</span>
-                    <span className="cc-review-row-val">{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
 
@@ -1242,54 +1399,152 @@ function Step5Review({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Campaign_Create() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const sideWidth = collapsed ? 64 : 240;
-  const [activeStep, setActiveStep] = useState(1);
 
+  const isBackNav = consumeNavFlag();
+  const locationState = location.state as any;
+  const isReturnFromCreative = !!(locationState?.fromCreativeUpload);
+  const shouldRestoreDraft = isBackNav || isReturnFromCreative;
+  const initialDraft = shouldRestoreDraft ? loadDraft() : null;
+
+  if (!shouldRestoreDraft) {
+    clearDraft();
+  }
+
+  const [activeStep, setActiveStep] = useState<number>(initialDraft?.activeStep ?? 1);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const [lineItemOffset, setLineItemOffset] = useState<number>(initialDraft?.lineItemOffset ?? 1);
+
+  const [confirmedLineItemIds, setConfirmedLineItemIds] = useState<Set<string>>(
+    () => new Set<string>(initialDraft?.confirmedLineItemIds ?? [])
+  );
+
   // Step 1
-  const [client, setClient] = useState('');
-  const [clientId, setClientId] = useState('');  // ✅ add this
-  const [advertiser, setAdvertiser] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [client, setClient] = useState<string>(initialDraft?.client ?? '');
+  const [clientId, setClientId] = useState<string>(initialDraft?.clientId ?? '');
+  const [advertiser, setAdvertiser] = useState<string>(initialDraft?.advertiser ?? '');
+  const [websiteUrl, setWebsiteUrl] = useState<string>(initialDraft?.websiteUrl ?? '');
 
   // Step 2
-  const [campaignName, setCampaignName] = useState('');
-  const [clientCampaignId, setClientCampaignId] = useState('');
-  const [purchaseOrderId, setPurchaseOrderId] = useState('');
-  const [campaignType, setCampaignType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [buyingType, setBuyingType] = useState<string[]>([]);
-  const [objective, setObjective] = useState('');
-  const [notes, setNotes] = useState('');
+  const [campaignName, setCampaignName] = useState<string>(initialDraft?.campaignName ?? '');
+  const [clientCampaignId, setClientCampaignId] = useState<string>(initialDraft?.clientCampaignId ?? '');
+  const [purchaseOrderId, setPurchaseOrderId] = useState<string>(initialDraft?.purchaseOrderId ?? '');
+  const [campaignType, setCampaignType] = useState<string>(initialDraft?.campaignType ?? '');
+  const [startDate, setStartDate] = useState<string>(initialDraft?.startDate ?? '');
+  const [endDate, setEndDate] = useState<string>(initialDraft?.endDate ?? '');
+  const [buyingType, setBuyingType] = useState<string[]>(initialDraft?.buyingType ?? []);
+  const [objective, setObjective] = useState<string>(initialDraft?.objective ?? '');
+  const [notes, setNotes] = useState<string>(initialDraft?.notes ?? '');
 
   // Step 3
-  const [age, setAge] = useState<string[]>([]);
-  const [gender, setGender] = useState('');
-  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [freqCap, setFreqCap] = useState('');
-  const [brandSafety, setBrandSafety] = useState('');
-  const [viewability, setViewability] = useState('');
+  const [age, setAge] = useState<string[]>(initialDraft?.age ?? []);
+  const [gender, setGender] = useState<string>(initialDraft?.gender ?? '');
+  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>(initialDraft?.geoLocations ?? []);
+  const [platforms, setPlatforms] = useState<string[]>(initialDraft?.platforms ?? []);
+  const [freqCap, setFreqCap] = useState<string>(initialDraft?.freqCap ?? '');
+  const [brandSafety, setBrandSafety] = useState<string>(initialDraft?.brandSafety ?? '');
+  const [viewability, setViewability] = useState<string>(initialDraft?.viewability ?? '');
 
-  // Step 4 — Line Items
-  const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
+  // Step 4 — line items
+  const [lineItems, setLineItems] = useState<LineItem[]>(() => {
+    if (initialDraft?.lineItems?.length) {
+      return initialDraft.lineItems.map((li: any) => ({ ...li, creatives: [] }));
+    }
+    return [emptyLineItem(1, 1)];
+  });
 
+  const [lineItemCreatives, setLineItemCreatives] = useState<LineItemCreativesMap>(() => {
+    if (isReturnFromCreative && locationState?.allLineItemCreatives) {
+      return locationState.allLineItemCreatives as LineItemCreativesMap;
+    }
+    return {};
+  });
+
+  // ── Fetch backend offset on fresh load ────────────────────────────────────
+  useEffect(() => {
+    if (!shouldRestoreDraft) {
+      fetchLastLineItemOffset().then(offset => {
+        setLineItemOffset(offset);
+        setLineItems([emptyLineItem(1, offset)]);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── On return from Creative_Upload or Creative_Video_Upload ───────────────
+  useEffect(() => {
+    if (locationState?.uploadedCreatives && locationState?.lineItemId) {
+      const lid = locationState.lineItemId as string;
+      const returnedAll = (locationState.allLineItemCreatives ?? {}) as LineItemCreativesMap;
+
+      setLineItemCreatives(() => ({
+        ...returnedAll,
+        [lid]: locationState.uploadedCreatives,
+      }));
+
+      window.history.replaceState({}, '');
+    }
+  }, [locationState]);
+
+  // ── Persist draft ─────────────────────────────────────────────────────────
+  const isMounted = useRef(false);
+  useEffect(() => {
+    if (!isMounted.current) {
+      isMounted.current = true;
+      return;
+    }
+    saveDraft({
+      activeStep,
+      client, clientId, advertiser, websiteUrl,
+      campaignName, clientCampaignId, purchaseOrderId,
+      campaignType, startDate, endDate, buyingType, objective, notes,
+      age, gender, geoLocations, platforms,
+      freqCap, brandSafety, viewability,
+      lineItemOffset,
+      confirmedLineItemIds: [...confirmedLineItemIds],
+      lineItems: lineItems.map(li => ({ ...li, creatives: [] })),
+    });
+  }, [
+    activeStep,
+    client, clientId, advertiser, websiteUrl,
+    campaignName, clientCampaignId, purchaseOrderId,
+    campaignType, startDate, endDate, buyingType, objective, notes,
+    age, gender, geoLocations, platforms,
+    freqCap, brandSafety, viewability,
+    lineItemOffset,
+    confirmedLineItemIds,
+    lineItems,
+  ]);
+
+  // ── "Next Step" handler ───────────────────────────────────────────────────
+  const handleNextStep = () => {
+    if (activeStep === 4) {
+      const incomplete = lineItems.filter(li => !isLineItemComplete(li));
+      if (incomplete.length > 0) {
+        const names = incomplete.map((li) =>
+          li.lineItemName.trim() ? `"${li.lineItemName}"` : `Line Item ${lineItems.indexOf(li) + 1}`
+        ).join(', ');
+        message.error(`Please fill all required fields (Name, Start Date, End Date, Ad Format) for: ${names}`);
+        return;
+      }
+      setConfirmedLineItemIds(new Set(lineItems.map(li => li.id)));
+    }
+    setActiveStep(s => s + 1);
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitStatus('idle');
     setErrorMsg('');
 
-    // In handleSubmit — update geo string to include new fields
-    const geoString = geoLocations.map(loc =>
-      [loc.country, loc.state, loc.city, loc.zipcode, loc.range].filter(Boolean).join(' > ')
-    ).join('; ');
-
     const fd = new FormData();
+
     fd.append('client', clientId);
     fd.append('client_name', client);
     fd.append('advertiser', advertiser);
@@ -1299,7 +1554,15 @@ export default function Campaign_Create() {
     fd.append('objective', objective);
     fd.append('age', age.join(', '));
     fd.append('gender', gender);
-    fd.append('geo_targeting', geoString);
+    fd.append('geo_targeting', JSON.stringify(
+      geoLocations.map(loc => ({
+        country: loc.country || '',
+        state: loc.state || '',
+        city: loc.city || '',
+        zipcode: loc.zipcode || '',
+        range: loc.range || '',
+      }))
+    ));
     fd.append('platforms', platforms.join(', '));
     fd.append('brand_safety', brandSafety);
     fd.append('start_date', startDate);
@@ -1311,28 +1574,59 @@ export default function Campaign_Create() {
     if (freqCap) fd.append('frequency_cap', freqCap);
     if (viewability) fd.append('viewability_goal', viewability);
 
-    // Serialize line items (metadata as JSON, files appended separately)
+    // ── Merge image + video creatives per line item ────────────────────────
     fd.append('line_items', JSON.stringify(
-      lineItems.map(li => ({
-        lineItemName: li.lineItemName,
-        ethnicity: li.ethnicity,
-        startDate: li.startDate,
-        endDate: li.endDate,
-        adFormat: li.adFormat,
-        impressions: li.impressions,
-        landingPage: li.landingPage,
-        creatives: li.creatives.map(f => f.name),
-      }))
+      lineItems.map((li) => {
+        const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
+        const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
+        const allCreatives = [...imageCreatives, ...videoCreatives];
+        return {
+          line_item_id: li.id,
+          lineItemName: li.lineItemName,
+          ethnicity: li.ethnicity,
+          startDate: li.startDate,
+          endDate: li.endDate,
+          adFormat: li.adFormat,
+          impressions: li.impressions,
+          units: li.units,
+          ctr: li.ctr,
+          viewability: li.viewability,
+          vcr: li.vcr,
+          creatives: allCreatives.map((creative: CreativeData) => ({
+            creative_name: creative.creative_name,
+            dimensions: creative.dimensions,
+            aspect_ratio: creative.aspect_ratio,
+            file_size: creative.file_size,
+            click_through_url: creative.click_through_url || '',
+            appended_html_tag: creative.appended_html_tag || '',
+            integration_code: creative.integration_code || '',
+            notes: creative.notes || '',
+          })),
+        };
+      })
     ));
+
+    // ── Append actual files (image + video assets) ────────────────────────
     lineItems.forEach((li, i) => {
-      li.creatives.forEach(file => {
-        fd.append(`line_item_${i}_creative`, file, file.name);
+      const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
+      const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
+      const allCreatives = [...imageCreatives, ...videoCreatives];
+
+      allCreatives.forEach((creative: CreativeData, j: number) => {
+        if (creative.main_asset) {
+          fd.append(`line_item_${i}main_asset${j}`, creative.main_asset, creative.main_asset.name);
+        }
       });
     });
 
     try {
-      const res = await fetch(SUBMIT_URL, { method: 'POST', body: fd });
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST',
+        body: fd,
+        headers: { 'ngrok-skip-browser-warning': '1' },
+      });
       if (res.ok) {
+        clearDraft();
         setSubmitStatus('success');
       } else {
         const text = await res.text();
@@ -1361,6 +1655,11 @@ export default function Campaign_Create() {
     3: { title: 'Objectives & Settings', sub: 'Define target audience and platform settings' },
     4: { title: 'Line Item Details', sub: 'Add one or more line items for this campaign' },
     5: { title: 'Review & Confirm', sub: 'Review all details before creating the campaign' },
+  };
+
+  const handleCancel = () => {
+    clearDraft();
+    navigate('/user_campaigns');
   };
 
   return (
@@ -1468,13 +1767,15 @@ export default function Campaign_Create() {
                     viewability={viewability} setViewability={setViewability}
                   />
                 )}
-                
                 {activeStep === 4 && (
                   <Step4LineItems
                     campaignStartDate={startDate}
                     campaignEndDate={endDate}
                     lineItems={lineItems}
                     setLineItems={setLineItems}
+                    lineItemCreatives={lineItemCreatives}
+                    lineItemOffset={lineItemOffset}
+                    confirmedLineItemIds={confirmedLineItemIds}
                   />
                 )}
                 {activeStep === 5 && (
@@ -1487,8 +1788,9 @@ export default function Campaign_Create() {
                     age={age} gender={gender}
                     geoLocations={geoLocations} platforms={platforms}
                     freqCap={freqCap} brandSafety={brandSafety} viewability={viewability}
-                    startDate={startDate} endDate={endDate} 
+                    startDate={startDate} endDate={endDate}
                     lineItems={lineItems}
+                    lineItemCreatives={lineItemCreatives}
                     onEdit={() => setActiveStep(1)}
                   />
                 )}
@@ -1498,13 +1800,19 @@ export default function Campaign_Create() {
 
           {/* Bottom Bar */}
           <div className="cc-bottom-bar">
-            <Button className="cc-btn-cancel" onClick={() => navigate('/user_campaigns')}>Cancel</Button>
+            <Button className="cc-btn-cancel" onClick={handleCancel}>Cancel</Button>
             <div className="cc-bottom-bar-actions">
               {activeStep > 1 && (
                 <Button className="cc-btn-back" onClick={() => setActiveStep(s => s - 1)}>← Back</Button>
               )}
               {activeStep < 5 ? (
-                <Button type="primary" className="cc-btn-next" onClick={() => setActiveStep(s => s + 1)} icon={<ArrowRightOutlined />} iconPosition="end">
+                <Button
+                  type="primary"
+                  className="cc-btn-next"
+                  onClick={handleNextStep}
+                  icon={<ArrowRightOutlined />}
+                  iconPosition="end"
+                >
                   Next Step
                 </Button>
               ) : (
