@@ -33,6 +33,7 @@ export interface GeoAddNewSelectProps {
 
 // ✅ Updated to match CreativeData type in Campaign_Create.tsx
 export interface CreativeData {
+  type?: 'standard' | 'third_party';   // ✅ add this
   lineItemId: string | undefined;
   main_asset: File | null;                    // main asset binary
   backup_image: File | null;             // ✅ backup image binary

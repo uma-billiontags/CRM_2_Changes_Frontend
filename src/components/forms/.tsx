@@ -1,142 +1,227 @@
-// Campaign form
-
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
-  Form, Input, Select, Button, DatePicker, InputNumber, Divider, message
-} from 'antd';
+  Form, Input, Select, Switch, Button, Upload, Tabs, Typography, Divider
+} from "antd";
 import {
-  ArrowRightOutlined, CheckOutlined,
-  LayoutOutlined, NotificationOutlined, PlusOutlined,
-  FileTextOutlined, SettingOutlined, LogoutOutlined,
-  BellOutlined, RightOutlined, HistoryOutlined,
-  WifiOutlined, EditOutlined, AppstoreOutlined,
-  CloseOutlined, InfoCircleOutlined,
-  EnvironmentOutlined, CreditCardOutlined,
-  DeleteOutlined, FileImageOutlined, VideoCameraOutlined, PaperClipOutlined,
-} from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
-import isBetween from 'dayjs/plugin/isBetween';
-import '../styles/Campaign_Create.css';
-
-dayjs.extend(isBetween);
+  PlusOutlined, DeleteOutlined, UploadOutlined,
+  SaveOutlined, ArrowLeftOutlined,
+} from "@ant-design/icons";
+import "../styles/Onboarding.css";
+import type { ContactRow, AddressRow, CompanyForm, Country, PhoneInputProps, AddNewSelectProps } from '../types/onboard.form.types';
+import { getExampleNumber, isSupportedCountry } from "libphonenumber-js";
+import examples from "libphonenumber-js/mobile/examples";
 
 const { TextArea } = Input;
+const { Text } = Typography;
 
-const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
+// API
+const SUBMIT_URL = "http://127.0.0.1:8000/create_client/";
 
-// Static data for dropdowns
-const GEO_COUNTRIES = ['India', 'USA', 'UK', 'UAE', 'Singapore', 'Australia'];
-const GEO_STATES: Record<string, string[]> = {
-  India: ['Karnataka', 'Maharashtra', 'Tamil Nadu', 'Delhi', 'Gujarat', 'Telangana', 'Rajasthan'],
-  USA: ['California', 'New York', 'Texas', 'Florida', 'Illinois'],
-  UK: ['England', 'Scotland', 'Wales', 'Northern Ireland'],
-  UAE: ['Dubai', 'Abu Dhabi', 'Sharjah'],
-  Singapore: ['Central', 'East', 'West', 'North'],
-  Australia: ['New South Wales', 'Victoria', 'Queensland', 'Western Australia'],
+// Dropdown choices — all data lives here on the frontend
+const DEFAULT_CHOICES = {
+  billing_currencies: ["INR", "USD"],
+  agency_types: ["Digital", "Traditional", "Integrated", "Media Buying", "Creative"],
+  industries: ["E-Commerce", "FMCG", "Banking & Finance", "Healthcare", "Automotive", "Technology", "Entertainment", "Real Estate"],
+  place_of_supply: ["Karnataka", "Maharashtra", "Delhi", "Tamil Nadu", "Telangana", "Gujarat"],
+  payment_types: ["Prepaid", "Postpaid"],
+  payment_terms: ["Net 0 day", "Net 15 days", "Net 30 days", "Net 45 days", "Net 60 days"],
+  tax_types: ["GST", "IGST", "SGST+CGST", "Exempt"],
+  tds_options: ["Yes", "No"],
+  markets: ["India", "SEA", "MENA", "Europe", "North America"],
+  platforms: ["Google", "Meta", "DV360", "The Trade Desk", "Amazon DSP"],
+  inventory_types: ["Open Exchange", "PMP", "PG", "Direct"],
+  campaign_objectives: ["Brand Awareness", "Lead Generation", "App Install", "Sales Conversion"],
+  languages: ["English", "Hindi", "Tamil", "Telugu", "Kannada"],
+  ad_formats: ["Display", "Video", "Native", "Audio", "DOOH"],
+  timezones: ["IST (UTC+5:30)", "EST (UTC-5)", "PST (UTC-8)", "GMT (UTC+0)"],
+  client_types: ["Platinum", "Gold", "Silver", "Standard"],
+  priority_levels: ["High", "Medium", "Low"],
+  risk_levels: ["Low", "Medium", "High", "Critical"],
+  payment_behaviors: ["Always On Time", "Occasional Delay", "Frequent Delay"],
+  billing_contacts: ["admin@gmail.com", "campaign_team@gmail.com", "billiontags@gmail.com"],
+  account_managers: ["Rahul Sharma", "Priya Mehta", "Arun Kumar", "Sneha Reddy", "Vikram Nair"],
+  sales_owners: ["Deepak Joshi", "Anita Sinha", "Manoj Pillai", "Kavita Rao", "Suresh Iyer"],
+  campaign_managers: ["Neha Gupta", "Rohit Verma", "Pooja Nair", "Arjun Das", "Divya Menon"],
+  finance_owners: ["Sunil Kapoor", "Meera Bose", "Kiran Patel", "Lakshmi Chand", "Rajesh Tiwari"],
 };
-const GEO_CITIES: Record<string, string[]> = {
-  Karnataka: ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubli'],
-  Maharashtra: ['Mumbai', 'Pune', 'Nagpur', 'Nashik'],
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem'],
-  Delhi: ['New Delhi', 'Dwarka', 'Rohini', 'Saket'],
-  Gujarat: ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot'],
-  California: ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose'],
-  'New York': ['New York City', 'Buffalo', 'Rochester', 'Yonkers'],
-  England: ['London', 'Manchester', 'Birmingham', 'Leeds'],
-  Dubai: ['Downtown Dubai', 'Deira', 'Jumeirah', 'Marina'],
-};
 
-// ── Line Item type ────────────────────────────────────────────────────────────
-interface LineItem {
-  id: string;
-  lineItemName: string;
-  ethnicity: string[];
-  startDate: string;
-  endDate: string;
-  adFormat: string[];
-  impressions: string;
-  creatives: File[];
-  landingPage: string;
+function getDialCode(idd: { root?: string; suffixes?: string[] }) {
+  if (!idd?.root) return null;
+  const suffixes = idd.suffixes || [];
+  return suffixes.length === 1 ? idd.root + suffixes[0] : idd.root;
 }
 
-function emptyLineItem(): LineItem {
+// ─── PhoneInput component ─────────────────────────────────────────────────────
+
+function PhoneInput({
+  phone, phone_code, phone_cca2, countries, onPhoneChange, onCountryChange,
+}: PhoneInputProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+   // Dynamically derive max length from libphonenumber metadata
+  const maxPhoneLength = useMemo(() => {
+    try {
+      if (!isSupportedCountry(phone_cca2 as any)) return 15;
+      const example = getExampleNumber(phone_cca2 as any, examples);
+      return example ? example.nationalNumber.length : 15;
+    } catch {
+      return 15;
+    }
+  }, [phone_cca2]); // recalculates whenever country changes
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 50);
+  }, [open]);
+
+  const selectedCountry = countries.find((c) => c.cca2 === phone_cca2);
+
+  const filtered = countries.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.code.includes(search) ||
+      c.cca2.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: "flex" }}>
+      <div ref={dropdownRef} style={{ position: "relative", flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => { setOpen((o) => !o); setSearch(""); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, height: 38, padding: "0 8px",
+            border: "1px solid #d9d9d9", borderRight: "none", borderRadius: "6px 0 0 6px",
+            background: "#fafafa", cursor: "pointer", fontSize: 14,
+          }}
+        >
+          {selectedCountry ? (
+            <img src={selectedCountry.flagUrl} alt={selectedCountry.name}
+              style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+          ) : (
+            <span style={{ fontSize: 16 }}>🌐</span>
+          )}
+          <span style={{ fontWeight: 500 }}>{phone_code}</span>
+          <span style={{ fontSize: 10, color: "#999", marginLeft: 2 }}>▼</span>
+        </button>
+
+        {open && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 9999,
+            width: 300, background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)", overflow: "hidden",
+          }}>
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid #f0f0f0" }}>
+              <input ref={searchRef} type="text" placeholder="Search country or code..."
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: "100%", padding: "6px 10px", border: "1px solid #d9d9d9",
+                  borderRadius: 6, fontSize: 13, outline: "none", boxSizing: "border-box",
+                }} />
+            </div>
+            <div style={{ maxHeight: 240, overflowY: "auto" }}>
+              {filtered.length === 0 ? (
+                <div style={{ padding: "12px 16px", color: "#999", fontSize: 13 }}>No results found</div>
+              ) : (
+                filtered.map((c) => (
+                  <div key={c.cca2}
+                    onClick={() => { onCountryChange(c.code, c.cca2); onPhoneChange(""); setOpen(false); setSearch(""); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
+                      cursor: "pointer", fontSize: 13,
+                      background: c.cca2 === phone_cca2 ? "#f0f7ff" : "transparent",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = c.cca2 === phone_cca2 ? "#e0f0ff" : "#f5f5f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = c.cca2 === phone_cca2 ? "#f0f7ff" : "transparent")}
+                  >
+                    <img src={c.flagUrl} alt={c.name}
+                      style={{ width: 22, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{c.name}</span>
+                    <span style={{ color: "#888", fontWeight: 500 }}>{c.code}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <input
+        type="tel"
+        placeholder={`Enter ${maxPhoneLength}-digit number`}  // dynamic placeholder
+        value={phone}
+        maxLength={maxPhoneLength}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "").slice(0, maxPhoneLength);
+          onPhoneChange(digits);
+        }}
+        style={{
+          flex: 1, height: 38, padding: "0 8px", border: "1px solid #d9d9d9",
+          borderRadius: "0 6px 6px 0", fontSize: 14, outline: "none",
+          background: "#fff", color: "#000",
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const toOpts = (arr: string[]) => arr.map((s) => ({ value: s, label: s }));
+
+function makeContact(): ContactRow {
   return {
-    id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    lineItemName: '',
-    ethnicity: [],
-    startDate: '',
-    endDate: '',
-    adFormat: [],
-    impressions: '',
-    creatives: [],
-    landingPage: '',
+    id: Date.now(),
+    contact_name: "", contact_phone: "", contact_email: "",
+    contact_designation: "", contact_country: "", contact_zipcode: "",
+    contact_address_1: "", contact_address_2: "", digital_signature: null,
   };
 }
 
-// ── Line Item helpers ─────────────────────────────────────────────────────────
-const ETHNICITY_OPTIONS = [
-  'General', 'Asian', 'South Asian', 'African American',
-  'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
+function makeAddress(): AddressRow {
+  return {
+    id: Date.now(),
+    company_address_line1: "", company_address_line2: "",
+    company_country: "", company_zipcode: "",
+  };
+}
+
+const TABS = [
+  { id: "basic", label: "Basic Information", emoji: "🪪" },
+  { id: "billing", label: "Billing & Commercials", emoji: "💳" },
+  { id: "contacts", label: "Contacts & Addresses", emoji: "👤" },
+  { id: "review", label: "Review & Summary", emoji: "✅" },
 ];
 
-const AD_FORMAT_OPTIONS = [
-  { value: 'image', label: 'Image' },
-  { value: 'video', label: 'Video' },
-];
+// ─── AddNewSelect ─────────────────────────────────────────────────────────────
 
-function getAccept(adFormats: string[]): string {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return 'image/*,video/*';
-  if (hasImage) return 'image/jpeg,image/png,image/gif,image/webp,image/svg+xml';
-  if (hasVideo) return 'video/mp4,video/webm,video/ogg,video/quicktime';
-  return '*';
-}
-
-function getFormatLabel(adFormats: string[]): string {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return 'images or videos';
-  if (hasImage) return 'images (JPG, PNG, GIF, WebP)';
-  if (hasVideo) return 'videos (MP4, WebM, MOV)';
-  return 'files';
-}
-
-function isFileAllowed(file: File, adFormats: string[]): boolean {
-  const hasImage = adFormats.includes('image');
-  const hasVideo = adFormats.includes('video');
-  if (hasImage && hasVideo) return file.type.startsWith('image/') || file.type.startsWith('video/');
-  if (hasImage) return file.type.startsWith('image/');
-  if (hasVideo) return file.type.startsWith('video/');
-  return false;
-}
-
-
-// Reuse AddNewSelect from Onboarding — inline version for GeoTargeting
-interface GeoAddNewSelectProps {
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  setOptions: (opts: string[]) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}
-
-function GeoAddNewSelect({ value, onChange, options, setOptions, placeholder, disabled }: GeoAddNewSelectProps) {
+function AddNewSelect({
+  value, onChange, options, setOptions, placeholder, loading = false, showSearch = false,
+}: AddNewSelectProps & { loading?: boolean; showSearch?: boolean }) {
   const [isAdding, setIsAdding] = useState(false);
-  const [newValue, setNewValue] = useState('');
+  const [newValue, setNewValue] = useState("");
 
   const handleAdd = () => {
     const trimmed = newValue.trim();
     if (trimmed && !options.includes(trimmed)) {
       setOptions([...options, trimmed]);
-      onChange(trimmed);
-    } else if (trimmed) {
-      onChange(trimmed);
     }
-    setNewValue('');
+    if (trimmed) onChange(trimmed);
+    setNewValue("");
     setIsAdding(false);
   };
 
@@ -144,2937 +229,1240 @@ function GeoAddNewSelect({ value, onChange, options, setOptions, placeholder, di
     return (
       <Input
         autoFocus
-        placeholder="Type and press Enter"
+        placeholder="Type and press Enter to save"
         value={newValue}
-        suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵</span>}
-        onChange={e => setNewValue(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') handleAdd();
-          if (e.key === 'Escape') { setNewValue(''); setIsAdding(false); }
+        suffix={<span style={{ fontSize: 11, color: "#aaa" }}>↵ Enter</span>}
+        onChange={(e) => setNewValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleAdd();
+          if (e.key === "Escape") { setNewValue(""); setIsAdding(false); }
         }}
-        onBlur={() => { setNewValue(''); setIsAdding(false); }}
-        style={{ height: 38 }}
+        onBlur={() => { setNewValue(""); setIsAdding(false); }}
       />
     );
   }
 
   return (
     <Select
-      placeholder={placeholder}
+      placeholder={loading ? "Loading…" : placeholder}
+      loading={loading}
       allowClear
-      disabled={disabled}
-      style={{ width: '100%', height: 38 }}
+      showSearch={showSearch}
+      filterOption={showSearch
+        ? (input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+        : undefined
+      }
+      style={{ width: "100%" }}
       value={value || undefined}
-      onChange={v => onChange(v ?? '')}
-      dropdownRender={menu => (
+      onChange={(v) => onChange(v ?? "")}
+      dropdownRender={(menu) => (
         <>
           {menu}
-          <Divider style={{ margin: '4px 0' }} />
+          <Divider style={{ margin: "4px 0" }} />
           <div
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => !disabled && setIsAdding(true)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setIsAdding(true)}
             style={{
-              padding: '8px 12px',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              color: disabled ? '#ccc' : '#4f46e5',
-              fontSize: 13,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
+              padding: "8px 12px", cursor: "pointer", color: "#4f46e5",
+              fontSize: 13, display: "flex", alignItems: "center", gap: 6,
             }}
           >
-            <PlusOutlined />
-            Add new
+            <PlusOutlined /> Add new
           </div>
         </>
       )}
-      options={options.map(s => ({ value: s, label: s }))}
+      options={toOpts(options)}
     />
   );
 }
 
-const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
+// ─── useLocationData ──────────────────────────────────────────────────────────
 
-// ── Nav ───────────────────────────────────────────────────────────────────────
-const NAV = [
-  {
-    g: 'WORKSPACE',
-    items: [
-      { label: 'Dashboard', icon: <LayoutOutlined />, to: '/user_dashboard' },
-      { label: 'My Campaigns', icon: <NotificationOutlined />, to: '/user_campaigns' },
-      { label: 'Create Campaign', icon: <PlusOutlined />, to: '/campaign_create' },
-      { label: 'Brief Capture', icon: <EditOutlined />, to: '/user_brief' },
-      { label: 'My Drafts', icon: <AppstoreOutlined />, to: '/user_drafts' },
-    ],
-  },
-  {
-    g: 'AD OPS',
-    items: [
-      { label: 'Insertion Orders', icon: <FileTextOutlined />, to: '/user_io' },
-      { label: 'Line Items', icon: <AppstoreOutlined />, to: '/user_lineitems' },
-      { label: 'Creatives', icon: <LayoutOutlined />, to: '/user_creatives' },
-      { label: 'Setup Tasks', icon: <SettingOutlined />, to: '/user_tasks' },
-    ],
-  },
-  {
-    g: 'MONITOR',
-    items: [
-      { label: 'Live Status', icon: <WifiOutlined />, to: '/user_live' },
-      { label: 'Change History', icon: <HistoryOutlined />, to: '/user_history' },
-      { label: 'Approvals', icon: <FileTextOutlined />, to: '/user_approvals' },
-    ],
-  },
-  {
-    g: 'INSIGHTS',
-    items: [
-      { label: 'Reports', icon: <FileTextOutlined />, to: '/user_reports' },
-      { label: 'Billing', icon: <CreditCardOutlined />, to: '/user_billing' },
-    ],
-  },
-];
-
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const location = useLocation();
-  return (
-    <aside className="cc-sidebar" style={{ width: collapsed ? 64 : 240 }}>
-      <div className="cc-sidebar-logo" style={{ padding: collapsed ? '0 14px' : '0 16px', justifyContent: collapsed ? 'center' : 'space-between' }}>
-        {!collapsed && (
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <div className="cc-sidebar-logo-icon">N</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>
-                Billion <span style={{ color: '#60A5FA' }}>Tags</span>
-              </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
-                CAMPAIGN PLATFORM
-              </div>
-            </div>
-          </Link>
-        )}
-        {collapsed && <div className="cc-sidebar-logo-icon">N</div>}
-        <button
-          onClick={onToggle}
-          className="cc-sidebar-toggle"
-          style={collapsed ? { position: 'absolute', right: 8, top: 20 } : {}}
-        >
-          {collapsed ? '›' : '‹'}
-        </button>
-      </div>
-
-      <nav className="cc-nav">
-        {NAV.map(({ g, items }) => (
-          <div key={g} style={{ marginBottom: 2 }}>
-            {!collapsed && <div className="cc-nav-group-label">{g}</div>}
-            {items.map(({ label, icon, to }) => {
-              const active = location.pathname === to;
-              return (
-                <Link key={to} to={to} style={{ textDecoration: 'none' }}>
-                  <div className={`cc-nav-item ${active ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}>
-                    {icon}
-                    {!collapsed && <span>{label}</span>}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div className="cc-sidebar-footer" style={{ padding: collapsed ? '10px 8px' : '10px' }}>
-        {!collapsed && (
-          <div className="cc-sidebar-user">
-            <div className="cc-sidebar-avatar">AS</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Aarav Shah</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CAMPAIGN MANAGER</div>
-            </div>
-          </div>
-        )}
-        <Link to="/portal_settings" style={{ textDecoration: 'none' }}>
-          <div className={`cc-nav-item ${collapsed ? 'collapsed' : ''}`} style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 3 }}>
-            <SettingOutlined />{!collapsed && 'Settings'}
-          </div>
-        </Link>
-        <Link to="/login" style={{ textDecoration: 'none' }}>
-          <div className={`cc-nav-item ${collapsed ? 'collapsed' : ''}`} style={{ color: 'rgba(248,113,113,0.85)', fontSize: 12, fontWeight: 600 }}>
-            <LogoutOutlined />{!collapsed && 'Sign Out'}
-          </div>
-        </Link>
-      </div>
-    </aside>
-  );
-}
-
-// ── Geo Location ──────────────────────────────────────────────────────────────
-interface GeoLocation {
-  country: string;
-  state: string;
-  city: string;
-  zipcode: string;
-  range: string;
-}
-
-// ── GeoTargeting ─────────────────────────────────────────────────────────────
-function GeoTargeting({ locations, onAdd, onRemove }: {
-  locations: GeoLocation[];
-  onAdd: (l: GeoLocation & { zipcode: string; range: string }) => void;
-  onRemove: (i: number) => void;
-}) {
-  const [country, setCountry] = useState('');
-  const [state, setState] = useState('');
-  const [city, setCity] = useState('');
-  const [zipcode, setZipcode] = useState('');
-  const [range, setRange] = useState('');
-  const [countryOpts, setCountryOpts] = useState<string[]>(GEO_COUNTRIES);
-  const [stateOpts, setStateOpts] = useState<string[]>([]);
-  const [cityOpts, setCityOpts] = useState<string[]>([]);
-
-  const rangeEnabled = !!(country || state || city || zipcode.trim());
-
-  const handleCountryChange = (v: string) => {
-    setCountry(v); setState(''); setCity('');
-    setStateOpts(GEO_STATES[v] || []); setCityOpts([]);
-  };
-
-  const handleStateChange = (v: string) => {
-    setState(v); setCity('');
-    setCityOpts(GEO_CITIES[v] || []);
-  };
-
-  const handleAdd = () => {
-    if (!country && !state && !city && !zipcode.trim()) return;
-    onAdd({ country, state, city, zipcode: zipcode.trim(), range: range.trim() });
-    setCountry(''); setState(''); setCity(''); setZipcode(''); setRange('');
-    setStateOpts([]); setCityOpts([]);
-  };
-
-  const canAdd = !!(country || state || city || zipcode.trim());
-
-  const fmt = (l: any) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ');
-
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, alignItems: 'end', marginBottom: 8 }}>
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Country
-          </div>
-          <GeoAddNewSelect value={country} onChange={handleCountryChange} options={countryOpts} setOptions={setCountryOpts} placeholder="Select country…" />
-        </div>
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />State
-          </div>
-          <GeoAddNewSelect value={state} onChange={handleStateChange} options={stateOpts.length > 0 ? stateOpts : (GEO_STATES[country] || [])} setOptions={setStateOpts} placeholder="Select state…" />
-        </div>
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />City
-          </div>
-          <GeoAddNewSelect value={city} onChange={setCity} options={cityOpts.length > 0 ? cityOpts : (GEO_CITIES[state] || [])} setOptions={setCityOpts} placeholder="Select city…" />
-        </div>
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Zip Code
-          </div>
-          <Input placeholder="e.g. 560001" value={zipcode} onChange={e => setZipcode(e.target.value)} style={{ height: 38 }} />
-        </div>
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: rangeEnabled ? 'var(--slate-500)' : 'var(--slate-300)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: rangeEnabled ? 'var(--blue)' : 'var(--slate-300)', marginRight: 4 }} />Range
-          </div>
-          <Input
-            placeholder="e.g. 10 km" value={range} disabled={!rangeEnabled}
-            onChange={e => setRange(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && rangeEnabled) handleAdd(); }}
-            style={{ height: 38, backgroundColor: rangeEnabled ? '#fff' : '#f5f5f5', cursor: rangeEnabled ? 'text' : 'not-allowed' }}
-          />
-        </div>
-        <Button type="primary" disabled={!canAdd} onClick={handleAdd} icon={<PlusOutlined />} style={{ height: 38 }}>Add</Button>
-      </div>
-      <div className="cc-geo-helper" style={{ marginBottom: 8 }}>
-        <InfoCircleOutlined style={{ marginRight: 4 }} />
-        Select at least one of Country, State, City or enter a Zip Code. Range is enabled after any selection.
-      </div>
-      {locations.length > 0 ? (
-        <div className="cc-geo-tags">
-          {locations.map((loc: any, idx: number) => (
-            <span key={idx} className="cc-geo-tag">
-              <EnvironmentOutlined style={{ fontSize: 10 }} />
-              {fmt(loc)}
-              <button className="cc-tag-remove" onClick={() => onRemove(idx)}>
-                <CloseOutlined style={{ fontSize: 10 }} />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="cc-geo-empty">No geo targets added yet. Fill at least one field above to begin.</div>
-      )}
-    </div>
-  );
-}
-
-// ── InfoBox ───────────────────────────────────────────────────────────────────
-function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; children: React.ReactNode }) {
-  return (
-    <div className={`cc-info-box ${variant}`}>
-      <InfoCircleOutlined style={{ color: variant === 'blue' ? 'var(--blue)' : 'var(--amber)', flexShrink: 0, marginTop: 1 }} />
-      <p>{children}</p>
-    </div>
-  );
-}
-
-// ── Step 1 ────────────────────────────────────────────────────────────────────
-function Step1({ client, setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
-  const [clientName, setClientName] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(CLIENT_URL, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
-    })
-      .then(res => res.json())
-      .then(data => {
-        setClientName(data.name || '');
-        setClient(data.name || '');
-        setClientId(data.client_id || '');
-      })
-      .catch(() => setClientName('Failed to load'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div className="cc-form-section-sm">
-      <Form layout="vertical" className="cc-form">
-        <Form.Item label="Company Name" required>
-          <Input className="cc-company-name-input" value={loading ? 'Loading…' : clientName} disabled style={{ fontWeight: 600 }} />
-        </Form.Item>
-        <Form.Item label="Advertiser (Brand)" required>
-          <Select
-            value={advertiser || undefined}
-            onChange={setAdvertiser}
-            placeholder="Select an advertiser…"
-            options={toOpts(['Unilever India', 'Tata Digital', 'HDFC Bank', 'Myntra', 'Reliance Retail', 'Mahindra Group', 'Airtel India'])}
-            style={{ width: '100%', height: 38 }}
-          />
-        </Form.Item>
-        <InfoBox variant="blue">
-          All campaigns, line items, creatives and reports will be mapped under the selected client and advertiser. This cannot be changed after creation.
-        </InfoBox>
-        <Form.Item label="Website URL">
-          <Input placeholder="https://" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} style={{ height: 38 }} />
-        </Form.Item>
-      </Form>
-    </div>
-  );
-}
-
-// ── Step 2 ────────────────────────────────────────────────────────────────────
-function Step2({
-  campaignId, campaignName, setCampaignName,
-  clientCampaignId, setClientCampaignId,
-  purchaseOrderId, setPurchaseOrderId,
-  campaignType, setCampaignType,
-  buyingType, setBuyingType,
-  objective, setObjective,
-  notes, setNotes, startDate, setStartDate, endDate, setEndDate
-}: any) {
-  return (
-    <div className="cc-form-section-sm">
-      <Form layout="vertical" className="cc-form">
-        <div className="cc-row-grid">
-          <Form.Item label="Campaign ID">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              {campaignId ? (
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--slate-800)' }}>{campaignId}</span>
-              ) : (
-                <span style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--slate-400)', fontWeight: 400 }}>Auto-generated after save</span>
-              )}
-            </div>
-          </Form.Item>
-        </div>
-
-        <div className="cc-row-grid">
-          <Form.Item label="Client Campaign ID">
-            <Input placeholder="Enter Client Campaign ID" value={clientCampaignId} onChange={e => setClientCampaignId(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Purchase Order ID">
-            <Input placeholder="Enter Purchase Order ID" value={purchaseOrderId} onChange={e => setPurchaseOrderId(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Campaign Name" required>
-            <Input placeholder="e.g. Summer Awareness 2024" value={campaignName} onChange={e => setCampaignName(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Campaign Type" required>
-            <Select
-              value={campaignType || undefined}
-              onChange={setCampaignType}
-              placeholder="Select type…"
-              options={toOpts(['Brand Awareness', 'Performance', 'Retargeting', 'Prospecting', 'Lead Generation'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
-          <Form.Item label="Campaign Start Date" required>
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={startDate ? dayjs(startDate) : null}
-              onChange={(_, ds) => setStartDate(typeof ds === 'string' ? ds : '')}
-            />
-          </Form.Item>
-          <Form.Item label="Campaign End Date" required>
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={endDate ? dayjs(endDate) : null}
-              onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')}
-            />
-          </Form.Item>
-          
-          <Form.Item label="Buying Type" required>
-            <Select
-              mode="multiple"
-              value={buyingType}
-              onChange={(vals: string[]) => setBuyingType(vals)}
-              placeholder="Select buying type…"
-              style={{ width: '100%' }}
-              options={[
-                { value: 'Programmatic (DV360)', label: 'Programmatic (DV360)' },
-                { value: 'Direct', label: 'Direct' },
-                { value: 'Programmatic Guaranteed', label: 'Programmatic Guaranteed' },
-                { value: 'Preferred Deal', label: 'Preferred Deal' },
-                { value: 'Open Auction', label: 'Open Auction' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-          <Form.Item label="Campaign Objective" required>
-            <Select
-              value={objective || undefined}
-              onChange={setObjective}
-              placeholder="Select objective…"
-              options={toOpts(['Increase Brand Awareness', 'Drive Website Traffic', 'Generate Leads', 'Boost Sales', 'App Installs'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
-        </div>
-
-        <Form.Item label="Notes">
-          <TextArea placeholder="Add any notes for internal reference" value={notes} onChange={e => setNotes(e.target.value)} rows={4} />
-        </Form.Item>
-      </Form>
-    </div>
-  );
-}
-
-// ── Step 3 ────────────────────────────────────────────────────────────────────
-function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, platforms, setPlatforms, freqCap, setFreqCap, brandSafety, setBrandSafety, viewability, setViewability }: any) {
-  return (
-    <div className="cc-form-section">
-      <Form layout="vertical" className="cc-form">
-        <div className="cc-row-grid">
-          <Form.Item label="Age" required>
-            <Select
-              mode="multiple"
-              value={age}
-              onChange={(vals: string[]) => setAge(vals)}
-              placeholder="Select Age"
-              style={{ width: '100%' }}
-              options={[
-                { value: '18 to 24', label: '18 to 24' },
-                { value: '25 to 34', label: '25 to 34' },
-                { value: '35 to 44', label: '35 to 44' },
-                { value: '45 to 54', label: '45 to 54' },
-                { value: '55 to 64', label: '55 to 64' },
-                { value: 'Others', label: 'Others' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-          <Form.Item label="Gender" required>
-            <Select
-              value={gender || undefined}
-              onChange={setGender}
-              placeholder="Select Gender"
-              style={{ width: '100%' }}
-              options={[
-                { value: 'Male', label: 'Male' },
-                { value: 'Female', label: 'Female' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-        </div>
-
-        <Form.Item label="Geo Targeting" required>
-          <div className="cc-geo-wrap">
-            <div className="cc-geo-header">
-              <div className="cc-geo-icon-wrap">
-                <EnvironmentOutlined style={{ color: 'var(--blue)', fontSize: 13 }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--slate-700)' }}>Location Targeting</div>
-                <div style={{ fontSize: 11, color: 'var(--slate-400)' }}>Country → State → City</div>
-              </div>
-              {geoLocations.length > 0 && (
-                <div className="cc-geo-count-badge">{geoLocations.length} location{geoLocations.length > 1 ? 's' : ''} added</div>
-              )}
-            </div>
-            <GeoTargeting
-              locations={geoLocations}
-              onAdd={(loc: GeoLocation) => setGeoLocations((p: GeoLocation[]) => [...p, loc])}
-              onRemove={(idx: number) => setGeoLocations((p: GeoLocation[]) => p.filter((_: GeoLocation, i: number) => i !== idx))}
-            />
-          </div>
-        </Form.Item>
-
-        <Form.Item label="Platform / Inventory" required>
-          <Select
-            mode="multiple"
-            value={platforms}
-            onChange={(vals: string[]) => setPlatforms(vals)}
-            placeholder="Select Platforms"
-            style={{ width: '100%' }}
-            options={[
-              { value: 'Display', label: 'Display' },
-              { value: 'Video', label: 'Video' },
-              { value: 'PMP', label: 'PMP' },
-              { value: 'CTV', label: 'CTV' },
-              { value: 'Audio', label: 'Audio' },
-              { value: 'Native', label: 'Native' },
-              { value: 'DOOH', label: 'DOOH' },
-              { value: 'Mobile', label: 'Mobile' },
-            ]}
-            maxTagCount="responsive"
-          />
-        </Form.Item>
-
-        <div className="cc-row-grid">
-          <Form.Item label="Frequency Cap">
-            <div className="cc-unit-input">
-              <InputNumber
-                min={1}
-                placeholder="e.g. 3"
-                value={freqCap ? Number(freqCap) : undefined}
-                onChange={v => setFreqCap(String(v ?? ''))}
-                style={{ width: 80, height: 38 }}
-              />
-              <span className="cc-unit-label">impressions / user</span>
-            </div>
-          </Form.Item>
-          <Form.Item label="Brand Safety Level" required>
-            <Select
-              value={brandSafety || undefined}
-              onChange={setBrandSafety}
-              placeholder="Select level…"
-              options={toOpts(['Standard', 'Strict', 'Custom'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
-        </div>
-
-        <Form.Item label="Viewability Goal">
-          <div className="cc-unit-input">
-            <InputNumber
-              min={0} max={100}
-              placeholder="e.g. 70"
-              value={viewability ? Number(viewability) : undefined}
-              onChange={v => setViewability(String(v ?? ''))}
-              style={{ width: 80, height: 38 }}
-            />
-            <span className="cc-unit-label">%</span>
-          </div>
-        </Form.Item>
-      </Form>
-    </div>
-  );
-}
-
-// ── Line Item Card ────────────────────────────────────────────────────────────
-interface LineItemCardProps {
-  item: LineItem;
-  index: number;
-  campaignStart: string;
-  campaignEnd: string;
-  onChange: (id: string, field: keyof LineItem, value: any) => void;
-  onRemove: (id: string) => void;
-  canRemove: boolean;
-}
-
-function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove }: LineItemCardProps) {
-  const [dateError, setDateError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  function validateDates(start: string, end: string): string {
-    if (!campaignStart || !campaignEnd) return '';
-    const cStart = dayjs(campaignStart);
-    const cEnd = dayjs(campaignEnd);
-
-    if (start) {
-      const s = dayjs(start);
-      if (s.isBefore(cStart, 'day') || s.isAfter(cEnd, 'day')) {
-        return `Start date must be between ${cStart.format('DD MMM YYYY')} and ${cEnd.format('DD MMM YYYY')}.`;
-      }
-    }
-    if (end) {
-      const e = dayjs(end);
-      if (e.isBefore(cStart, 'day') || e.isAfter(cEnd, 'day')) {
-        return `End date must be between ${cStart.format('DD MMM YYYY')} and ${cEnd.format('DD MMM YYYY')}.`;
-      }
-    }
-    if (start && end && dayjs(end).isBefore(dayjs(start), 'day')) {
-      return 'End date must be after start date.';
-    }
-    return '';
-  }
-
-  function handleStartDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
-    onChange(item.id, 'startDate', val);
-    setDateError(validateDates(val, item.endDate));
-  }
-
-  function handleEndDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
-    onChange(item.id, 'endDate', val);
-    setDateError(validateDates(item.startDate, val));
-  }
-
-  function disabledDate(current: Dayjs): boolean {
-    if (!campaignStart || !campaignEnd) return false;
-    return current.isBefore(dayjs(campaignStart), 'day') || current.isAfter(dayjs(campaignEnd), 'day');
-  }
-
-  function handleAdFormatChange(vals: string[]) {
-    onChange(item.id, 'adFormat', vals);
-    // Remove incompatible creatives
-    const compatible = item.creatives.filter(f => {
-      const hasImage = vals.includes('image');
-      const hasVideo = vals.includes('video');
-      if (hasImage && hasVideo) return true;
-      if (hasImage) return f.type.startsWith('image/');
-      if (hasVideo) return f.type.startsWith('video/');
-      return false;
-    });
-    if (compatible.length !== item.creatives.length) {
-      onChange(item.id, 'creatives', compatible);
-      message.info('Some creatives were removed due to format change.');
-    }
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    if (item.adFormat.length === 0) {
-      message.warning('Please select an Ad Format before uploading creatives.');
-      return;
-    }
-    const invalid = files.filter(f => !isFileAllowed(f, item.adFormat));
-    const valid = files.filter(f => isFileAllowed(f, item.adFormat));
-    if (invalid.length > 0) {
-      message.error(`Invalid file(s): ${invalid.map(f => f.name).join(', ')}. Only ${getFormatLabel(item.adFormat)} allowed.`);
-    }
-    if (valid.length > 0) {
-      onChange(item.id, 'creatives', [...item.creatives, ...valid]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  function removeCreative(idx: number) {
-    onChange(item.id, 'creatives', item.creatives.filter((_, i) => i !== idx));
-  }
-
-  function fileIcon(file: File) {
-    if (file.type.startsWith('image/')) return <FileImageOutlined style={{ color: '#4f46e5', fontSize: 14 }} />;
-    if (file.type.startsWith('video/')) return <VideoCameraOutlined style={{ color: '#0ea5e9', fontSize: 14 }} />;
-    return <PaperClipOutlined style={{ fontSize: 14 }} />;
-  }
-
-  const accept = item.adFormat.length > 0 ? getAccept(item.adFormat) : '*';
-  const formatLabel = item.adFormat.length > 0 ? getFormatLabel(item.adFormat) : 'files';
-
-  // Badge colors per format
-  const badgeBg = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#ede9fe' : item.adFormat.includes('image') ? '#dbeafe' : '#e0f2fe';
-  const badgeColor = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#6d28d9' : item.adFormat.includes('image') ? '#1d4ed8' : '#0369a1';
-  const badgeText = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? 'Image + Video' : item.adFormat.includes('image') ? 'Images only' : 'Videos only';
-
-  return (
-    <div style={{
-      border: '0.5px solid var(--color-border-secondary, #e2e8f0)',
-      borderRadius: 12,
-      background: '#fff',
-      padding: '20px 24px',
-      marginBottom: 16,
-    }}>
-      {/* Card header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%', background: '#4f46e5',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 600, flexShrink: 0,
-          }}>
-            {index + 1}
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--slate-800, #1e293b)' }}>
-            {item.lineItemName || `Line Item ${index + 1}`}
-          </span>
-        </div>
-        {canRemove && (
-          <button
-            onClick={() => onRemove(item.id)}
-            style={{
-              background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6,
-              padding: '4px 10px', cursor: 'pointer', color: '#ef4444',
-              fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <DeleteOutlined style={{ fontSize: 12 }} /> Remove
-          </button>
-        )}
-      </div>
-
-      <Form layout="vertical">
-        {/* Row: Line Item Name + Ethnicity */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Line Item Name <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Input
-              placeholder="e.g. Mumbai Display — 18-34"
-              value={item.lineItemName}
-              onChange={e => onChange(item.id, 'lineItemName', e.target.value)}
-              style={{ height: 38 }}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ethnicity</span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Select
-              mode="multiple"
-              value={item.ethnicity}
-              onChange={vals => onChange(item.id, 'ethnicity', vals)}
-              placeholder="Select ethnicity…"
-              maxTagCount="responsive"
-              style={{ width: '100%' }}
-              options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Row: Start Date + End Date */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Start Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }}
-            validateStatus={dateError ? 'error' : ''}
-          >
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={item.startDate ? dayjs(item.startDate) : null}
-              onChange={handleStartDate}
-              disabledDate={disabledDate}
-              placeholder={campaignStart ? `From ${dayjs(campaignStart).format('DD MMM YYYY')}` : 'Select date'}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>End Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }}
-            validateStatus={dateError ? 'error' : ''}
-          >
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={item.endDate ? dayjs(item.endDate) : null}
-              onChange={handleEndDate}
-              disabledDate={disabledDate}
-              placeholder={campaignEnd ? `Until ${dayjs(campaignEnd).format('DD MMM YYYY')}` : 'Select date'}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Date error banner */}
-        {dateError && (
-          <div style={{
-            background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: 6,
-            padding: '7px 12px', marginBottom: 14, fontSize: 12.5, color: '#dc2626',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            ⚠ {dateError}
-          </div>
-        )}
-
-        {/* Campaign flight reference pill */}
-        {campaignStart && campaignEnd && (
-          <div style={{
-            fontSize: 11.5, color: '#64748b', marginBottom: 14,
-            background: '#f8fafc', borderRadius: 6, padding: '4px 10px',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            border: '0.5px solid #e2e8f0',
-          }}>
-            Campaign flight: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
-          </div>
-        )}
-
-        {/* Row: Ad Format + Impressions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Select
-              mode="multiple"
-              value={item.adFormat}
-              onChange={handleAdFormatChange}
-              placeholder="Select format…"
-              maxTagCount="responsive"
-              style={{ width: '100%' }}
-              options={AD_FORMAT_OPTIONS}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Input
-              placeholder="e.g. 1000000"
-              value={item.impressions}
-              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
-              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>}
-              style={{ height: 38 }}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Creatives Upload */}
-        <Form.Item
-          label={
-            <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-              Creatives
-              {item.adFormat.length > 0 && (
-                <span style={{
-                  background: badgeBg, color: badgeColor,
-                  fontSize: 10.5, fontWeight: 500, padding: '1px 8px',
-                  borderRadius: 10,
-                }}>
-                  {badgeText}
-                </span>
-              )}
-            </span>
-          }
-          style={{ marginBottom: 14 }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={accept}
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
-
-          {/* Upload trigger */}
-          <div
-            onClick={() => {
-              if (item.adFormat.length === 0) {
-                message.warning('Please select an Ad Format first.');
-                return;
-              }
-              fileInputRef.current?.click();
-            }}
-            style={{
-              border: `1px dashed ${item.adFormat.length === 0 ? '#d1d5db' : '#4f46e5'}`,
-              borderRadius: 8,
-              padding: '14px 16px',
-              cursor: item.adFormat.length === 0 ? 'not-allowed' : 'pointer',
-              background: item.adFormat.length === 0 ? '#f9fafb' : '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <PlusOutlined style={{ fontSize: 16, color: item.adFormat.length === 0 ? '#d1d5db' : '#4f46e5' }} />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: item.adFormat.length === 0 ? '#9ca3af' : '#1e293b' }}>
-                {item.adFormat.length === 0 ? 'Select an Ad Format above to enable upload' : `Upload ${formatLabel}`}
-              </div>
-              {item.adFormat.length > 0 && (
-                <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Click to browse — multiple files supported</div>
-              )}
-            </div>
-          </div>
-
-          {/* File list */}
-          {item.creatives.length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {item.creatives.map((file, idx) => (
-                <div key={idx} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 10px', background: '#f8fafc',
-                  borderRadius: 6, border: '0.5px solid #e2e8f0',
-                }}>
-                  {fileIcon(file)}
-                  <span style={{ flex: 1, fontSize: 12.5, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {file.name}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
-                    {(file.size / 1024).toFixed(1)} KB
-                  </span>
-                  <button
-                    onClick={() => removeCreative(idx)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444', display: 'flex', alignItems: 'center' }}
-                  >
-                    <CloseOutlined style={{ fontSize: 11 }} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </Form.Item>
-
-        {/* Landing Page */}
-        <Form.Item
-          label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Landing Page</span>}
-          style={{ marginBottom: 0 }}
-        >
-          <Input
-            placeholder="https://example.com/landing"
-            value={item.landingPage}
-            onChange={e => onChange(item.id, 'landingPage', e.target.value)}
-            style={{ height: 38 }}
-          />
-        </Form.Item>
-      </Form>
-    </div>
-  );
-}
-
-// ── Step 5 — Line Item Details ────────────────────────────────────────────────
-function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLineItems }: {
-  campaignStartDate: string;
-  campaignEndDate: string;
-  lineItems: LineItem[];
-  setLineItems: React.Dispatch<React.SetStateAction<LineItem[]>>;
-}) {
-  function handleChange(id: string, field: keyof LineItem, value: any) {
-    setLineItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  }
-
-  function handleAdd() {
-    setLineItems(prev => [...prev, emptyLineItem()]);
-  }
-
-  function handleRemove(id: string) {
-    setLineItems(prev => prev.filter(item => item.id !== id));
-  }
-
-  return (
-    <div className="cc-form-section">
-      {/* Campaign flight hint */}
-      {(!campaignStartDate || !campaignEndDate) && (
-        <div style={{
-          background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: 8,
-          padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <InfoCircleOutlined style={{ color: '#d97706' }} />
-          No campaign dates set. Go back to Step 2 to set them — line item dates will be validated against those dates.
-        </div>
-      )}
-
-      {lineItems.map((item, idx) => (
-        <LineItemCard
-          key={item.id}
-          item={item}
-          index={idx}
-          campaignStart={campaignStartDate}
-          campaignEnd={campaignEndDate}
-          onChange={handleChange}
-          onRemove={handleRemove}
-          canRemove={lineItems.length > 1}
-        />
-      ))}
-
-      <button
-        onClick={handleAdd}
-        style={{
-          width: '100%', padding: '12px',
-          border: '1px dashed #4f46e5', borderRadius: 8,
-          background: 'none', cursor: 'pointer',
-          color: '#4f46e5', fontWeight: 500, fontSize: 13,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}
-      >
-        <PlusOutlined /> Add Another Line Item
-      </button>
-    </div>
-  );
-}
-
-// ── Step 6 — Review & Confirm ─────────────────────────────────────────────────
-function Step5Review({
-  client, advertiser, websiteUrl,
-  campaignName, clientCampaignId, purchaseOrderId,
-  campaignType, buyingType, objective, notes,
-  age, gender, geoLocations, platforms,
-  freqCap, brandSafety, viewability,
-  budgetType, totalBudget, startDate, endDate, durationDays,
-  pacing, dayParting, timezone,
-  lineItems,
-  onEdit,
-}: any) {
-  const geoString = geoLocations.length > 0
-    ? geoLocations.map((l: GeoLocation) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ')).join(', ')
-    : '—';
-
-  const campaignRows = [
-    { label: 'Client', value: client || '—' },
-    { label: 'Advertiser', value: advertiser || '—' },
-    { label: 'Website URL', value: websiteUrl || '—' },
-    { label: 'Campaign Name', value: campaignName || '—' },
-    { label: 'Client Campaign ID', value: clientCampaignId || '—' },
-    { label: 'Purchase Order ID', value: purchaseOrderId || '—' },
-    { label: 'Campaign Type', value: campaignType || '—' },
-    { label: 'Buying Type', value: buyingType.length > 0 ? buyingType.join(', ') : '—' },
-    { label: 'Objective', value: objective || '—' },
-    { label: 'Notes', value: notes || '—' },
-    { label: 'Age', value: Array.isArray(age) && age.length > 0 ? age.join(', ') : '—' },
-    { label: 'Gender', value: gender || '—' },
-    { label: 'Geo Targeting', value: geoString },
-    { label: 'Platforms', value: platforms.join(', ') || '—' },
-    { label: 'Frequency Cap', value: freqCap ? `${freqCap} impressions/user` : '—' },
-    { label: 'Brand Safety', value: brandSafety || '—' },
-    { label: 'Viewability Goal', value: viewability ? `${viewability}%` : '—' },
-    { label: 'Budget', value: totalBudget ? `₹ ${totalBudget} (${budgetType === 'total' ? 'Total' : 'Daily'})` : '—' },
-    { label: 'Flight Duration', value: durationDays > 0 ? `${startDate} → ${endDate} (${durationDays} days)` : '—' },
-    { label: 'Pacing', value: pacing || '—' },
-    { label: 'Day Parting', value: dayParting || '—' },
-    { label: 'Time Zone', value: timezone || '—' },
-  ];
-
-  return (
-    <div className="cc-form-section">
-      <div className="cc-review-ready">
-        <div className="cc-review-ready-icon">
-          <CheckOutlined style={{ color: '#fff', fontSize: 18, fontWeight: 900 }} />
-        </div>
-        <div>
-          <div className="cc-review-ready-title">All steps complete — ready to launch</div>
-          <div className="cc-review-ready-sub">Review the details below before creating the campaign.</div>
-        </div>
-      </div>
-
-      {/* Campaign Summary */}
-      <div className="cc-review-header">
-        <span className="cc-review-label">Campaign Summary</span>
-        <button className="cc-review-edit-btn" onClick={onEdit}>← Edit Details</button>
-      </div>
-      <div className="cc-review-table">
-        {campaignRows.map((row, i) => (
-          <div key={row.label} className="cc-review-row" style={{ background: i % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
-            <span className="cc-review-row-key">{row.label}</span>
-            <span className="cc-review-row-val">{row.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Line Items Summary */}
-      {lineItems.length > 0 && (
-        <>
-          <div className="cc-review-header" style={{ marginTop: 20 }}>
-            <span className="cc-review-label">Line Items ({lineItems.length})</span>
-          </div>
-          {lineItems.map((li: LineItem, i: number) => (
-            <div key={li.id} style={{
-              border: '0.5px solid #e2e8f0', borderRadius: 10,
-              marginBottom: 12, overflow: 'hidden',
-            }}>
-              <div style={{
-                background: '#f8fafc', padding: '8px 14px',
-                fontSize: 12.5, fontWeight: 600, color: '#1e293b',
-                borderBottom: '0.5px solid #e2e8f0',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%', background: '#4f46e5',
-                  color: '#fff', fontSize: 11, display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>{i + 1}</span>
-                {li.lineItemName || `Line Item ${i + 1}`}
-              </div>
-              <div className="cc-review-table">
-                {[
-                  { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
-                  { label: 'Start Date', value: li.startDate || '—' },
-                  { label: 'End Date', value: li.endDate || '—' },
-                  { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
-                  { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
-                  { label: 'Creatives', value: li.creatives.length > 0 ? `${li.creatives.length} file(s): ${li.creatives.map(f => f.name).join(', ')}` : '—' },
-                  { label: 'Landing Page', value: li.landingPage || '—' },
-                ].map((row, j) => (
-                  <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
-                    <span className="cc-review-row-key">{row.label}</span>
-                    <span className="cc-review-row-val">{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-
-      <div style={{ marginTop: 18 }}>
-        <InfoBox variant="amber">
-          Once created, you can manage line items, add creatives and launch the campaign from the campaigns dashboard.
-        </InfoBox>
-      </div>
-    </div>
-  );
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-export default function Campaign_Create() {
-  const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-  const sideWidth = collapsed ? 64 : 240;
-  const [activeStep, setActiveStep] = useState(1);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // Step 1
-  const [client, setClient] = useState('');
-  const [clientId, setClientId] = useState('');  // ✅ add this
-  const [advertiser, setAdvertiser] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
-
-  // Step 2
-  const [campaignName, setCampaignName] = useState('');
-  const [clientCampaignId, setClientCampaignId] = useState('');
-  const [purchaseOrderId, setPurchaseOrderId] = useState('');
-  const [campaignType, setCampaignType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [buyingType, setBuyingType] = useState<string[]>([]);
-  const [objective, setObjective] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // Step 3
-  const [age, setAge] = useState<string[]>([]);
-  const [gender, setGender] = useState('');
-  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [freqCap, setFreqCap] = useState('');
-  const [brandSafety, setBrandSafety] = useState('');
-  const [viewability, setViewability] = useState('');
-
-  // Step 4 — Line Items
-  const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setSubmitStatus('idle');
-    setErrorMsg('');
-
-    // In handleSubmit — update geo string to include new fields
-    const geoString = geoLocations.map(loc =>
-      [loc.country, loc.state, loc.city, loc.zipcode, loc.range].filter(Boolean).join(' > ')
-    ).join('; ');
-
-    const fd = new FormData();
-    fd.append('client', clientId);
-    fd.append('client_name', client);
-    fd.append('advertiser', advertiser);
-    fd.append('campaign_name', campaignName);
-    fd.append('campaign_type', campaignType);
-    fd.append('buying_type', buyingType.join(', '));
-    fd.append('objective', objective);
-    fd.append('age', age.join(', '));
-    fd.append('gender', gender);
-    fd.append('geo_targeting', geoString);
-    fd.append('platforms', platforms.join(', '));
-    fd.append('brand_safety', brandSafety);
-    fd.append('start_date', startDate);
-    fd.append('end_date', endDate);
-    if (websiteUrl) fd.append('website_url', websiteUrl);
-    if (clientCampaignId) fd.append('client_campaign_id', clientCampaignId);
-    if (purchaseOrderId) fd.append('purchase_order_id', purchaseOrderId);
-    if (notes) fd.append('notes', notes);
-    if (freqCap) fd.append('frequency_cap', freqCap);
-    if (viewability) fd.append('viewability_goal', viewability);
-
-    // Serialize line items (metadata as JSON, files appended separately)
-    fd.append('line_items', JSON.stringify(
-      lineItems.map(li => ({
-        lineItemName: li.lineItemName,
-        ethnicity: li.ethnicity,
-        startDate: li.startDate,
-        endDate: li.endDate,
-        adFormat: li.adFormat,
-        impressions: li.impressions,
-        landingPage: li.landingPage,
-        creatives: li.creatives.map(f => f.name),
-      }))
-    ));
-    lineItems.forEach((li, i) => {
-      li.creatives.forEach(file => {
-        fd.append(`line_item_${i}_creative`, file, file.name);
-      });
-    });
-
-    try {
-      const res = await fetch(SUBMIT_URL, { method: 'POST', body: fd });
-      if (res.ok) {
-        setSubmitStatus('success');
-      } else {
-        const text = await res.text();
-        setSubmitStatus('error');
-        setErrorMsg(text || `Server error: ${res.status}`);
-      }
-    } catch (err: unknown) {
-      setSubmitStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const STEPS = [
-    { n: 1, label: 'Select Client & Advertiser', sub: 'Choose client and advertiser' },
-    { n: 2, label: 'Campaign Details', sub: 'Basic campaign information' },
-    { n: 3, label: 'Objectives & Settings', sub: 'Define goals and settings' },
-    { n: 4, label: 'Line Item Details', sub: 'Add line items' },
-    { n: 5, label: 'Review & Confirm', sub: 'Review and create campaign' },
-  ];
-
-  const stepTitles: Record<number, { title: string; sub: string }> = {
-    1: { title: 'Select Client & Advertiser', sub: 'Choose the client and advertiser for this campaign' },
-    2: { title: 'Campaign Details', sub: 'Provide basic information about the campaign' },
-    3: { title: 'Objectives & Settings', sub: 'Define target audience and platform settings' },
-    4: { title: 'Line Item Details', sub: 'Add one or more line items for this campaign' },
-    5: { title: 'Review & Confirm', sub: 'Review all details before creating the campaign' },
-  };
-
-  return (
-    <div className="cc-root">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
-
-      <div className="cc-main" style={{ marginLeft: sideWidth }}>
-
-        {/* Topbar */}
-        <header className="cc-topbar">
-          <div className="cc-topbar-breadcrumb">
-            <Link to="/user_campaigns" style={{ color: 'var(--slate-500)', textDecoration: 'none' }}>Campaigns</Link>
-            <RightOutlined style={{ fontSize: 13 }} />
-            <span style={{ color: 'var(--slate)', fontWeight: 600 }}>Create Campaign</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="cc-topbar-bell">
-              <BellOutlined style={{ fontSize: 15, color: 'var(--slate-500)' }} />
-              <span className="cc-topbar-bell-dot" />
-            </div>
-            <div className="cc-topbar-avatar">AK</div>
-          </div>
-        </header>
-
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
-          <div className="cc-page-header">
-            <h1 className="cc-page-title">Create New Campaign</h1>
-            <p className="cc-page-sub">Follow the steps below to create a new campaign</p>
-          </div>
-
-          {submitStatus === 'success' && (
-            <div className="cc-banner cc-banner-success">✅ Campaign created successfully! Redirecting…</div>
-          )}
-          {submitStatus === 'error' && (
-            <div className="cc-banner cc-banner-error">❌ Submission failed: {errorMsg}</div>
-          )}
-
-          {/* Stepper */}
-          <div className="cc-stepper-wrap">
-            <div className="cc-stepper">
-              {STEPS.map((s, i) => {
-                const isActive = s.n === activeStep;
-                const isDone = s.n < activeStep;
-                return (
-                  <React.Fragment key={s.n}>
-                    <div className={`cc-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} onClick={() => isDone && setActiveStep(s.n)}>
-                      <div className={`cc-step-circle ${isActive ? 'is-active' : isDone ? 'is-done' : 'inactive'}`}>
-                        {isDone ? <CheckOutlined style={{ fontSize: 13 }} /> : s.n}
-                      </div>
-                      <div>
-                        <div className={`cc-step-label ${isActive ? 'active' : isDone ? 'done' : ''}`}>{s.label}</div>
-                        <div className={`cc-step-sub ${isActive ? 'active' : ''}`}>{s.sub}</div>
-                      </div>
-                    </div>
-                    {i < STEPS.length - 1 && <div className={`cc-step-connector ${isDone ? 'done' : ''}`} />}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Step Content */}
-          <div className="cc-content-wrap" key={activeStep}>
-            <div className="cc-card">
-              <div className="cc-card-header">
-                <div className="cc-card-step-badge">{activeStep}</div>
-                <div>
-                  <div className="cc-card-title">{stepTitles[activeStep].title}</div>
-                  <div className="cc-card-sub">{stepTitles[activeStep].sub}</div>
-                </div>
-                <div className="cc-card-step-count">Step {activeStep} of {STEPS.length}</div>
-              </div>
-              <div className="cc-card-body">
-                {activeStep === 1 && (
-                  <Step1
-                    client={client} setClient={setClient}
-                    setClientId={setClientId}
-                    advertiser={advertiser} setAdvertiser={setAdvertiser}
-                    websiteUrl={websiteUrl} setWebsiteUrl={setWebsiteUrl}
-                  />
-                )}
-                {activeStep === 2 && (
-                  <Step2
-                    campaignId=""
-                    campaignName={campaignName} setCampaignName={setCampaignName}
-                    clientCampaignId={clientCampaignId} setClientCampaignId={setClientCampaignId}
-                    purchaseOrderId={purchaseOrderId} setPurchaseOrderId={setPurchaseOrderId}
-                    campaignType={campaignType} setCampaignType={setCampaignType}
-                    buyingType={buyingType} setBuyingType={setBuyingType}
-                    objective={objective} setObjective={setObjective}
-                    notes={notes} setNotes={setNotes}
-                    startDate={startDate} setStartDate={setStartDate}
-                    endDate={endDate} setEndDate={setEndDate}
-                  />
-                )}
-                {activeStep === 3 && (
-                  <Step3
-                    age={age} setAge={setAge}
-                    gender={gender} setGender={setGender}
-                    geoLocations={geoLocations} setGeoLocations={setGeoLocations}
-                    platforms={platforms} setPlatforms={setPlatforms}
-                    freqCap={freqCap} setFreqCap={setFreqCap}
-                    brandSafety={brandSafety} setBrandSafety={setBrandSafety}
-                    viewability={viewability} setViewability={setViewability}
-                  />
-                )}
-                
-                {activeStep === 4 && (
-                  <Step4LineItems
-                    campaignStartDate={startDate}
-                    campaignEndDate={endDate}
-                    lineItems={lineItems}
-                    setLineItems={setLineItems}
-                  />
-                )}
-                {activeStep === 5 && (
-                  <Step5Review
-                    client={client} advertiser={advertiser} websiteUrl={websiteUrl}
-                    campaignName={campaignName}
-                    clientCampaignId={clientCampaignId} purchaseOrderId={purchaseOrderId}
-                    campaignType={campaignType} buyingType={buyingType}
-                    objective={objective} notes={notes}
-                    age={age} gender={gender}
-                    geoLocations={geoLocations} platforms={platforms}
-                    freqCap={freqCap} brandSafety={brandSafety} viewability={viewability}
-                    startDate={startDate} endDate={endDate} 
-                    lineItems={lineItems}
-                    onEdit={() => setActiveStep(1)}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="cc-bottom-bar">
-            <Button className="cc-btn-cancel" onClick={() => navigate('/user_campaigns')}>Cancel</Button>
-            <div className="cc-bottom-bar-actions">
-              {activeStep > 1 && (
-                <Button className="cc-btn-back" onClick={() => setActiveStep(s => s - 1)}>← Back</Button>
-              )}
-              {activeStep < 5 ? (
-                <Button type="primary" className="cc-btn-next" onClick={() => setActiveStep(s => s + 1)} icon={<ArrowRightOutlined />} iconPosition="end">
-                  Next Step
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  className="cc-btn-submit"
-                  loading={submitting}
-                  onClick={handleSubmit}
-                  icon={<CheckOutlined />}
-                >
-                  {submitting ? 'Creating…' : 'Create Campaign'}
-                </Button>
-              )}
-            </div>
-          </div>
-
-        </main>
-      </div>
-    </div>
-  );
-}// Campaign form
-
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  Form, Input, Select, Button, DatePicker, InputNumber, Divider, message
-} from 'antd';
-import {
-  ArrowRightOutlined, CheckOutlined,
-  PlusOutlined, BellOutlined, RightOutlined,
-  CloseOutlined, InfoCircleOutlined,
-  EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
-} from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
-import isBetween from 'dayjs/plugin/isBetween';
-import '../styles/Campaign_Create.css';
-import Sidebar from '../shared/Sidebar';
-import type { LineItem, GeoLocation, GeoAddNewSelectProps, LineItemCardProps } from '../types/campaign.form.types';
-
-dayjs.extend(isBetween);
-
-const { TextArea } = Input;
-
-const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
-
-function emptyLineItem(): LineItem {
-  return {
-    id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    lineItemName: '',
-    ethnicity: [],
-    startDate: '',
-    endDate: '',
-    adFormat: [],
-    impressions: '',
-    creatives: [],
-    landingPage: '',
-  };
-}
-
-// ── Line Item helpers ─────────────────────────────────────────────────────────
-const ETHNICITY_OPTIONS = [
-  'General', 'Asian', 'South Asian', 'African American',
-  'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
-];
-
-const AD_FORMAT_OPTIONS = [
-  { value: 'image', label: 'Image' },
-  { value: 'video', label: 'Video' },
-];
-
-const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
-
-// ── GeoTargeting with live API + Add New ─────────────────────────────────────
-function GeoTargeting({ locations, onAdd, onRemove }: {
-  locations: GeoLocation[];
-  onAdd: (l: GeoLocation & { zipcode: string; range: string }) => void;
-  onRemove: (i: number) => void;
-}) {
-  const [country, setCountry] = useState('');
-  const [state, setState] = useState('');
-  const [city, setCity] = useState(''); 
-  const [zipcode, setZipcode] = useState('');
-  const [range, setRange] = useState('');
-
+function useLocationData() {
   const [countryOpts, setCountryOpts] = useState<string[]>([]);
   const [stateOpts, setStateOpts] = useState<string[]>([]);
   const [cityOpts, setCityOpts] = useState<string[]>([]);
-
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingStates, setLoadingStates] = useState(false);
   const [loadingCities, setLoadingCities] = useState(false);
 
-  const [addingCountry, setAddingCountry] = useState(false);
-  const [addingState, setAddingState] = useState(false);
-  const [addingCity, setAddingCity] = useState(false);
-  const [newCountry, setNewCountry] = useState('');
-  const [newState, setNewState] = useState('');
-  const [newCity, setNewCity] = useState('');
-
   const allStatesRef = useRef<string[]>([]);
   const allCitiesRef = useRef<string[]>([]);
 
-  const rangeEnabled = !!city;
-  const canAdd = !!(country || state || city || zipcode.trim());
-
-  // ── Load all countries on mount ──
   useEffect(() => {
     setLoadingCountries(true);
-    fetch('https://countriesnow.space/api/v0.1/countries/positions')
-      .then(r => r.json())
-      .then(data => {
-        const names = (data.data || []).map((c: any) => c.name).sort();
+    fetch("https://countriesnow.space/api/v0.1/countries/positions")
+      .then((r) => r.json())
+      .then((data) => {
+        const names: string[] = (data.data || []).map((c: any) => c.name).sort();
         setCountryOpts(names);
       })
-      .catch(() => console.warn('Failed to load countries'))
+      .catch(() => console.warn("Failed to load countries"))
       .finally(() => setLoadingCountries(false));
   }, []);
 
-  // ── Load all states on mount ──
   useEffect(() => {
     setLoadingStates(true);
-    fetch('https://countriesnow.space/api/v0.1/countries/states')
-      .then(r => r.json())
-      .then(data => {
-        const allStates = (data.data || [])
+    fetch("https://countriesnow.space/api/v0.1/countries/states")
+      .then((r) => r.json())
+      .then((data) => {
+        const all: string[] = (data.data || [])
           .flatMap((c: any) => (c.states || []).map((s: any) => s.name))
           .filter(Boolean)
           .sort();
-        const unique = [...new Set<string>(allStates)];
+        const unique = [...new Set<string>(all)];
         allStatesRef.current = unique;
         setStateOpts(unique);
       })
-      .catch(() => console.warn('Failed to load states'))
+      .catch(() => console.warn("Failed to load states"))
       .finally(() => setLoadingStates(false));
   }, []);
 
-  // ── Load all cities on mount ──
   useEffect(() => {
     setLoadingCities(true);
-    fetch('https://countriesnow.space/api/v0.1/countries')
-      .then(r => r.json())
-      .then(data => {
-        const allCities = (data.data || [])
+    fetch("https://countriesnow.space/api/v0.1/countries")
+      .then((r) => r.json())
+      .then((data) => {
+        const all: string[] = (data.data || [])
           .flatMap((c: any) => c.cities || [])
           .sort();
-        const unique = [...new Set<string>(allCities)];
+        const unique = [...new Set<string>(all)];
         allCitiesRef.current = unique;
         setCityOpts(unique);
       })
-      .catch(() => console.warn('Failed to load cities'))
+      .catch(() => console.warn("Failed to load cities"))
       .finally(() => setLoadingCities(false));
   }, []);
 
-  // ── Helper: fetch cities for a country ──
-  const fetchCitiesForCountry = (countryName: string): Promise<string[]> => {
-    return fetch('https://countriesnow.space/api/v0.1/countries/cities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  const fetchCitiesForCountry = (countryName: string): Promise<string[]> =>
+    fetch("https://countriesnow.space/api/v0.1/countries/cities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ country: countryName }),
     })
-      .then(r => r.json())
-      .then(data => (data.data || []).sort())
+      .then((r) => r.json())
+      .then((data) => (data.data || []).sort())
       .catch(() => []);
-  };
 
-  // ── Helper: fetch cities for a state (with country fallback) ──
+  const fetchStatesForCountry = (countryName: string): Promise<string[]> =>
+    fetch("https://countriesnow.space/api/v0.1/countries/states", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country: countryName }),
+    })
+      .then((r) => r.json())
+      .then((data) => (data.data?.states || []).map((s: any) => s.name).sort())
+      .catch(() => []);
+
   const fetchCitiesForState = async (countryName: string, stateName: string): Promise<string[]> => {
-    // Try state-specific endpoint first
     try {
-      const res = await fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("https://countriesnow.space/api/v0.1/countries/state/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ country: countryName, state: stateName }),
       });
       const data = await res.json();
-      const cities = (data.data || []).sort();
+      const cities: string[] = (data.data || []).sort();
       if (cities.length > 0) return cities;
     } catch { }
-
-    // Fallback: fetch all cities for the country
     if (countryName) {
-      const countryCities = await fetchCitiesForCountry(countryName);
-      if (countryCities.length > 0) return countryCities;
+      const fallback = await fetchCitiesForCountry(countryName);
+      if (fallback.length > 0) return fallback;
     }
-
-    // Last resort: return full global list
     return allCitiesRef.current;
   };
 
-  // ── Country change → fetch states + cities ──
-  const handleCountryChange = (v: string) => {
-    setCountry(v); setState(''); setCity('');
-
-    if (!v) {
+  const handleCountryChange = (
+    country: string,
+    onStateClear: () => void,
+    onCityClear: () => void,
+  ) => {
+    onStateClear();
+    onCityClear();
+    if (!country) {
       setStateOpts(allStatesRef.current);
       setCityOpts(allCitiesRef.current);
       return;
     }
-
-    // Fetch states for country
     setLoadingStates(true);
-    fetch('https://countriesnow.space/api/v0.1/countries/states', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ country: v }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        const states = (data.data?.states || []).map((s: any) => s.name).sort();
-        setStateOpts(states.length > 0 ? states : allStatesRef.current);
-      })
-      .catch(() => setStateOpts(allStatesRef.current))
+    fetchStatesForCountry(country)
+      .then((states) => setStateOpts(states.length > 0 ? states : allStatesRef.current))
       .finally(() => setLoadingStates(false));
 
-    // Fetch cities for country
     setLoadingCities(true);
-    fetchCitiesForCountry(v)
-      .then(cities => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
+    fetchCitiesForCountry(country)
+      .then((cities) => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
       .finally(() => setLoadingCities(false));
   };
 
-  // ── State change → fetch cities (with fallback) ──
-  const handleStateChange = (v: string) => {
-    setState(v); setCity('');
-
-    if (!v) {
-      // State cleared — restore to country-level cities or full list
+  const handleStateChange = (
+    state: string,
+    country: string,
+    onCityClear: () => void,
+  ) => {
+    onCityClear();
+    if (!state) {
       if (country) {
         setLoadingCities(true);
         fetchCitiesForCountry(country)
-          .then(cities => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
+          .then((cities) => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
           .finally(() => setLoadingCities(false));
       } else {
         setCityOpts(allCitiesRef.current);
       }
       return;
     }
-
-    // State selected — fetch cities with fallback chain
     setLoadingCities(true);
-    fetchCitiesForState(country, v)
-      .then(cities => setCityOpts(cities))
+    fetchCitiesForState(country, state)
+      .then((cities) => setCityOpts(cities))
       .finally(() => setLoadingCities(false));
   };
 
-  // ── Add new helpers ──
-  const commitNewCountry = () => {
-    const trimmed = newCountry.trim();
-    if (trimmed && !countryOpts.includes(trimmed)) {
-      setCountryOpts(p => [...p, trimmed].sort());
+  return {
+    countryOpts, setCountryOpts,
+    stateOpts, setStateOpts,
+    cityOpts, setCityOpts,
+    loadingCountries, loadingStates, loadingCities,
+    handleCountryChange, handleStateChange,
+  };
+}
+
+// ─── BillingForm props type ───────────────────────────────────────────────────
+
+interface BillingFormProps {
+  company: CompanyForm;
+  sf: (k: keyof CompanyForm, v: string | boolean) => void;
+  form: ReturnType<typeof Form.useForm>[0];
+  taxTypes: string[];
+  setTaxTypes: React.Dispatch<React.SetStateAction<string[]>>;
+  billingContacts: string[];
+  setBillingContacts: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+// ─── BillingForm — OUTSIDE Onboarding ────────────────────────────────────────
+
+function BillingForm({
+  company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
+}: BillingFormProps) {
+  const isPostpaid = company.payment_type === "Postpaid";
+
+  const handlePaymentTypeChange = (v: string) => {
+    sf("payment_type", v ?? "");
+    if (v === "Prepaid") {
+      sf("payment_terms", "Net 0 day"); sf("credit_period_days", "0");
+      form.setFieldsValue({ payment_terms: "Net 0 day", credit_period_days: "0" });
+    } else if (v === "Postpaid") {
+      sf("payment_terms", ""); sf("credit_period_days", "");
+      form.setFieldsValue({ payment_terms: undefined, credit_period_days: "" });
     }
-    if (trimmed) { setCountry(trimmed); setState(''); setCity(''); }
-    setNewCountry(''); setAddingCountry(false);
   };
 
-  const commitNewState = () => {
-    const trimmed = newState.trim();
-    if (trimmed && !stateOpts.includes(trimmed)) {
-      setStateOpts(p => [...p, trimmed].sort());
+  const handlePaymentTermsChange = (v: string) => {
+    sf("payment_terms", v ?? "");
+    if (isPostpaid && v) {
+      const match = v.match(/\d+/);
+      const days = match ? match[0] : "0";
+      sf("credit_period_days", days);
+      form.setFieldsValue({ credit_period_days: days });
     }
-    if (trimmed) { setState(trimmed); setCity(''); }
-    setNewState(''); setAddingState(false);
   };
-
-  const commitNewCity = () => {
-    const trimmed = newCity.trim();
-    if (trimmed && !cityOpts.includes(trimmed)) {
-      setCityOpts(p => [...p, trimmed].sort());
-    }
-    if (trimmed) setCity(trimmed);
-    setNewCity(''); setAddingCity(false);
-  };
-
-  const handleAdd = () => {
-    if (!canAdd) return;
-    onAdd({ country, state, city, zipcode: zipcode.trim(), range: range.trim() });
-    setCountry(''); setState(''); setCity(''); setZipcode(''); setRange('');
-  };
-
-  const fmt = (l: any) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ');
-
-  const addNewDropdown = (
-    isAdding: boolean,
-    newVal: string,
-    setNewVal: (v: string) => void,
-    setIsAdding: (v: boolean) => void,
-    commit: () => void,
-    menu: React.ReactNode
-  ) => (
-    <>
-      {menu}
-      <Divider style={{ margin: '4px 0' }} />
-      {isAdding ? (
-        <div style={{ padding: '6px 8px' }}>
-          <Input
-            autoFocus
-            size="small"
-            placeholder="Type and press Enter"
-            value={newVal}
-            suffix={<span style={{ fontSize: 10, color: '#aaa' }}>↵</span>}
-            onChange={e => setNewVal(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') { e.stopPropagation(); commit(); }
-              if (e.key === 'Escape') { setNewVal(''); setIsAdding(false); }
-            }}
-            onBlur={() => { setNewVal(''); setIsAdding(false); }}
-          />
-        </div>
-      ) : (
-        <div
-          onMouseDown={e => e.preventDefault()}
-          onClick={() => setIsAdding(true)}
-          style={{
-            padding: '8px 12px', cursor: 'pointer',
-            color: '#4f46e5', fontSize: 13,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <PlusOutlined /> Add new
-        </div>
-      )}
-    </>
-  );
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, alignItems: 'end', marginBottom: 8 }}>
+    <Form form={form} layout="vertical" className="onboarding-form">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
 
-        {/* ── Country ── */}
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Country
-          </div>
+        <Form.Item label="Payment Type" name="payment_type"
+          rules={[{ required: true, message: "Payment type is required" }]}>
+          <Select placeholder="Select" allowClear style={{ width: "100%" }}
+            value={company.payment_type || undefined}
+            onChange={handlePaymentTypeChange}
+            options={toOpts(DEFAULT_CHOICES.payment_types)} />
+        </Form.Item>
+
+        <Form.Item label="Payment Terms" name="payment_terms"
+          rules={[{ required: true, message: "Payment terms is required" }]}>
           <Select
-            showSearch
-            allowClear
-            placeholder={loadingCountries ? 'Loading…' : 'Select country…'}
-            loading={loadingCountries}
-            style={{ width: '100%', height: 38 }}
-            value={country || undefined}
-            onChange={v => handleCountryChange(v ?? '')}
-            filterOption={(input, option) =>
-              (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-            }
-            dropdownRender={menu => addNewDropdown(
-              addingCountry, newCountry, setNewCountry, setAddingCountry, commitNewCountry, menu
-            )}
-            options={countryOpts.map(c => ({ value: c, label: c }))}
+            placeholder={!company.payment_type ? "Select payment type first" : "Select"}
+            allowClear style={{ width: "100%" }}
+            value={company.payment_terms || undefined}
+            onChange={handlePaymentTermsChange}
+            disabled={!isPostpaid}
+            options={isPostpaid ? toOpts(DEFAULT_CHOICES.payment_terms) : [{ value: "Net 0 day", label: "Net 0 day" }]}
           />
-        </div>
+        </Form.Item>
 
-        {/* ── State ── */}
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />State
-          </div>
-          <Select
-            showSearch
-            allowClear
-            placeholder={loadingStates ? 'Loading…' : 'Select state…'}
-            loading={loadingStates}
-            style={{ width: '100%', height: 38 }}
-            value={state || undefined}
-            onChange={v => handleStateChange(v ?? '')}
-            filterOption={(input, option) =>
-              (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-            }
-            dropdownRender={menu => addNewDropdown(
-              addingState, newState, setNewState, setAddingState, commitNewState, menu
-            )}
-            options={stateOpts.map(s => ({ value: s, label: s }))}
-          />
-        </div>
+        <Form.Item label="Credit Period (Days)" name="credit_period_days"
+          rules={[{ required: true, message: "Credit period is required" }]}>
+          <Input type="number" placeholder="Auto-filled" value={company.credit_period_days}
+            disabled style={{ backgroundColor: "#f5f5f5", color: "#333", cursor: "not-allowed", fontWeight: 500 }} />
+        </Form.Item>
 
-        {/* ── City ── */}
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />City
-          </div>
-          <Select
-            showSearch
-            allowClear
-            placeholder={loadingCities ? 'Loading…' : 'Select city…'}
-            loading={loadingCities}
-            style={{ width: '100%', height: 38 }}
-            value={city || undefined}
-            onChange={v => setCity(v ?? '')}
-            filterOption={(input, option) =>
-              (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-            }
-            dropdownRender={menu => addNewDropdown(
-              addingCity, newCity, setNewCity, setAddingCity, commitNewCity, menu
-            )}
-            options={cityOpts.map(c => ({ value: c, label: c }))}
-          />
-        </div>
+        <Form.Item label="Tax Type" name="tax_type"
+          rules={[{ required: true, message: "Tax type is required" }]}>
+          <AddNewSelect value={company.tax_type} onChange={(v: any) => sf("tax_type", v)}
+            options={taxTypes} setOptions={setTaxTypes} placeholder="Select tax type" />
+        </Form.Item>
 
-        {/* ── Zip Code ── */}
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Zip Code
-          </div>
-          <Input
-            placeholder="e.g. 560001"
-            value={zipcode}
-            onChange={e => setZipcode(e.target.value)}
-            style={{ height: 38 }}
-          />
-        </div>
+        <Form.Item label="TDS Applicable" name="tds_applicable"
+          rules={[{ required: true, message: "TDS applicable is required" }]}>
+          <Select placeholder="Select" allowClear style={{ width: "100%" }}
+            value={company.tds_applicable || undefined}
+            onChange={(v) => sf("tds_applicable", v ?? "")}
+            options={toOpts(DEFAULT_CHOICES.tds_options)} />
+        </Form.Item>
 
-        {/* ── Range ── */}
-        <div>
-          <div className="cc-geo-sub-label" style={{ color: rangeEnabled ? 'var(--slate-500)' : 'var(--slate-300)', marginBottom: 4, fontSize: 12 }}>
-            <EnvironmentOutlined style={{ color: rangeEnabled ? 'var(--blue)' : 'var(--slate-300)', marginRight: 4 }} />Range
-          </div>
-          <Input
-            placeholder="e.g. 10 km"
-            value={range}
-            disabled={!rangeEnabled}
-            onChange={e => setRange(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && rangeEnabled) handleAdd(); }}
-            style={{ height: 38, backgroundColor: rangeEnabled ? '#fff' : '#f5f5f5', cursor: rangeEnabled ? 'text' : 'not-allowed' }}
-          />
-        </div>
+        <Form.Item label="TDS Section" name="tds_section"
+          rules={[{ required: true, message: "TDS section is required" }]}>
+          <Input placeholder="e.g. 194J" value={company.tds_section}
+            onChange={(e) => sf("tds_section", e.target.value)} />
+        </Form.Item>
 
-        <Button type="primary" disabled={!canAdd} onClick={handleAdd} icon={<PlusOutlined />} style={{ height: 38 }}>
-          Add
+        <Form.Item label="Currency">
+          <Select style={{ width: "100%" }} value={company.billing_currency}
+            onChange={(v) => sf("billing_currency", v)}
+            options={DEFAULT_CHOICES.billing_currencies.map((c) => ({
+              value: c, label: c === "INR" ? "INR (₹)" : c,
+            }))} />
+        </Form.Item>
+
+        <Form.Item label="Advance / Security Deposit" name="advance_amount"
+          rules={[{ required: true, message: "Advance amount is required" }]}>
+          <Input type="number" placeholder="Enter amount" value={company.advance_amount}
+            onChange={(e) => sf("advance_amount", e.target.value)} />
+        </Form.Item>
+
+        <Form.Item label="Credit Limit" name="credit_limit"
+          rules={[{ required: true, message: "Credit limit is required" }]}>
+          <Input type="number" placeholder="Enter credit limit" value={company.credit_limit}
+            onChange={(e) => sf("credit_limit", e.target.value)} />
+        </Form.Item>
+
+        <Form.Item label="Outstanding Limit Allowed" name="outstanding_limit"
+          rules={[{ required: true, message: "Outstanding limit is required" }]}>
+          <Input type="number" placeholder="Enter outstanding limit" value={company.outstanding_limit}
+            onChange={(e) => sf("outstanding_limit", e.target.value)} />
+        </Form.Item>
+
+        <Form.Item label="Billing Contact (Finance)" name="billing_contact"
+          rules={[{ required: true, message: "Billing contact is required" }]}>
+          <AddNewSelect value={company.billing_contact} onChange={(v: any) => sf("billing_contact", v)}
+            options={billingContacts} setOptions={setBillingContacts} placeholder="Select contact" />
+        </Form.Item>
+
+      </div>
+    </Form>
+  );
+}
+
+// ─── ContactsSection props type ───────────────────────────────────────────────
+
+interface ContactsSectionProps {
+  contacts: ContactRow[];
+  addContact: () => void;
+  removeContact: (id: number) => void;
+  updateContact: (id: number, k: keyof ContactRow, v: string | File | null) => void;
+  company: CompanyForm;
+  sf: (k: keyof CompanyForm, v: string | boolean) => void;
+  form: ReturnType<typeof Form.useForm>[0];
+  countries: Country[];
+  loadingCountries: boolean;
+  countryOpts: string[];
+  setCountryOpts: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+// ─── ContactsSection — OUTSIDE Onboarding ────────────────────────────────────
+
+function ContactsSection({
+  contacts, addContact, removeContact, updateContact,
+  company, sf, form, countries, loadingCountries, countryOpts, setCountryOpts,
+}: ContactsSectionProps) {
+  return (
+    <FormCard icon="👤" title="Company Contacts"
+      subtitle="Add one or more contacts (first contact submitted to server)"
+      action={
+        <Button type="primary" icon={<PlusOutlined />} onClick={addContact}
+          className="ob-btn-default text-indigo-600 border-indigo-300"
+          style={{ paddingTop: "8px", paddingBottom: "8px" }}>
+          Add Contact
         </Button>
-      </div>
-
-      <div className="cc-geo-helper" style={{ marginBottom: 8 }}>
-        <InfoCircleOutlined style={{ marginRight: 4 }} />
-        Select at least one field or enter a Zip Code. Range enables after city is selected.
-      </div>
-
-      {locations.length > 0 ? (
-        <div className="cc-geo-tags">
-          {locations.map((loc: any, idx: number) => (
-            <span key={idx} className="cc-geo-tag">
-              <EnvironmentOutlined style={{ fontSize: 10 }} />
-              {fmt(loc)}
-              <button className="cc-tag-remove" onClick={() => onRemove(idx)}>
-                <CloseOutlined style={{ fontSize: 10 }} />
-              </button>
+      }>
+      {contacts.length === 0 ? (
+        <div className="text-sm text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-lg">
+          No contacts added yet.
+        </div>
+      ) : contacts.map((c, idx) => (
+        <div key={c.id} className="rounded-lg border border-gray-200 p-4 mb-3 last:mb-0 bg-white">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Contact #{idx + 1}
+              {idx > 0 && <span className="ml-2 text-amber-500 font-normal normal-case">(client-side only)</span>}
             </span>
-          ))}
-        </div>
-      ) : (
-        <div className="cc-geo-empty">No geo targets added yet.</div>
-      )}
-    </div>
-  );
-}
-// ── InfoBox ───────────────────────────────────────────────────────────────────
-function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; children: React.ReactNode }) {
-  return (
-    <div className={`cc-info-box ${variant}`}>
-      <InfoCircleOutlined style={{ color: variant === 'blue' ? 'var(--blue)' : 'var(--amber)', flexShrink: 0, marginTop: 1 }} />
-      <p>{children}</p>
-    </div>
-  );
-}
-
-// ── Step 1 ────────────────────────────────────────────────────────────────────
-function Step1({ client, setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
-  const [clientName, setClientName] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(CLIENT_URL, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
-    })
-      .then(res => res.json())
-      .then(data => {
-        setClientName(data.name || '');
-        setClient(data.name || '');
-        setClientId(data.client_id || '');
-      })
-      .catch(() => setClientName('Failed to load'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div className="cc-form-section-sm">
-      <Form layout="vertical" className="cc-form">
-        <Form.Item label="Company Name" required>
-          <Input className="cc-company-name-input" value={loading ? 'Loading…' : clientName} disabled style={{ fontWeight: 600 }} />
-        </Form.Item>
-        <Form.Item label="Advertiser (Brand)" required>
-          <Select
-            value={advertiser || undefined}
-            onChange={setAdvertiser}
-            placeholder="Select an advertiser…"
-            options={toOpts(['Unilever India', 'Tata Digital', 'HDFC Bank', 'Myntra', 'Reliance Retail', 'Mahindra Group', 'Airtel India'])}
-            style={{ width: '100%', height: 38 }}
-          />
-        </Form.Item>
-        <InfoBox variant="blue">
-          All campaigns, line items, creatives and reports will be mapped under the selected client and advertiser. This cannot be changed after creation.
-        </InfoBox>
-        <Form.Item label="Website URL">
-          <Input placeholder="https://" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} style={{ height: 38 }} />
-        </Form.Item>
-      </Form>
-    </div>
-  );
-}
-
-// ── Step 2 ────────────────────────────────────────────────────────────────────
-function Step2({
-  campaignId, campaignName, setCampaignName,
-  clientCampaignId, setClientCampaignId,
-  purchaseOrderId, setPurchaseOrderId,
-  campaignType, setCampaignType,
-  buyingType, setBuyingType,
-  objective, setObjective,
-  notes, setNotes, startDate, setStartDate, endDate, setEndDate
-}: any) {
-  return (
-    <div className="cc-form-section-sm">
-      <Form layout="vertical" className="cc-form">
-        <div className="cc-row-grid">
-          <Form.Item label="Campaign ID">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              {campaignId ? (
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--slate-800)' }}>{campaignId}</span>
-              ) : (
-                <span style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--slate-400)', fontWeight: 400 }}>Auto-generated after save</span>
-              )}
+            <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeContact(c.id)} />
+          </div>
+          <Form layout="vertical" className="onboarding-form">
+            <div className="grid md:grid-cols-4 gap-x-3">
+              <Form.Item label="Name" required>
+                <Input placeholder="Full name" value={c.contact_name}
+                  onChange={(e) => updateContact(c.id, "contact_name", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Phone Number" name="phone"
+                rules={[{ required: true, message: "Phone number is required" }]}
+                getValueProps={() => ({ value: company.phone })}>
+                <PhoneInput
+                  phone={company.phone} phone_code={company.phone_code}
+                  phone_cca2={company.phone_cca2} countries={countries}
+                  onPhoneChange={(v) => { sf("phone", v); form.setFieldValue("phone", v); }}
+                  onCountryChange={(code, cca2) => { sf("phone_code", code); sf("phone_cca2", cca2); }}
+                />
+              </Form.Item>
+              <Form.Item label="Email" required>
+                <Input placeholder="email@company.com" value={c.contact_email}
+                  onChange={(e) => updateContact(c.id, "contact_email", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Designation" required>
+                <Input placeholder="Finance Director" value={c.contact_designation}
+                  onChange={(e) => updateContact(c.id, "contact_designation", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Address Line 1" required>
+                <Input placeholder="350 Mission St" value={c.contact_address_1}
+                  onChange={(e) => updateContact(c.id, "contact_address_1", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Address Line 2">
+                <Input placeholder="Suite 100" value={c.contact_address_2}
+                  onChange={(e) => updateContact(c.id, "contact_address_2", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Country" required>
+                <AddNewSelect
+                  placeholder="Select country…"
+                  loading={loadingCountries}
+                  showSearch
+                  value={c.contact_country}
+                  onChange={(v) => updateContact(c.id, "contact_country", v ?? "")}
+                  options={countryOpts}
+                  setOptions={setCountryOpts}
+                />
+              </Form.Item>
+              <Form.Item label="Zip Code" required>
+                <Input placeholder="560001" value={c.contact_zipcode}
+                  onChange={(e) => updateContact(c.id, "contact_zipcode", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Digital Signature">
+                <Upload maxCount={1} accept="image/*,.pdf"
+                  beforeUpload={(file) => { updateContact(c.id, "digital_signature", file); return false; }}
+                  onRemove={() => updateContact(c.id, "digital_signature", null)}
+                  showUploadList={{ showRemoveIcon: true }}>
+                  <Button icon={<UploadOutlined />} block>
+                    {c.digital_signature ? (c.digital_signature as File).name : "Upload Signature"}
+                  </Button>
+                </Upload>
+              </Form.Item>
             </div>
-          </Form.Item>
+          </Form>
         </div>
-
-        <div className="cc-row-grid">
-          <Form.Item label="Client Campaign ID">
-            <Input placeholder="Enter Client Campaign ID" value={clientCampaignId} onChange={e => setClientCampaignId(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Purchase Order ID">
-            <Input placeholder="Enter Purchase Order ID" value={purchaseOrderId} onChange={e => setPurchaseOrderId(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Campaign Name" required>
-            <Input placeholder="e.g. Summer Awareness 2024" value={campaignName} onChange={e => setCampaignName(e.target.value)} style={{ height: 38 }} />
-          </Form.Item>
-          <Form.Item label="Campaign Type" required>
-            <Select
-              value={campaignType || undefined}
-              onChange={setCampaignType}
-              placeholder="Select type…"
-              options={toOpts(['Brand Awareness', 'Performance', 'Retargeting', 'Prospecting', 'Lead Generation'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
-          <Form.Item label="Campaign Start Date" required>
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={startDate ? dayjs(startDate) : null}
-              onChange={(_, ds) => setStartDate(typeof ds === 'string' ? ds : '')}
-            />
-          </Form.Item>
-          <Form.Item label="Campaign End Date" required>
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={endDate ? dayjs(endDate) : null}
-              onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')}
-            />
-          </Form.Item>
-
-          <Form.Item label="Buying Type" required>
-            <Select
-              mode="multiple"
-              value={buyingType}
-              onChange={(vals: string[]) => setBuyingType(vals)}
-              placeholder="Select buying type…"
-              style={{ width: '100%' }}
-              options={[
-                { value: 'Programmatic (DV360)', label: 'Programmatic (DV360)' },
-                { value: 'Direct', label: 'Direct' },
-                { value: 'Programmatic Guaranteed', label: 'Programmatic Guaranteed' },
-                { value: 'Preferred Deal', label: 'Preferred Deal' },
-                { value: 'Open Auction', label: 'Open Auction' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-          <Form.Item label="Campaign Objective" required>
-            <Select
-              value={objective || undefined}
-              onChange={setObjective}
-              placeholder="Select objective…"
-              options={toOpts(['Increase Brand Awareness', 'Drive Website Traffic', 'Generate Leads', 'Boost Sales', 'App Installs'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
-        </div>
-
-        <Form.Item label="Notes">
-          <TextArea placeholder="Add any notes for internal reference" value={notes} onChange={e => setNotes(e.target.value)} rows={4} />
-        </Form.Item>
-      </Form>
-    </div>
+      ))}
+    </FormCard>
   );
 }
 
-// ── Step 3 ────────────────────────────────────────────────────────────────────
-function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, platforms, setPlatforms, freqCap, setFreqCap, brandSafety, setBrandSafety, viewability, setViewability }: any) {
+// ─── AddressesSection props type ──────────────────────────────────────────────
+
+interface AddressesSectionProps {
+  addresses: AddressRow[];
+  addAddress: () => void;
+  removeAddress: (id: number) => void;
+  updateAddress: (id: number, k: keyof AddressRow, v: string) => void;
+  loadingCountries: boolean;
+  countryOpts: string[];
+  setCountryOpts: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+// ─── AddressesSection — OUTSIDE Onboarding ───────────────────────────────────
+
+function AddressesSection({
+  addresses, addAddress, removeAddress, updateAddress,
+  loadingCountries, countryOpts, setCountryOpts,
+}: AddressesSectionProps) {
   return (
-    <div className="cc-form-section">
-      <Form layout="vertical" className="cc-form">
-        <div className="cc-row-grid">
-          <Form.Item label="Age" required>
-            <Select
-              mode="multiple"
-              value={age}
-              onChange={(vals: string[]) => setAge(vals)}
-              placeholder="Select Age"
-              style={{ width: '100%' }}
-              options={[
-                { value: '18 to 24', label: '18 to 24' },
-                { value: '25 to 34', label: '25 to 34' },
-                { value: '35 to 44', label: '35 to 44' },
-                { value: '45 to 54', label: '45 to 54' },
-                { value: '55 to 64', label: '55 to 64' },
-                { value: 'Others', label: 'Others' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-          <Form.Item label="Gender" required>
-            <Select
-              value={gender || undefined}
-              onChange={setGender}
-              placeholder="Select Gender"
-              style={{ width: '100%' }}
-              options={[
-                { value: 'Male', label: 'Male' },
-                { value: 'Female', label: 'Female' },
-              ]}
-              maxTagCount="responsive"
-            />
-          </Form.Item>
+    <FormCard icon="📍" title="Company Addresses"
+      subtitle="Billing, shipping or registered locations (first address submitted to server)"
+      action={
+        <Button type="primary" icon={<PlusOutlined />} onClick={addAddress}
+          className="ob-btn-default text-indigo-600 border-indigo-300"
+          style={{ paddingTop: "8px", paddingBottom: "8px" }}>
+          Add Address
+        </Button>
+      }>
+      {addresses.length === 0 ? (
+        <div className="text-sm text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-lg">
+          No addresses added yet.
         </div>
-
-        <Form.Item label="Geo Targeting" required>
-          <div className="cc-geo-wrap">
-            <div className="cc-geo-header">
-              <div className="cc-geo-icon-wrap">
-                <EnvironmentOutlined style={{ color: 'var(--blue)', fontSize: 13 }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--slate-700)' }}>Location Targeting</div>
-                <div style={{ fontSize: 11, color: 'var(--slate-400)' }}>Country → State → City</div>
-              </div>
-              {geoLocations.length > 0 && (
-                <div className="cc-geo-count-badge">{geoLocations.length} location{geoLocations.length > 1 ? 's' : ''} added</div>
-              )}
-            </div>
-            <GeoTargeting
-              locations={geoLocations}
-              onAdd={(loc: GeoLocation) => setGeoLocations((p: GeoLocation[]) => [...p, loc])}
-              onRemove={(idx: number) => setGeoLocations((p: GeoLocation[]) => p.filter((_: GeoLocation, i: number) => i !== idx))}
-            />
+      ) : addresses.map((a, idx) => (
+        <div key={a.id} className="rounded-lg border border-gray-200 p-4 mb-3 last:mb-0 bg-white">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Address #{idx + 1} · Registered
+              {idx > 0 && <span className="ml-2 text-amber-500 font-normal normal-case">(client-side only)</span>}
+            </span>
+            <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeAddress(a.id)} />
           </div>
-        </Form.Item>
-
-        <Form.Item label="Platform / Inventory" required>
-          <Select
-            mode="multiple"
-            value={platforms}
-            onChange={(vals: string[]) => setPlatforms(vals)}
-            placeholder="Select Platforms"
-            style={{ width: '100%' }}
-            options={[
-              { value: 'Display', label: 'Display' },
-              { value: 'Video', label: 'Video' },
-              { value: 'PMP', label: 'PMP' },
-              { value: 'CTV', label: 'CTV' },
-              { value: 'Audio', label: 'Audio' },
-              { value: 'Native', label: 'Native' },
-              { value: 'DOOH', label: 'DOOH' },
-              { value: 'Mobile', label: 'Mobile' },
-            ]}
-            maxTagCount="responsive"
-          />
-        </Form.Item>
-
-        <div className="cc-row-grid">
-          <Form.Item label="Frequency Cap">
-            <div className="cc-unit-input">
-              <InputNumber
-                min={1}
-                placeholder="e.g. 3"
-                value={freqCap ? Number(freqCap) : undefined}
-                onChange={v => setFreqCap(String(v ?? ''))}
-                style={{ width: 80, height: 38 }}
-              />
-              <span className="cc-unit-label">impressions / user</span>
+          <Form layout="vertical" className="onboarding-form">
+            <div className="grid md:grid-cols-4 gap-x-3">
+              <Form.Item label="Address Line 1" className="md:col-span-2" required>
+                <Input placeholder="350 Mission Street" value={a.company_address_line1}
+                  onChange={(e) => updateAddress(a.id, "company_address_line1", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Address Line 2" className="md:col-span-2">
+                <Input placeholder="Suite 1200" value={a.company_address_line2}
+                  onChange={(e) => updateAddress(a.id, "company_address_line2", e.target.value)} />
+              </Form.Item>
+              <Form.Item label="Country" required>
+                <AddNewSelect
+                  placeholder="Select country…"
+                  loading={loadingCountries}
+                  showSearch
+                  value={a.company_country}
+                  onChange={(v) => updateAddress(a.id, "company_country", v ?? "")}
+                  options={countryOpts}
+                  setOptions={setCountryOpts}
+                />
+              </Form.Item>
+              <Form.Item label="Zipcode" required>
+                <Input placeholder="560001" value={a.company_zipcode}
+                  onChange={(e) => updateAddress(a.id, "company_zipcode", e.target.value)} />
+              </Form.Item>
             </div>
-          </Form.Item>
-          <Form.Item label="Brand Safety Level" required>
-            <Select
-              value={brandSafety || undefined}
-              onChange={setBrandSafety}
-              placeholder="Select level…"
-              options={toOpts(['Standard', 'Strict', 'Custom'])}
-              style={{ width: '100%', height: 38 }}
-            />
-          </Form.Item>
+          </Form>
         </div>
-
-        <Form.Item label="Viewability Goal">
-          <div className="cc-unit-input">
-            <InputNumber
-              min={0} max={100}
-              placeholder="e.g. 70"
-              value={viewability ? Number(viewability) : undefined}
-              onChange={v => setViewability(String(v ?? ''))}
-              style={{ width: 80, height: 38 }}
-            />
-            <span className="cc-unit-label">%</span>
-          </div>
-        </Form.Item>
-      </Form>
-    </div>
+      ))}
+    </FormCard>
   );
 }
 
-function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove }: LineItemCardProps) {
-  const [dateError, setDateError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);  // ← add this
+// ─── FormCard ─────────────────────────────────────────────────────────────────
 
-  function validateDates(start: string, end: string): string {
-    if (!campaignStart || !campaignEnd) return '';
-    const cStart = dayjs(campaignStart);
-    const cEnd = dayjs(campaignEnd);
-
-    if (start) {
-      const s = dayjs(start);
-      if (s.isBefore(cStart, 'day') || s.isAfter(cEnd, 'day')) {
-        return `Start date must be between ${cStart.format('DD MMM YYYY')} and ${cEnd.format('DD MMM YYYY')}.`;
-      }
-    }
-    if (end) {
-      const e = dayjs(end);
-      if (e.isBefore(cStart, 'day') || e.isAfter(cEnd, 'day')) {
-        return `End date must be between ${cStart.format('DD MMM YYYY')} and ${cEnd.format('DD MMM YYYY')}.`;
-      }
-    }
-    if (start && end && dayjs(end).isBefore(dayjs(start), 'day')) {
-      return 'End date must be after start date.';
-    }
-    return '';
-  }
-
-  function handleStartDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
-    onChange(item.id, 'startDate', val);
-    setDateError(validateDates(val, item.endDate));
-  }
-
-  function handleEndDate(_: Dayjs | null, ds: string | null) {
-    const val = ds ?? '';
-    onChange(item.id, 'endDate', val);
-    setDateError(validateDates(item.startDate, val));
-  }
-
-  function disabledDate(current: Dayjs): boolean {
-    if (!campaignStart || !campaignEnd) return false;
-    return current.isBefore(dayjs(campaignStart), 'day') || current.isAfter(dayjs(campaignEnd), 'day');
-  }
-
-  function handleAdFormatChange(vals: string[]) {
-    onChange(item.id, 'adFormat', vals);
-    // Remove incompatible creatives
-    const compatible = item.creatives.filter(f => {
-      const hasImage = vals.includes('image');
-      const hasVideo = vals.includes('video');
-      if (hasImage && hasVideo) return true;
-      if (hasImage) return f.type.startsWith('image/');
-      if (hasVideo) return f.type.startsWith('video/');
-      return false;
-    });
-    if (compatible.length !== item.creatives.length) {
-      onChange(item.id, 'creatives', compatible);
-      message.info('Some creatives were removed due to format change.');
-    }
-  }
-
-  // Badge colors per format
-  const badgeBg = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#ede9fe' : item.adFormat.includes('image') ? '#dbeafe' : '#e0f2fe';
-  const badgeColor = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? '#6d28d9' : item.adFormat.includes('image') ? '#1d4ed8' : '#0369a1';
-  const badgeText = item.adFormat.includes('image') && item.adFormat.includes('video')
-    ? 'Image + Video' : item.adFormat.includes('image') ? 'Images only' : 'Videos only';
-
+function FormCard({
+  icon, title, subtitle, action, badge, children,
+}: {
+  icon: string; title: string; subtitle?: string;
+  action?: React.ReactNode; badge?: string; children: React.ReactNode;
+}) {
   return (
-    <div style={{
-      border: '0.5px solid var(--color-border-secondary, #e2e8f0)',
-      borderRadius: 12,
-      background: '#fff',
-      padding: '20px 24px',
-      marginBottom: 16,
-    }}>
-      {/* Card header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%', background: '#4f46e5',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 600, flexShrink: 0,
-          }}>
-            {index + 1}
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--slate-800, #1e293b)' }}>
-            {item.lineItemName || `Line Item ${index + 1}`}
-          </span>
-        </div>
-        {canRemove && (
-          <button
-            onClick={() => onRemove(item.id)}
-            style={{
-              background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6,
-              padding: '4px 10px', cursor: 'pointer', color: '#ef4444',
-              fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <DeleteOutlined style={{ fontSize: 12 }} /> Remove
-          </button>
-        )}
-      </div>
-
-      <Form layout="vertical">
-        {/* Row: Line Item Name + Ethnicity */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Line Item Name <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Input
-              placeholder="e.g. Mumbai Display — 18-34"
-              value={item.lineItemName}
-              onChange={e => onChange(item.id, 'lineItemName', e.target.value)}
-              style={{ height: 38 }}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ethnicity</span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Select
-              mode="multiple"
-              value={item.ethnicity}
-              onChange={vals => onChange(item.id, 'ethnicity', vals)}
-              placeholder="Select ethnicity…"
-              maxTagCount="responsive"
-              style={{ width: '100%' }}
-              options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Row: Start Date + End Date */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Start Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }}
-            validateStatus={dateError ? 'error' : ''}
-          >
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={item.startDate ? dayjs(item.startDate) : null}
-              onChange={handleStartDate}
-              disabledDate={disabledDate}
-              placeholder={campaignStart ? `From ${dayjs(campaignStart).format('DD MMM YYYY')}` : 'Select date'}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>End Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }}
-            validateStatus={dateError ? 'error' : ''}
-          >
-            <DatePicker
-              style={{ width: '100%', height: 38 }}
-              value={item.endDate ? dayjs(item.endDate) : null}
-              onChange={handleEndDate}
-              disabledDate={disabledDate}
-              placeholder={campaignEnd ? `Until ${dayjs(campaignEnd).format('DD MMM YYYY')}` : 'Select date'}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Date error banner */}
-        {dateError && (
-          <div style={{
-            background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: 6,
-            padding: '7px 12px', marginBottom: 14, fontSize: 12.5, color: '#dc2626',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            ⚠ {dateError}
-          </div>
-        )}
-
-        {/* Campaign flight reference pill */}
-        {campaignStart && campaignEnd && (
-          <div style={{
-            fontSize: 11.5, color: '#64748b', marginBottom: 14,
-            background: '#f8fafc', borderRadius: 6, padding: '4px 10px',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            border: '0.5px solid #e2e8f0',
-          }}>
-            Campaign flight: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
-          </div>
-        )}
-
-        {/* Row: Ad Format + Impressions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Select
-              mode="multiple"
-              value={item.adFormat}
-              onChange={handleAdFormatChange}
-              placeholder="Select format…"
-              maxTagCount="responsive"
-              style={{ width: '100%' }}
-              options={AD_FORMAT_OPTIONS}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>}
-            style={{ marginBottom: 14 }}
-          >
-            <Input
-              placeholder="e.g. 1000000"
-              value={item.impressions}
-              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
-              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>}
-              style={{ height: 38 }}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Creatives Upload */}
-        <Form.Item
-          label={
-            <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-              Creatives
-              {item.adFormat.length > 0 && (
-                <span style={{ background: badgeBg, color: badgeColor, fontSize: 10.5, fontWeight: 500, padding: '1px 8px', borderRadius: 10 }}>
-                  {badgeText}
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xl mb-4 leading-none">{icon}</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-800 text-sm">{title}</h3>
+              {badge && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 font-medium">
+                  {badge}
                 </span>
               )}
-            </span>
-          }
-          style={{ marginBottom: 14 }}
-        >
-          {/* Hidden file inputs — always rendered, never conditional */}
-          <input
-            ref={fileInputRef}
-            type="file" multiple
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const valid = files.filter(f => f.type.startsWith('image/'));
-              if (valid.length > 0) onChange(item.id, 'creatives', [...item.creatives, ...valid]);
-              if (fileInputRef.current) fileInputRef.current.value = '';
-            }}
-          />
-          <input
-            ref={videoInputRef}
-            type="file" multiple
-            accept="video/mp4,video/webm,video/ogg,video/quicktime"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const valid = files.filter(f => f.type.startsWith('video/'));
-              if (valid.length > 0) onChange(item.id, 'creatives', [...item.creatives, ...valid]);
-              if (videoInputRef.current) videoInputRef.current.value = '';
-            }}
-          />
-
-          {item.adFormat.length === 0 && (
-            <div style={{
-              border: '1px dashed #d1d5db', borderRadius: 8, padding: '14px 16px',
-              background: '#f9fafb', display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <PlusOutlined style={{ fontSize: 16, color: '#d1d5db' }} />
-              <div style={{ fontSize: 13, color: '#9ca3af' }}>Select an Ad Format above to enable upload</div>
             </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: item.adFormat.includes('image') && item.adFormat.includes('video') ? '1fr 1fr' : '1fr', gap: 12 }}>
-
-            {/* IMAGE ZONE — show if image is selected */}
-            {item.adFormat.includes('image') && (
-              <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <FileImageOutlined /> Images
-                </div>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    border: '1px dashed #1d4ed8', borderRadius: 8,
-                    padding: '12px 14px', cursor: 'pointer', background: '#eff6ff',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}
-                >
-                  <PlusOutlined style={{ fontSize: 14, color: '#1d4ed8' }} />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1e293b' }}>Upload Images</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>JPG, PNG, GIF, WebP</div>
-                  </div>
-                </div>
-                {item.creatives.filter(f => f.type.startsWith('image/')).length > 0 && (
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {item.creatives
-                      .map((file, originalIdx) => ({ file, originalIdx }))
-                      .filter(({ file }) => file.type.startsWith('image/'))
-                      .map(({ file, originalIdx }) => (
-                        <div key={originalIdx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: '#f8fafc', borderRadius: 6, border: '0.5px solid #e2e8f0' }}>
-                          <FileImageOutlined style={{ color: '#1d4ed8', fontSize: 13 }} />
-                          <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{(file.size / 1024).toFixed(1)} KB</span>
-                          <button onClick={() => onChange(item.id, 'creatives', item.creatives.filter((_, i) => i !== originalIdx))}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444', display: 'flex', alignItems: 'center' }}>
-                            <CloseOutlined style={{ fontSize: 11 }} />
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* VIDEO ZONE — show if video is selected */}
-            {item.adFormat.includes('video') && (
-              <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#0369a1', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <VideoCameraOutlined /> Videos
-                </div>
-                <div
-                  onClick={() => videoInputRef.current?.click()}
-                  style={{
-                    border: '1px dashed #0369a1', borderRadius: 8,
-                    padding: '12px 14px', cursor: 'pointer', background: '#e0f2fe',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}
-                >
-                  <PlusOutlined style={{ fontSize: 14, color: '#0369a1' }} />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1e293b' }}>Upload Videos</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>MP4, WebM, MOV</div>
-                  </div>
-                </div>
-                {item.creatives.filter(f => f.type.startsWith('video/')).length > 0 && (
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {item.creatives
-                      .map((file, originalIdx) => ({ file, originalIdx }))
-                      .filter(({ file }) => file.type.startsWith('video/'))
-                      .map(({ file, originalIdx }) => (
-                        <div key={originalIdx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: '#f8fafc', borderRadius: 6, border: '0.5px solid #e2e8f0' }}>
-                          <VideoCameraOutlined style={{ color: '#0369a1', fontSize: 13 }} />
-                          <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{(file.size / 1024).toFixed(1)} KB</span>
-                          <button onClick={() => onChange(item.id, 'creatives', item.creatives.filter((_, i) => i !== originalIdx))}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444', display: 'flex', alignItems: 'center' }}>
-                            <CloseOutlined style={{ fontSize: 11 }} />
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            )}
-
+            {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
           </div>
-        </Form.Item>
-
-        {/* Landing Page */}
-        <Form.Item
-          label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Landing Page</span>}
-          style={{ marginBottom: 0 }}
-        >
-          <Input
-            placeholder="https://example.com/landing"
-            value={item.landingPage}
-            onChange={e => onChange(item.id, 'landingPage', e.target.value)}
-            style={{ height: 38 }}
-          />
-        </Form.Item>
-      </Form>
+        </div>
+        {action}
+      </div>
+      {children}
     </div>
   );
 }
 
-// ── Step 5 — Line Item Details ────────────────────────────────────────────────
-function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLineItems }: {
-  campaignStartDate: string;
-  campaignEndDate: string;
-  lineItems: LineItem[];
-  setLineItems: React.Dispatch<React.SetStateAction<LineItem[]>>;
-}) {
-  function handleChange(id: string, field: keyof LineItem, value: any) {
-    setLineItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  }
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
-  function handleAdd() {
-    setLineItems(prev => [...prev, emptyLineItem()]);
-  }
+export default function Onboarding() {
+  const [form] = Form.useForm();
 
-  function handleRemove(id: string) {
-    setLineItems(prev => prev.filter(item => item.id !== id));
-  }
-
-  return (
-    <div className="cc-form-section">
-      {/* Campaign flight hint */}
-      {(!campaignStartDate || !campaignEndDate) && (
-        <div style={{
-          background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: 8,
-          padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <InfoCircleOutlined style={{ color: '#d97706' }} />
-          No campaign dates set. Go back to Step 2 to set them — line item dates will be validated against those dates.
-        </div>
-      )}
-
-      {lineItems.map((item, idx) => (
-        <LineItemCard
-          key={item.id}
-          item={item}
-          index={idx}
-          campaignStart={campaignStartDate}
-          campaignEnd={campaignEndDate}
-          onChange={handleChange}
-          onRemove={handleRemove}
-          canRemove={lineItems.length > 1}
-        />
-      ))}
-
-      <button
-        onClick={handleAdd}
-        style={{
-          width: '100%', padding: '12px',
-          border: '1px dashed #4f46e5', borderRadius: 8,
-          background: 'none', cursor: 'pointer',
-          color: '#4f46e5', fontWeight: 500, fontSize: 13,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}
-      >
-        <PlusOutlined /> Add Another Line Item
-      </button>
-    </div>
-  );
-}
-
-// ── Step 6 — Review & Confirm ─────────────────────────────────────────────────
-function Step5Review({
-  client, advertiser, websiteUrl,
-  campaignName, clientCampaignId, purchaseOrderId,
-  campaignType, buyingType, objective, notes,
-  age, gender, geoLocations, platforms,
-  freqCap, brandSafety, viewability,
-  budgetType, totalBudget, startDate, endDate, durationDays,
-  pacing, dayParting, timezone,
-  lineItems,
-  onEdit,
-}: any) {
-  const geoString = geoLocations.length > 0
-    ? geoLocations.map((l: GeoLocation) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ')).join(', ')
-    : '—';
-
-  const campaignRows = [
-    { label: 'Client', value: client || '—' },
-    { label: 'Advertiser', value: advertiser || '—' },
-    { label: 'Website URL', value: websiteUrl || '—' },
-    { label: 'Campaign Name', value: campaignName || '—' },
-    { label: 'Client Campaign ID', value: clientCampaignId || '—' },
-    { label: 'Purchase Order ID', value: purchaseOrderId || '—' },
-    { label: 'Campaign Type', value: campaignType || '—' },
-    { label: 'Buying Type', value: buyingType.length > 0 ? buyingType.join(', ') : '—' },
-    { label: 'Objective', value: objective || '—' },
-    { label: 'Notes', value: notes || '—' },
-    { label: 'Age', value: Array.isArray(age) && age.length > 0 ? age.join(', ') : '—' },
-    { label: 'Gender', value: gender || '—' },
-    { label: 'Geo Targeting', value: geoString },
-    { label: 'Platforms', value: platforms.join(', ') || '—' },
-    { label: 'Frequency Cap', value: freqCap ? `${freqCap} impressions/user` : '—' },
-    { label: 'Brand Safety', value: brandSafety || '—' },
-    { label: 'Viewability Goal', value: viewability ? `${viewability}%` : '—' },
-    { label: 'Budget', value: totalBudget ? `₹ ${totalBudget} (${budgetType === 'total' ? 'Total' : 'Daily'})` : '—' },
-    { label: 'Flight Duration', value: durationDays > 0 ? `${startDate} → ${endDate} (${durationDays} days)` : '—' },
-    { label: 'Pacing', value: pacing || '—' },
-    { label: 'Day Parting', value: dayParting || '—' },
-    { label: 'Time Zone', value: timezone || '—' },
-  ];
-
-  return (
-    <div className="cc-form-section">
-      <div className="cc-review-ready">
-        <div className="cc-review-ready-icon">
-          <CheckOutlined style={{ color: '#fff', fontSize: 18, fontWeight: 900 }} />
-        </div>
-        <div>
-          <div className="cc-review-ready-title">All steps complete — ready to launch</div>
-          <div className="cc-review-ready-sub">Review the details below before creating the campaign.</div>
-        </div>
-      </div>
-
-      {/* Campaign Summary */}
-      <div className="cc-review-header">
-        <span className="cc-review-label">Campaign Summary</span>
-        <button className="cc-review-edit-btn" onClick={onEdit}>← Edit Details</button>
-      </div>
-      <div className="cc-review-table">
-        {campaignRows.map((row, i) => (
-          <div key={row.label} className="cc-review-row" style={{ background: i % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
-            <span className="cc-review-row-key">{row.label}</span>
-            <span className="cc-review-row-val">{row.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Line Items Summary */}
-      {lineItems.length > 0 && (
-        <>
-          <div className="cc-review-header" style={{ marginTop: 20 }}>
-            <span className="cc-review-label">Line Items ({lineItems.length})</span>
-          </div>
-          {lineItems.map((li: LineItem, i: number) => (
-            <div key={li.id} style={{
-              border: '0.5px solid #e2e8f0', borderRadius: 10,
-              marginBottom: 12, overflow: 'hidden',
-            }}>
-              <div style={{
-                background: '#f8fafc', padding: '8px 14px',
-                fontSize: 12.5, fontWeight: 600, color: '#1e293b',
-                borderBottom: '0.5px solid #e2e8f0',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%', background: '#4f46e5',
-                  color: '#fff', fontSize: 11, display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>{i + 1}</span>
-                {li.lineItemName || `Line Item ${i + 1}`}
-              </div>
-              <div className="cc-review-table">
-                {[
-                  { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
-                  { label: 'Start Date', value: li.startDate || '—' },
-                  { label: 'End Date', value: li.endDate || '—' },
-                  { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
-                  { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
-                  { label: 'Creatives', value: li.creatives.length > 0 ? `${li.creatives.length} file(s): ${li.creatives.map(f => f.name).join(', ')}` : '—' },
-                  { label: 'Landing Page', value: li.landingPage || '—' },
-                ].map((row, j) => (
-                  <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
-                    <span className="cc-review-row-key">{row.label}</span>
-                    <span className="cc-review-row-val">{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-
-      <div style={{ marginTop: 18 }}>
-        <InfoBox variant="amber">
-          Once created, you can manage line items, add creatives and launch the campaign from the campaigns dashboard.
-        </InfoBox>
-      </div>
-    </div>
-  );
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-export default function Campaign_Create() {
-  const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-  const sideWidth = collapsed ? 64 : 240;
-  const [activeStep, setActiveStep] = useState(1);
-
+  const [activeTab, setActiveTab] = useState("basic");
   const [submitting, setSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Step 1
-  const [client, setClient] = useState('');
-  const [clientId, setClientId] = useState('');  // ✅ add this
-  const [advertiser, setAdvertiser] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [countries, setCountries] = useState<Country[]>([]);
 
-  // Step 2
-  const [campaignName, setCampaignName] = useState('');
-  const [clientCampaignId, setClientCampaignId] = useState('');
-  const [purchaseOrderId, setPurchaseOrderId] = useState('');
-  const [campaignType, setCampaignType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [buyingType, setBuyingType] = useState<string[]>([]);
-  const [objective, setObjective] = useState('');
-  const [notes, setNotes] = useState('');
+  useEffect(() => {
+    fetch("https://restcountries.com/v3.1/all?fields=name,flags,idd,cca2")
+      .then((r) => r.json())
+      .then((data) => {
+        const seen = new Set<string>();
+        const list: Country[] = data
+          .map((c: any) => ({
+            name: c.name.common, cca2: c.cca2,
+            flagUrl: c.flags?.png ?? "", code: getDialCode(c.idd),
+          }))
+          .filter((c: Country) => {
+            if (!c.code) return false;
+            if (seen.has(c.cca2)) return false;
+            seen.add(c.cca2); return true;
+          })
+          .sort((a: Country, b: Country) => a.name.localeCompare(b.name));
+        setCountries(list);
+      });
+  }, []);
 
-  // Step 3
-  const [age, setAge] = useState<string[]>([]);
-  const [gender, setGender] = useState('');
-  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [freqCap, setFreqCap] = useState('');
-  const [brandSafety, setBrandSafety] = useState('');
-  const [viewability, setViewability] = useState('');
+  const {
+    countryOpts, setCountryOpts,
+    stateOpts, setStateOpts,
+    cityOpts, setCityOpts,
+    loadingCountries, loadingStates, loadingCities,
+    handleCountryChange: _handleCountryChange,
+    handleStateChange: _handleStateChange,
+  } = useLocationData();
 
-  // Step 4 — Line Items
-  const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
+  const [agencyTypes, setAgencyTypes] = useState<string[]>(DEFAULT_CHOICES.agency_types);
+  const [placesOfSupply, setPlacesOfSupply] = useState<string[]>(DEFAULT_CHOICES.place_of_supply);
+  const [taxTypes, setTaxTypes] = useState<string[]>(DEFAULT_CHOICES.tax_types);
+  const [clientTypes, setClientTypes] = useState<string[]>(DEFAULT_CHOICES.client_types);
+  const [priorityLevels, setPriorityLevels] = useState<string[]>(DEFAULT_CHOICES.priority_levels);
+  const [riskLevels, setRiskLevels] = useState<string[]>(DEFAULT_CHOICES.risk_levels);
+  const [paymentBehaviors, setPaymentBehaviors] = useState<string[]>(DEFAULT_CHOICES.payment_behaviors);
+  const [billingContacts, setBillingContacts] = useState<string[]>(DEFAULT_CHOICES.billing_contacts);
+  const [accountManagers, setAccountManagers] = useState<string[]>(DEFAULT_CHOICES.account_managers);
+  const [salesOwners, setSalesOwners] = useState<string[]>(DEFAULT_CHOICES.sales_owners);
+  const [campaignManagers, setCampaignManagers] = useState<string[]>(DEFAULT_CHOICES.campaign_managers);
+  const [financeOwners, setFinanceOwners] = useState<string[]>(DEFAULT_CHOICES.finance_owners);
+
+  const [company, setCompany] = useState<CompanyForm>({
+    reporting_id: "", company_name: "", company_type: "", agency_type: "",
+    brand: "", website: "", phone_code: "+91", phone_cca2: "IN", phone: "", email: "",
+    billing_currency: "INR", address_line1: "", address_line2: "",
+    country: "", state: "", city: "", zipcode: "", cin_number: "", vast_number: "",
+    place_of_supply: "", is_active: true,
+    credit_period_days: "",
+    payment_terms: "15 Days", payment_type: "Prepaid", tax_type: "", tds_applicable: "",
+    tds_section: "", advance_amount: "", credit_limit: "", outstanding_limit: "",
+    billing_contact: "",
+    default_market: "", default_platform: "", inventory_type: "",
+    campaign_objective: "", language: "", audience_focus: "", ad_formats: "", timezone: "",
+    account_manager: "", sales_owner: "", campaign_manager: "", finance_owner: "",
+    client_type: "", priority: "", risk_level: "", payment_behavior: "",
+    avg_response_time: "", notes: "", additional_internal_notes: "", additional_tags: "",
+  });
+
+  const [contacts, setContacts] = useState<ContactRow[]>([makeContact()]);
+  const [addresses, setAddresses] = useState<AddressRow[]>([makeAddress()]);
+
+  const sf = (k: keyof CompanyForm, v: string | boolean) =>
+    setCompany((p) => ({ ...p, [k]: v }));
+
+  const onCompanyCountryChange = (v: string) => {
+    sf("country", v ?? "");
+    _handleCountryChange(
+      v ?? "",
+      () => { sf("state", ""); form.setFieldsValue({ state: undefined }); },
+      () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
+    );
+  };
+
+  const onCompanyStateChange = (v: string) => {
+    sf("state", v ?? "");
+    _handleStateChange(
+      v ?? "",
+      company.country,
+      () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
+    );
+  };
+
+  const addContact = () => setContacts((p) => [...p, { ...makeContact(), id: Date.now() }]);
+  const removeContact = (id: number) => setContacts((p) => p.filter((c) => c.id !== id));
+  const updateContact = (id: number, k: keyof ContactRow, v: string | File | null) =>
+    setContacts((p) => p.map((c) => (c.id === id ? { ...c, [k]: v } : c)));
+
+  const addAddress = () => setAddresses((p) => [...p, { ...makeAddress(), id: Date.now() }]);
+  const removeAddress = (id: number) => setAddresses((p) => p.filter((a) => a.id !== id));
+  const updateAddress = (id: number, k: keyof AddressRow, v: string) =>
+    setAddresses((p) => p.map((a) => (a.id === id ? { ...a, [k]: v } : a)));
+
+  const buildPayload = () => {
+    const clientFields = {
+      reporting_id: company.reporting_id,
+      name: company.company_name,
+      company_type: company.company_type,
+      agency_type: company.agency_type,
+      brand: company.brand,
+      website: company.website,
+      phone: company.phone,
+      email: company.email,
+      billing_currency: company.billing_currency,
+      address_line1: company.address_line1,
+      address_line2: company.address_line2,
+      country: company.country,
+      state: company.state,
+      city: company.city,
+      zipcode: company.zipcode,
+      cin_number: company.cin_number,
+      vast_number: company.vast_number,
+      place_of_supply: company.place_of_supply,
+      is_active: company.is_active,
+    };
+
+    const billing = {
+      credit_period_days: parseInt(company.credit_period_days) || 0,
+      payment_terms: company.payment_terms,
+      payment_type: company.payment_type,
+      tax_type: company.tax_type,
+      tds_applicable: company.tds_applicable === "Yes",
+      tds_section: company.tds_section,
+      billing_currency: company.billing_currency,
+      advance_amount: company.advance_amount,
+      credit_limit: company.credit_limit,
+      outstanding_limit: company.outstanding_limit,
+      billing_contact: company.billing_contact,
+    };
+
+    const ownership = {
+      account_manager: company.account_manager,
+      sales_owner: company.sales_owner,
+      campaign_manager: company.campaign_manager,
+      finance_owner: company.finance_owner,
+    };
+
+    const classification = {
+      client_type: company.client_type,
+      priority: company.priority,
+      risk_level: company.risk_level,
+      payment_behavior: company.payment_behavior,
+      avg_response_time: company.avg_response_time ? parseInt(company.avg_response_time) : null,
+      notes: company.notes,
+      additional_internal_notes: company.additional_internal_notes,
+      additional_tags: company.additional_tags,
+    };
+
+    const contactsPayload = contacts.map((c) => ({
+      name: c.contact_name,
+      phone: `${company.phone_code}${c.contact_phone}`,
+      email: c.contact_email,
+      designation: c.contact_designation,
+      country: c.contact_country,
+      zipcode: c.contact_zipcode,
+      address_line1: c.contact_address_1,
+      address_line2: c.contact_address_2,
+    }));
+
+    const addressesPayload = addresses.map((a, idx) => ({
+      address_line1: a.company_address_line1,
+      address_line2: a.company_address_line2,
+      country: a.company_country,
+      zipcode: a.company_zipcode,
+      is_primary: idx === 0,
+    }));
+
+    const jsonBody = {
+      ...clientFields, billing, ownership, classification,
+      contacts: contactsPayload, addresses: addressesPayload,
+    };
+
+    const signatureFile = contacts[0]?.digital_signature;
+    if (signatureFile) {
+      const fd = new FormData();
+      fd.append("data", JSON.stringify(jsonBody));
+      contacts.forEach((contact, index) => {
+        if (contact.digital_signature)
+          fd.append(`contact_signature_${index}`, contact.digital_signature);
+      });
+      return { body: fd, headers: {} as Record<string, string> };
+    }
+
+    return {
+      body: JSON.stringify(jsonBody),
+      headers: { "Content-Type": "application/json" } as Record<string, string>,
+    };
+  };
 
   const handleSubmit = async () => {
+    try { await form.validateFields(); } catch { return; }
     setSubmitting(true);
-    setSubmitStatus('idle');
-    setErrorMsg('');
-
-    // In handleSubmit — update geo string to include new fields
-    const geoString = geoLocations.map(loc =>
-      [loc.country, loc.state, loc.city, loc.zipcode, loc.range].filter(Boolean).join(' > ')
-    ).join('; ');
-
-    const fd = new FormData();
-    fd.append('client', clientId);
-    fd.append('client_name', client);
-    fd.append('advertiser', advertiser);
-    fd.append('campaign_name', campaignName);
-    fd.append('campaign_type', campaignType);
-    fd.append('buying_type', buyingType.join(', '));
-    fd.append('objective', objective);
-    fd.append('age', age.join(', '));
-    fd.append('gender', gender);
-    fd.append('geo_targeting', geoString);
-    fd.append('platforms', platforms.join(', '));
-    fd.append('brand_safety', brandSafety);
-    fd.append('start_date', startDate);
-    fd.append('end_date', endDate);
-    if (websiteUrl) fd.append('website_url', websiteUrl);
-    if (clientCampaignId) fd.append('client_campaign_id', clientCampaignId);
-    if (purchaseOrderId) fd.append('purchase_order_id', purchaseOrderId);
-    if (notes) fd.append('notes', notes);
-    if (freqCap) fd.append('frequency_cap', freqCap);
-    if (viewability) fd.append('viewability_goal', viewability);
-
-    // Serialize line items (metadata as JSON, files appended separately)
-    fd.append('line_items', JSON.stringify(
-      lineItems.map(li => ({
-        lineItemName: li.lineItemName,
-        ethnicity: li.ethnicity,
-        startDate: li.startDate,
-        endDate: li.endDate,
-        adFormat: li.adFormat,
-        impressions: li.impressions,
-        landingPage: li.landingPage,
-        creatives: li.creatives.map(f => f.name),
-      }))
-    ));
-    lineItems.forEach((li, i) => {
-      li.creatives.forEach(file => {
-        fd.append(`line_item_${i}_creative`, file, file.name);
-      });
-    });
-
+    setSubmitStatus("idle");
+    setErrorMessage("");
     try {
-      const res = await fetch(SUBMIT_URL, { method: 'POST', body: fd });
+      const { body, headers } = buildPayload();
+      const res = await fetch(SUBMIT_URL, { method: "POST", headers, body });
       if (res.ok) {
-        setSubmitStatus('success');
+        setSubmitStatus("success");
       } else {
-        const text = await res.text();
-        setSubmitStatus('error');
-        setErrorMsg(text || `Server error: ${res.status}`);
+        let errMsg = `Server error ${res.status}`;
+        try { const json = await res.json(); errMsg = JSON.stringify(json); }
+        catch { errMsg = (await res.text()) || errMsg; }
+        setSubmitStatus("error");
+        setErrorMessage(errMsg);
       }
     } catch (err: unknown) {
-      setSubmitStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Network error');
+      setSubmitStatus("error");
+      setErrorMessage(err instanceof Error ? err.message : "Network error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const STEPS = [
-    { n: 1, label: 'Select Client & Advertiser', sub: 'Choose client and advertiser' },
-    { n: 2, label: 'Campaign Details', sub: 'Basic campaign information' },
-    { n: 3, label: 'Objectives & Settings', sub: 'Define goals and settings' },
-    { n: 4, label: 'Line Item Details', sub: 'Add line items' },
-    { n: 5, label: 'Review & Confirm', sub: 'Review and create campaign' },
-  ];
+  const tabItems = TABS.map((t) => ({
+    key: t.id,
+    label: <span className="flex items-center gap-1.5 select-none">{t.emoji} {t.label}</span>,
+  }));
 
-  const stepTitles: Record<number, { title: string; sub: string }> = {
-    1: { title: 'Select Client & Advertiser', sub: 'Choose the client and advertiser for this campaign' },
-    2: { title: 'Campaign Details', sub: 'Provide basic information about the campaign' },
-    3: { title: 'Objectives & Settings', sub: 'Define target audience and platform settings' },
-    4: { title: 'Line Item Details', sub: 'Add one or more line items for this campaign' },
-    5: { title: 'Review & Confirm', sub: 'Review all details before creating the campaign' },
+  // ─── Shared props bundles (avoids repetition at call sites) ───────────────
+
+  const billingFormProps: BillingFormProps = {
+    company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
   };
 
+  const contactsSectionProps: ContactsSectionProps = {
+    contacts, addContact, removeContact, updateContact,
+    company, sf, form, countries,
+    loadingCountries, countryOpts, setCountryOpts,
+  };
+
+  const addressesSectionProps: AddressesSectionProps = {
+    addresses, addAddress, removeAddress, updateAddress,
+    loadingCountries, countryOpts, setCountryOpts,
+  };
+
+  // ─── JSX ──────────────────────────────────────────────────────────────────
   return (
-    <div className="cc-root">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+    <div className="min-h-screen bg-gray-100">
 
-      <div className="cc-main" style={{ marginLeft: sideWidth }}>
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 sticky top-0 z-40 shadow-sm">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">N</div>
+          <span className="font-semibold tracking-tight text-gray-800">
+            Billion <span className="text-indigo-600">Tags</span>
+          </span>
+        </Link>
+        <span className="text-xs text-gray-400 ml-2">/ New Client Onboarding</span>
+      </header>
 
-        {/* Topbar */}
-        <header className="cc-topbar">
-          <div className="cc-topbar-breadcrumb">
-            <Link to="/user_campaigns" style={{ color: 'var(--slate-500)', textDecoration: 'none' }}>Campaigns</Link>
-            <RightOutlined style={{ fontSize: 13 }} />
-            <span style={{ color: 'var(--slate)', fontWeight: 600 }}>Create Campaign</span>
+      <div className="max-w-7xl mx-auto px-6 pt-6 pb-14">
+
+        <div className="mb-5">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Onboard a new client</h1>
+          <p className="text-sm text-gray-500 mt-1.5">Complete all sections. All critical fields route through admin approval.</p>
+        </div>
+
+        {submitStatus === "success" && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+            ✅ Client submitted successfully! Client ID will be auto-assigned by the system.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="cc-topbar-bell">
-              <BellOutlined style={{ fontSize: 15, color: 'var(--slate-500)' }} />
-              <span className="cc-topbar-bell-dot" />
+        )}
+        {submitStatus === "error" && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            ❌ Submission failed: {errorMessage}
+          </div>
+        )}
+
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Link to="/" className="w-8 h-8 grid place-items-center rounded-md text-gray-400 hover:bg-gray-100">
+                <ArrowLeftOutlined />
+              </Link>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">Add New Client</p>
+                <p className="text-xs text-gray-400 mt-0.5">Create a new client profile with all required details</p>
+              </div>
             </div>
-            <div className="cc-topbar-avatar">AK</div>
+            <div className="flex items-center gap-2">
+              <Link to="/login">
+                <Button className="ob-btn-default">Cancel</Button>
+              </Link>
+              <Button type="primary" icon={<SaveOutlined />} loading={submitting}
+                onClick={handleSubmit} className="ob-btn-primary">
+                {submitting ? "Saving…" : "Save Client"}
+              </Button>
+            </div>
           </div>
-        </header>
 
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} className="onboarding-tabs" />
 
-          <div className="cc-page-header">
-            <h1 className="cc-page-title">Create New Campaign</h1>
-            <p className="cc-page-sub">Follow the steps below to create a new campaign</p>
-          </div>
+          <div className="p-6 bg-gray-50">
 
-          {submitStatus === 'success' && (
-            <div className="cc-banner cc-banner-success">✅ Campaign created successfully! Redirecting…</div>
-          )}
-          {submitStatus === 'error' && (
-            <div className="cc-banner cc-banner-error">❌ Submission failed: {errorMsg}</div>
-          )}
+            {/* ── TAB 1: BASIC INFORMATION ── */}
+            {activeTab === "basic" && (
+              <div className="space-y-5">
 
-          {/* Stepper */}
-          <div className="cc-stepper-wrap">
-            <div className="cc-stepper">
-              {STEPS.map((s, i) => {
-                const isActive = s.n === activeStep;
-                const isDone = s.n < activeStep;
-                return (
-                  <React.Fragment key={s.n}>
-                    <div className={`cc-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} onClick={() => isDone && setActiveStep(s.n)}>
-                      <div className={`cc-step-circle ${isActive ? 'is-active' : isDone ? 'is-done' : 'inactive'}`}>
-                        {isDone ? <CheckOutlined style={{ fontSize: 13 }} /> : s.n}
-                      </div>
-                      <div>
-                        <div className={`cc-step-label ${isActive ? 'active' : isDone ? 'done' : ''}`}>{s.label}</div>
-                        <div className={`cc-step-sub ${isActive ? 'active' : ''}`}>{s.sub}</div>
+                <FormCard icon="🪪" title="Basic Information">
+                  <Form form={form} layout="vertical" className="onboarding-form">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
+
+                      <Form.Item label="Client ID (Auto)">
+                        <Input disabled value="Auto-generated" />
+                      </Form.Item>
+
+                      <Form.Item label="Reporting ID (Internal)" name="reporting_id"
+                        rules={[{ required: true, message: "Reporting ID is required" }]}>
+                        <Input placeholder="Enter Reporting ID" value={company.reporting_id}
+                          onChange={(e) => sf("reporting_id", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Company Name" name="company_name"
+                        rules={[{ required: true, message: "Company name is required" }]}>
+                        <Input placeholder="Enter Company Name" value={company.company_name}
+                          onChange={(e) => sf("company_name", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Company Type" name="company_type"
+                        rules={[{ required: true, message: "Company type is required" }]}>
+                        <Input placeholder="Enter Company Type" value={company.company_type}
+                          onChange={(e) => sf("company_type", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Agency Type" name="agency_type"
+                        rules={[{ required: true, message: "Agency type is required" }]}>
+                        <AddNewSelect value={company.agency_type} onChange={(v: any) => sf("agency_type", v)}
+                          options={agencyTypes} setOptions={setAgencyTypes} placeholder="Select Agency Type" />
+                      </Form.Item>
+
+                      <Form.Item label="Brand / Parent Company">
+                        <Input placeholder="Enter Brand / Parent Company" value={company.brand}
+                          onChange={(e) => sf("brand", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Website" name="website"
+                        rules={[
+                          { required: true, message: "Website is required" },
+                          {
+                            pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/,
+                            message: "Enter a valid URL starting with http:// or https://",
+                          },
+                        ]}>
+                        <Input placeholder="https://" value={company.website}
+                          onChange={(e) => sf("website", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Phone Number" name="phone"
+                        rules={[{ required: true, message: "Phone number is required" }]}
+                        getValueProps={() => ({ value: company.phone })}>
+                        <PhoneInput
+                          phone={company.phone} phone_code={company.phone_code}
+                          phone_cca2={company.phone_cca2} countries={countries}
+                          onPhoneChange={(v) => { sf("phone", v); form.setFieldValue("phone", v); }}
+                          onCountryChange={(code, cca2) => { sf("phone_code", code); sf("phone_cca2", cca2); }}
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="Email" name="email"
+                        rules={[
+                          { required: true, message: "Email is required" },
+                          { type: "email", message: "Enter a valid email address" },
+                        ]}>
+                        <Input placeholder="Enter email address" value={company.email}
+                          onChange={(e) => sf("email", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Billing Currency">
+                        <Select style={{ width: "100%" }} value={company.billing_currency}
+                          onChange={(v) => sf("billing_currency", v)}
+                          options={DEFAULT_CHOICES.billing_currencies.map((c) => ({
+                            value: c, label: c === "INR" ? "INR (₹)" : c,
+                          }))} />
+                      </Form.Item>
+
+                      <Form.Item label="Address Line 1" name="address_line1" className="md:col-span-2"
+                        rules={[{ required: true, message: "Address line 1 is required" }]}>
+                        <Input placeholder="Enter address line 1" value={company.address_line1}
+                          onChange={(e) => sf("address_line1", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Address Line 2" className="md:col-span-2">
+                        <Input placeholder="Enter address line 2" value={company.address_line2}
+                          onChange={(e) => sf("address_line2", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Country" name="country"
+                        rules={[{ required: true, message: "Country is required" }]}>
+                        <AddNewSelect
+                          placeholder="Select country…"
+                          loading={loadingCountries}
+                          showSearch
+                          value={company.country}
+                          onChange={onCompanyCountryChange}
+                          options={countryOpts}
+                          setOptions={setCountryOpts}
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="State / Province" name="state"
+                        rules={[{ required: true, message: "State is required" }]}>
+                        <AddNewSelect
+                          placeholder={loadingStates ? "Loading…" : company.country ? "Select state…" : "Select country first…"}
+                          loading={loadingStates}
+                          showSearch
+                          value={company.state}
+                          onChange={onCompanyStateChange}
+                          options={stateOpts}
+                          setOptions={setStateOpts}
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="City" name="city"
+                        rules={[{ required: true, message: "City is required" }]}>
+                        <AddNewSelect
+                          placeholder={loadingCities ? "Loading…" : company.state ? "Select city…" : "Select state first…"}
+                          loading={loadingCities}
+                          showSearch
+                          value={company.city}
+                          onChange={(v) => sf("city", v ?? "")}
+                          options={cityOpts}
+                          setOptions={setCityOpts}
+                        />
+                      </Form.Item>
+
+                      <Form.Item label="Zip Code" name="zipcode"
+                        rules={[{ required: true, message: "Zip code is required" }]}>
+                        <Input type="number" placeholder="Enter pin / zip code" value={company.zipcode}
+                          onChange={(e) => sf("zipcode", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="CIN Number" name="cin_number"
+                        rules={[{ required: true, message: "CIN number is required" }]}>
+                        <Input placeholder="Enter CIN number" value={company.cin_number}
+                          onChange={(e) => sf("cin_number", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Vast Number" name="vast_number"
+                        rules={[{ required: true, message: "Vast number is required" }]}>
+                        <Input placeholder="Enter vast number" value={company.vast_number}
+                          onChange={(e) => sf("vast_number", e.target.value)} />
+                      </Form.Item>
+
+                      <Form.Item label="Place of Supply" name="place_of_supply"
+                        rules={[{ required: true, message: "Place of supply is required" }]}>
+                        <AddNewSelect value={company.place_of_supply} onChange={(v: any) => sf("place_of_supply", v)}
+                          options={placesOfSupply} setOptions={setPlacesOfSupply} placeholder="Select place of supply" />
+                      </Form.Item>
+
+                      <Form.Item label="Is Active">
+                        <div className="flex items-center gap-2 h-[38px]">
+                          <Switch checked={company.is_active} onChange={(checked) => sf("is_active", checked)} />
+                          <Text className="text-xs text-gray-500">
+                            {company.is_active ? "Active" : "Inactive"}
+                          </Text>
+                        </div>
+                      </Form.Item>
+
+                    </div>
+                  </Form>
+                </FormCard>
+
+                <FormCard icon="💳" title="Billing & Commercials">
+                  <BillingForm {...billingFormProps} />
+                </FormCard>
+
+                <ContactsSection {...contactsSectionProps} />
+                <AddressesSection {...addressesSectionProps} />
+
+                <FormCard icon="👥" title="Account Ownership">
+                  <Form form={form} layout="vertical" className="onboarding-form">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
+                      <Form.Item label="Account Manager" name="account_manager"
+                        rules={[{ required: true, message: "Account manager is required" }]}>
+                        <AddNewSelect value={company.account_manager} onChange={(v: any) => sf("account_manager", v)}
+                          options={accountManagers} setOptions={setAccountManagers} placeholder="Select account manager" />
+                      </Form.Item>
+                      <Form.Item label="Sales Owner" name="sales_owner"
+                        rules={[{ required: true, message: "Sales owner is required" }]}>
+                        <AddNewSelect value={company.sales_owner} onChange={(v: any) => sf("sales_owner", v)}
+                          options={salesOwners} setOptions={setSalesOwners} placeholder="Select sales owner" />
+                      </Form.Item>
+                      <Form.Item label="Campaign Manager" name="campaign_manager"
+                        rules={[{ required: true, message: "Campaign manager is required" }]}>
+                        <AddNewSelect value={company.campaign_manager} onChange={(v: any) => sf("campaign_manager", v)}
+                          options={campaignManagers} setOptions={setCampaignManagers} placeholder="Select campaign manager" />
+                      </Form.Item>
+                      <Form.Item label="Finance Owner" name="finance_owner"
+                        rules={[{ required: true, message: "Finance owner is required" }]}>
+                        <AddNewSelect value={company.finance_owner} onChange={(v: any) => sf("finance_owner", v)}
+                          options={financeOwners} setOptions={setFinanceOwners} placeholder="Select finance owner" />
+                      </Form.Item>
+                    </div>
+                  </Form>
+                </FormCard>
+
+                <FormCard icon="🏷️" title="Client Classification & Behavior">
+                  <Form form={form} layout="vertical" className="onboarding-form">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4">
+                      <Form.Item label="Client Type" name="client_type"
+                        rules={[{ required: true, message: "Client type is required" }]}>
+                        <AddNewSelect value={company.client_type} onChange={(v: any) => sf("client_type", v)}
+                          options={clientTypes} setOptions={setClientTypes} placeholder="Select type" />
+                      </Form.Item>
+                      <Form.Item label="Priority Level" name="priority"
+                        rules={[{ required: true, message: "Priority level is required" }]}>
+                        <AddNewSelect value={company.priority} onChange={(v: any) => sf("priority", v)}
+                          options={priorityLevels} setOptions={setPriorityLevels} placeholder="Select priority" />
+                      </Form.Item>
+                      <Form.Item label="Risk Level" name="risk_level"
+                        rules={[{ required: true, message: "Risk level is required" }]}>
+                        <AddNewSelect value={company.risk_level} onChange={(v: any) => sf("risk_level", v)}
+                          options={riskLevels} setOptions={setRiskLevels} placeholder="Select risk level" />
+                      </Form.Item>
+                      <Form.Item label="Payment Behavior" name="payment_behavior"
+                        rules={[{ required: true, message: "Payment behavior is required" }]}>
+                        <AddNewSelect value={company.payment_behavior} onChange={(v: any) => sf("payment_behavior", v)}
+                          options={paymentBehaviors} setOptions={setPaymentBehaviors} placeholder="Select behavior" />
+                      </Form.Item>
+                      <Form.Item label="Avg Response Time (Days)" name="avg_response_time"
+                        rules={[{ required: true, message: "Avg response time is required" }]}>
+                        <Input placeholder="Enter average days" value={company.avg_response_time}
+                          onChange={(e) => sf("avg_response_time", e.target.value)} />
+                      </Form.Item>
+                      <Form.Item label="Health Score (Auto)">
+                        <Input disabled value="–" />
+                      </Form.Item>
+                      <Form.Item label="Notes" name="notes" className="md:col-span-2">
+                        <Input placeholder="Enter notes about client" value={company.notes}
+                          onChange={(e) => sf("notes", e.target.value)} />
+                      </Form.Item>
+                    </div>
+                  </Form>
+                </FormCard>
+
+                <div className="grid md:grid-cols-2 gap-5">
+                  <FormCard icon="📊" title="Client Lifetime Summary" badge="Auto">
+                    <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                      {[
+                        ["Total Revenue (Lifetime)", "₹0.00"],
+                        ["Total Spend Managed", "₹0.00"],
+                        ["Total Campaigns Run", "0"],
+                        ["First Campaign Date", "–"],
+                        ["Last Campaign Date", "–"],
+                        ["Client Since", "–"],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div className="text-[11px] text-gray-400 leading-tight mb-1">{label}</div>
+                          <div className="text-sm font-semibold text-gray-800">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </FormCard>
+                  <FormCard icon="💰" title="Payment Snapshot" badge="Auto">
+                    <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                      {[
+                        { label: "Total Billed (To Date)", value: "₹0.00", red: false },
+                        { label: "Total Received (To Date)", value: "₹0.00", red: false },
+                        { label: "Outstanding Amount", value: "₹0.00", red: true },
+                        { label: "Overdue Amount", value: "₹0.00", red: true },
+                        { label: "Overdue Invoices", value: "0", red: false },
+                        { label: "Collection Efficiency", value: "0%", red: false },
+                      ].map((s) => (
+                        <div key={s.label}>
+                          <div className="text-[11px] text-gray-400 leading-tight mb-1">{s.label}</div>
+                          <div className={`text-sm font-semibold ${s.red ? "text-red-500" : "text-gray-800"}`}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </FormCard>
+                </div>
+
+                <FormCard icon="📝" title="Additional Notes">
+                  <Form form={form} layout="vertical" className="onboarding-form">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <Form.Item label="Internal Notes" name="additional_internal_notes">
+                        <TextArea rows={3} placeholder="Enter internal notes (visible to your team only)"
+                          value={company.additional_internal_notes}
+                          onChange={(e) => sf("additional_internal_notes", e.target.value)} />
+                      </Form.Item>
+                      <Form.Item label="Tags" name="additional_tags">
+                        <Input placeholder="Type and press enter to add tags" value={company.additional_tags}
+                          onChange={(e) => sf("additional_tags", e.target.value)} />
+                      </Form.Item>
+                    </div>
+                  </Form>
+                </FormCard>
+
+              </div>
+            )}
+
+            {/* ── TAB 2: BILLING & COMMERCIALS ── */}
+            {activeTab === "billing" && (
+              <div className="space-y-5">
+                <FormCard icon="💳" title="Billing & Commercials">
+                  <BillingForm {...billingFormProps} />
+                </FormCard>
+              </div>
+            )}
+
+            {/* ── TAB 3: CONTACTS & ADDRESSES ── */}
+            {activeTab === "contacts" && (
+              <div className="space-y-5">
+                <ContactsSection {...contactsSectionProps} />
+                <AddressesSection {...addressesSectionProps} />
+              </div>
+            )}
+
+            {/* ── TAB 4: REVIEW & SUMMARY ── */}
+            {activeTab === "review" && (
+              <div className="space-y-5">
+                <FormCard icon="✅" title="Review & Summary" subtitle="Confirm all details before final submission">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Company Details</p>
+                      {[
+                        ["Company Name", company.company_name],
+                        ["Reporting ID", company.reporting_id],
+                        ["Company Type", company.company_type],
+                        ["Email", company.email],
+                        ["Phone", `${company.phone_code} ${company.phone}`],
+                        ["Country", company.country],
+                        ["State", company.state],
+                        ["City", company.city],
+                        ["CIN Number", company.cin_number],
+                        ["Vast Number", company.vast_number],
+                        ["Status", company.is_active ? "Active" : "Inactive"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex justify-between py-2 border-b border-gray-100 last:border-0 text-sm">
+                          <span className="text-gray-400">{label}</span>
+                          <span className="font-medium text-gray-800 max-w-[55%] truncate text-right">{value || "–"}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Billing Details</p>
+                      {[
+                        ["Billing Currency", company.billing_currency],
+                        ["Payment Type", company.payment_type],
+                        ["Payment Terms", company.payment_terms],
+                        ["Tax Type", company.tax_type],
+                        ["Credit Limit", company.credit_limit],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex justify-between py-2 border-b border-gray-100 last:border-0 text-sm">
+                          <span className="text-gray-400">{label}</span>
+                          <span className="font-medium text-gray-800">{value || "–"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {contacts[0]?.contact_name && (
+                    <div className="mt-5 pt-5 border-t border-gray-100">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Primary Contact</p>
+                      <div className="grid md:grid-cols-4 gap-4 text-sm">
+                        {[
+                          ["Name", contacts[0].contact_name],
+                          ["Email", contacts[0].contact_email],
+                          ["Phone", contacts[0].contact_phone],
+                          ["Designation", contacts[0].contact_designation],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <div className="text-xs text-gray-400 mb-0.5">{label}</div>
+                            <div className="font-medium text-gray-800">{value || "–"}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    {i < STEPS.length - 1 && <div className={`cc-step-connector ${isDone ? 'done' : ''}`} />}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Step Content */}
-          <div className="cc-content-wrap" key={activeStep}>
-            <div className="cc-card">
-              <div className="cc-card-header">
-                <div className="cc-card-step-badge">{activeStep}</div>
-                <div>
-                  <div className="cc-card-title">{stepTitles[activeStep].title}</div>
-                  <div className="cc-card-sub">{stepTitles[activeStep].sub}</div>
+                  )}
+                </FormCard>
+                <div className="flex justify-end">
+                  <Button type="primary" size="large" icon={<SaveOutlined />}
+                    loading={submitting} onClick={handleSubmit} className="ob-btn-primary px-8">
+                    {submitting ? "Submitting…" : "Submit for Approval"}
+                  </Button>
                 </div>
-                <div className="cc-card-step-count">Step {activeStep} of {STEPS.length}</div>
               </div>
-              <div className="cc-card-body">
-                {activeStep === 1 && (
-                  <Step1
-                    client={client} setClient={setClient}
-                    setClientId={setClientId}
-                    advertiser={advertiser} setAdvertiser={setAdvertiser}
-                    websiteUrl={websiteUrl} setWebsiteUrl={setWebsiteUrl}
-                  />
-                )}
-                {activeStep === 2 && (
-                  <Step2
-                    campaignId=""
-                    campaignName={campaignName} setCampaignName={setCampaignName}
-                    clientCampaignId={clientCampaignId} setClientCampaignId={setClientCampaignId}
-                    purchaseOrderId={purchaseOrderId} setPurchaseOrderId={setPurchaseOrderId}
-                    campaignType={campaignType} setCampaignType={setCampaignType}
-                    buyingType={buyingType} setBuyingType={setBuyingType}
-                    objective={objective} setObjective={setObjective}
-                    notes={notes} setNotes={setNotes}
-                    startDate={startDate} setStartDate={setStartDate}
-                    endDate={endDate} setEndDate={setEndDate}
-                  />
-                )}
-                {activeStep === 3 && (
-                  <Step3
-                    age={age} setAge={setAge}
-                    gender={gender} setGender={setGender}
-                    geoLocations={geoLocations} setGeoLocations={setGeoLocations}
-                    platforms={platforms} setPlatforms={setPlatforms}
-                    freqCap={freqCap} setFreqCap={setFreqCap}
-                    brandSafety={brandSafety} setBrandSafety={setBrandSafety}
-                    viewability={viewability} setViewability={setViewability}
-                  />
-                )}
+            )}
 
-                {activeStep === 4 && (
-                  <Step4LineItems
-                    campaignStartDate={startDate}
-                    campaignEndDate={endDate}
-                    lineItems={lineItems}
-                    setLineItems={setLineItems}
-                  />
-                )}
-                {activeStep === 5 && (
-                  <Step5Review
-                    client={client} advertiser={advertiser} websiteUrl={websiteUrl}
-                    campaignName={campaignName}
-                    clientCampaignId={clientCampaignId} purchaseOrderId={purchaseOrderId}
-                    campaignType={campaignType} buyingType={buyingType}
-                    objective={objective} notes={notes}
-                    age={age} gender={gender}
-                    geoLocations={geoLocations} platforms={platforms}
-                    freqCap={freqCap} brandSafety={brandSafety} viewability={viewability}
-                    startDate={startDate} endDate={endDate}
-                    lineItems={lineItems}
-                    onEdit={() => setActiveStep(1)}
-                  />
-                )}
-              </div>
-            </div>
           </div>
-
-          {/* Bottom Bar */}
-          <div className="cc-bottom-bar">
-            <Button className="cc-btn-cancel" onClick={() => navigate('/user_campaigns')}>Cancel</Button>
-            <div className="cc-bottom-bar-actions">
-              {activeStep > 1 && (
-                <Button className="cc-btn-back" onClick={() => setActiveStep(s => s - 1)}>← Back</Button>
-              )}
-              {activeStep < 5 ? (
-                <Button type="primary" className="cc-btn-next" onClick={() => setActiveStep(s => s + 1)} icon={<ArrowRightOutlined />} iconPosition="end">
-                  Next Step
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  className="cc-btn-submit"
-                  loading={submitting}
-                  onClick={handleSubmit}
-                  icon={<CheckOutlined />}
-                >
-                  {submitting ? 'Creating…' : 'Create Campaign'}
-                </Button>
-              )}
-            </div>
-          </div>
-
-        </main>
+        </div>
       </div>
     </div>
   );

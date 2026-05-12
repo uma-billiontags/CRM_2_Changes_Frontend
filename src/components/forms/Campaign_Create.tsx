@@ -1,5 +1,3 @@
-// Campaign form — Fixed: allLineItemCreatives preserved across navigation
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -10,7 +8,7 @@ import {
   PlusOutlined, BellOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
-} from '@ant-design/icons';
+} from '@ant-design/icons'; 
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import '../styles/Campaign_Create.css';
@@ -21,23 +19,24 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
+const SUBMIT_URL = 'http://127.0.0.1:8000/create_campaign/';
+const CLIENT_URL = 'http://127.0.0.1:8000/get_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 type LineItemCreativesMap = Record<string, CreativeData[]>;
 
-// ── Line Item ID generator ────────────────────────────────────────────────────
+// Line Item ID generator
 function generateLineItemId(index: number, offset: number = 1): string {
   const userPrefix = 'USER';
   const paddedIndex = String(offset + index - 1).padStart(3, '0');
   return `LI${userPrefix}${paddedIndex}`;
 }
 
+// Generate an empty line item with a unique ID based on the index and offset
 function emptyLineItem(index: number, offset: number = 1): LineItem {
   return {
     id: generateLineItemId(index, offset),
@@ -55,13 +54,14 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
   };
 }
 
-// ── Draft helpers ─────────────────────────────────────────────────────────────
+// Draft management using sessionStorage
 function saveDraft(data: object) {
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
   } catch (e) { /* ignore */ }
 }
 
+// Returns the draft data or null if not found or on error
 function loadDraft(): Record<string, any> | null {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
@@ -71,6 +71,7 @@ function loadDraft(): Record<string, any> | null {
   }
 }
 
+// Clears the saved draft from sessionStorage
 function clearDraft() {
   try {
     sessionStorage.removeItem(DRAFT_KEY);
@@ -91,7 +92,7 @@ function consumeNavFlag(): boolean {
   }
 }
 
-// ── Line Item helpers ─────────────────────────────────────────────────────────
+// Line Item helpers 
 const ETHNICITY_OPTIONS = [
   'General', 'Asian', 'South Asian', 'African American',
   'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
@@ -111,6 +112,7 @@ const VIDEO_FORMATS = ['video', 'youtube'];
 
 const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
 
+// Validation helper to check if a line item has all required fields filled
 function isLineItemComplete(item: LineItem): boolean {
   return !!(
     item.lineItemName.trim() &&
@@ -120,6 +122,7 @@ function isLineItemComplete(item: LineItem): boolean {
   );
 }
 
+// Fetches all campaigns and their line items to determine the next available line item offset for unique ID generation
 async function fetchLastLineItemOffset(): Promise<number> {
   try {
     const res = await fetch(GET_CAMPAIGNS_URL, {
@@ -148,7 +151,7 @@ async function fetchLastLineItemOffset(): Promise<number> {
   }
 }
 
-// ── GeoTargeting ─────────────────────────────────────────────────────────────
+// GeoTargeting component for managing location-based targeting with dynamic country/state/city selection and addition
 function GeoTargeting({ locations, onAdd, onRemove }: {
   locations: GeoLocation[];
   onAdd: (l: GeoLocation & { zipcode: string; range: string }) => void;
@@ -480,7 +483,7 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
 
       <div className="cc-geo-helper" style={{ marginBottom: 8 }}>
         <InfoCircleOutlined style={{ marginRight: 4 }} />
-        Select at least one field or enter a Zip Code. Range enables after city is selected.
+        Select at least one field or enter a Zip Code. Range enables after city or address is entered.
       </div>
 
       {locations.length > 0 ? (
@@ -502,7 +505,7 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
   );
 }
 
-// ── InfoBox ───────────────────────────────────────────────────────────────────
+// InfoBox component for displaying informational messages with variant styling (blue or amber)
 function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; children: React.ReactNode }) {
   return (
     <div className={`cc-info-box ${variant}`}>
@@ -512,8 +515,8 @@ function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; c
   );
 }
 
-// ── Step 1 ────────────────────────────────────────────────────────────────────
-function Step1({ client, setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
+// Step 1 
+function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
   const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -538,6 +541,7 @@ function Step1({ client, setClient, setClientId, advertiser, setAdvertiser, webs
         <Form.Item label="Company Name" required>
           <Input className="cc-company-name-input" value={loading ? 'Loading…' : clientName} disabled style={{ fontWeight: 600 }} />
         </Form.Item>
+
         <Form.Item label="Advertiser (Brand)" required>
           <Select
             value={advertiser || undefined}
@@ -547,18 +551,35 @@ function Step1({ client, setClient, setClientId, advertiser, setAdvertiser, webs
             style={{ width: '100%', height: 38 }}
           />
         </Form.Item>
+
         <InfoBox variant="blue">
           All campaigns, line items, creatives and reports will be mapped under the selected client and advertiser. This cannot be changed after creation.
         </InfoBox>
-        <Form.Item label="Website URL">
-          <Input placeholder="https://" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} style={{ height: 38 }} />
+
+        <Form.Item
+          label="Website URL"
+          name="websiteUrl"
+          validateTrigger="onChange"
+          rules={[
+            {
+              pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/,
+              message: "Enter a valid URL starting with http:// or https://",
+            },
+          ]}
+        >
+          <Input
+            placeholder="https://"
+            value={websiteUrl}
+            onChange={e => setWebsiteUrl(e.target.value)}
+            style={{ height: 38 }}
+          />
         </Form.Item>
       </Form>
     </div>
   );
 }
 
-// ── Step 2 ────────────────────────────────────────────────────────────────────
+// Step 2
 function Step2({
   campaignId, campaignName, setCampaignName,
   clientCampaignId, setClientCampaignId,
@@ -623,6 +644,19 @@ function Step2({
               onChange={(vals: string[]) => setBuyingType(vals)}
               placeholder="Select buying type…"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={buyingType.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={[
                 { value: 'Programmatic (DV360)', label: 'Programmatic (DV360)' },
                 { value: 'Direct', label: 'Direct' },
@@ -630,7 +664,6 @@ function Step2({
                 { value: 'Preferred Deal', label: 'Preferred Deal' },
                 { value: 'Open Auction', label: 'Open Auction' },
               ]}
-              maxTagCount="responsive"
             />
           </Form.Item>
           <Form.Item label="Campaign Objective" required>
@@ -652,7 +685,7 @@ function Step2({
   );
 }
 
-// ── Step 3 ────────────────────────────────────────────────────────────────────
+// Step 3 
 function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, platforms, setPlatforms, freqCap, setFreqCap, brandSafety, setBrandSafety, viewability, setViewability }: any) {
   return (
     <div className="cc-form-section">
@@ -665,6 +698,19 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
               onChange={(vals: string[]) => setAge(vals)}
               placeholder="Select Age"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={age.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={[
                 { value: '18 to 24', label: '18 to 24' },
                 { value: '25 to 34', label: '25 to 34' },
@@ -673,20 +719,32 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
                 { value: '55 to 64', label: '55 to 64' },
                 { value: 'Others', label: 'Others' },
               ]}
-              maxTagCount="responsive"
             />
           </Form.Item>
           <Form.Item label="Gender" required>
             <Select
-              value={gender || undefined}
-              onChange={setGender}
+              mode='multiple'
+              value={gender}
+              onChange={(vals: string[]) => setGender(vals)}
               placeholder="Select Gender"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={gender.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={[
                 { value: 'Male', label: 'Male' },
                 { value: 'Female', label: 'Female' },
               ]}
-              maxTagCount="responsive"
             />
           </Form.Item>
         </div>
@@ -720,6 +778,19 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
             onChange={(vals: string[]) => setPlatforms(vals)}
             placeholder="Select Platforms"
             style={{ width: '100%' }}
+            maxTagCount="responsive"
+            menuItemSelectedIcon={null}
+            optionRender={(option) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={platforms.includes(option.value as string)}
+                  style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                />
+                <span>{option.label}</span>
+              </div>
+            )}
             options={[
               { value: 'Display', label: 'Display' },
               { value: 'Video', label: 'Video' },
@@ -730,7 +801,6 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
               { value: 'DOOH', label: 'DOOH' },
               { value: 'Mobile', label: 'Mobile' },
             ]}
-            maxTagCount="responsive"
           />
         </Form.Item>
 
@@ -775,7 +845,7 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
   );
 }
 
-// ── LineItemCard ──────────────────────────────────────────────────────────────
+// LineItemCard 
 interface ExtendedLineItemCardProps extends LineItemCardProps {
   lineItemCreatives: LineItemCreativesMap;
   allLineItemCreatives: LineItemCreativesMap;
@@ -796,7 +866,7 @@ function LineItemCard({
   const showViewability = hasImageFormat || hasVideoFormat;
   const showVCR = hasVideoFormat;
 
-  // ── Separate creative lists by type ──────────────────────────────────────
+  // Separate creative lists by type 
   const uploadedImageCreatives = lineItemCreatives[item.id + '_image'] || [];
   const uploadedVideoCreatives = lineItemCreatives[item.id + '_video'] || [];
 
@@ -862,7 +932,7 @@ function LineItemCard({
     }
   }
 
-  // ── Navigate to image upload page ────────────────────────────────────────
+  // Navigate to image upload page 
   const handleUploadCreatives = () => {
     setNavFlag();
     navigate('/creative_upload', {
@@ -875,7 +945,7 @@ function LineItemCard({
     });
   };
 
-  // ── Navigate to video upload page ────────────────────────────────────────
+  // Navigate to video upload page 
   const handleUploadVideoCreatives = () => {
     setNavFlag();
     navigate('/creative_video_upload', {
@@ -946,8 +1016,20 @@ function LineItemCard({
               value={item.ethnicity}
               onChange={(vals: string[]) => onChange(item.id, 'ethnicity', vals)}
               placeholder="Select ethnicity…"
-              maxTagCount="responsive"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={item.ethnicity.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))}
             />
           </Form.Item>
@@ -991,7 +1073,7 @@ function LineItemCard({
 
         {campaignStart && campaignEnd && (
           <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 14, background: '#f8fafc', borderRadius: 6, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, border: '0.5px solid #e2e8f0' }}>
-            Campaign flight: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
+            Line Item Date: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
           </div>
         )}
 
@@ -1003,8 +1085,20 @@ function LineItemCard({
               value={item.adFormat}
               onChange={handleAdFormatChange}
               placeholder="Select format…"
-              maxTagCount="responsive"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={item.adFormat.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={AD_FORMAT_OPTIONS}
             />
           </Form.Item>
@@ -1171,8 +1265,20 @@ function LineItemCard({
               value={item.units}
               onChange={(vals: string[]) => onChange(item.id, 'units', vals)}
               placeholder="Select units…"
-              maxTagCount="responsive"
               style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
+              optionRender={(option) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={item.units.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
               options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
             />
           </Form.Item>
@@ -1202,7 +1308,7 @@ function LineItemCard({
   );
 }
 
-// ── Step 4 — Line Item Details ────────────────────────────────────────────────
+// Step 4 — Line Item Details 
 interface Step4Props {
   campaignStartDate: string;
   campaignEndDate: string;
@@ -1217,6 +1323,7 @@ function Step4LineItems({
   campaignStartDate, campaignEndDate, lineItems, setLineItems,
   lineItemCreatives, lineItemOffset, confirmedLineItemIds,
 }: Step4Props) {
+
   function handleChange(id: string, field: keyof LineItem, value: any) {
     setLineItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   }
@@ -1268,15 +1375,13 @@ function Step4LineItems({
   );
 }
 
-// ── Step 5 — Review & Confirm ─────────────────────────────────────────────────
+// Step 5 — Review & Confirm 
 function Step5Review({
   client, advertiser, websiteUrl,
   campaignName, clientCampaignId, purchaseOrderId,
   campaignType, buyingType, objective, notes,
   age, gender, geoLocations, platforms,
-  freqCap, brandSafety, viewability,
-  budgetType, totalBudget, startDate, endDate, durationDays,
-  pacing, dayParting, timezone,
+  freqCap, brandSafety, viewability, startDate, endDate, durationDays,
   lineItems,
   lineItemCreatives,
   onEdit,
@@ -1297,17 +1402,13 @@ function Step5Review({
     { label: 'Objective', value: objective || '—' },
     { label: 'Notes', value: notes || '—' },
     { label: 'Age', value: Array.isArray(age) && age.length > 0 ? age.join(', ') : '—' },
-    { label: 'Gender', value: gender || '—' },
+    { label: 'Gender', value: Array.isArray(gender) && gender.length > 0 ? gender.join(', ') : '—' },
     { label: 'Geo Targeting', value: geoString },
     { label: 'Platforms', value: platforms.join(', ') || '—' },
     { label: 'Frequency Cap', value: freqCap ? `${freqCap} impressions/user` : '—' },
     { label: 'Brand Safety', value: brandSafety || '—' },
     { label: 'Viewability Goal', value: viewability ? `${viewability}%` : '—' },
-    { label: 'Budget', value: totalBudget ? `₹ ${totalBudget} (${budgetType === 'total' ? 'Total' : 'Daily'})` : '—' },
-    { label: 'Flight Duration', value: durationDays > 0 ? `${startDate} → ${endDate} (${durationDays} days)` : '—' },
-    { label: 'Pacing', value: pacing || '—' },
-    { label: 'Day Parting', value: dayParting || '—' },
-    { label: 'Time Zone', value: timezone || '—' },
+    { label: 'Campaign Duration', value: durationDays > 0 ? `${startDate} → ${endDate} (${durationDays} days)` : '—' },
   ];
 
   return (
@@ -1396,7 +1497,8 @@ function Step5Review({
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+
+// Main
 export default function Campaign_Create() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1443,7 +1545,7 @@ export default function Campaign_Create() {
 
   // Step 3
   const [age, setAge] = useState<string[]>(initialDraft?.age ?? []);
-  const [gender, setGender] = useState<string>(initialDraft?.gender ?? '');
+  const [gender, setGender] = useState<string[]>(initialDraft?.gender ?? []);
   const [geoLocations, setGeoLocations] = useState<GeoLocation[]>(initialDraft?.geoLocations ?? []);
   const [platforms, setPlatforms] = useState<string[]>(initialDraft?.platforms ?? []);
   const [freqCap, setFreqCap] = useState<string>(initialDraft?.freqCap ?? '');
@@ -1465,7 +1567,13 @@ export default function Campaign_Create() {
     return {};
   });
 
-  // ── Fetch backend offset on fresh load ────────────────────────────────────
+  // ✅ Add it here, before the return
+  const durationDays = startDate && endDate
+    ? dayjs(endDate).diff(dayjs(startDate), 'day')
+    : 0;
+
+
+  // Fetch backend offset on fresh load 
   useEffect(() => {
     if (!shouldRestoreDraft) {
       fetchLastLineItemOffset().then(offset => {
@@ -1476,7 +1584,7 @@ export default function Campaign_Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── On return from Creative_Upload or Creative_Video_Upload ───────────────
+  // On return from Creative_Upload or Creative_Video_Upload 
   useEffect(() => {
     if (locationState?.uploadedCreatives && locationState?.lineItemId) {
       const lid = locationState.lineItemId as string;
@@ -1491,7 +1599,7 @@ export default function Campaign_Create() {
     }
   }, [locationState]);
 
-  // ── Persist draft ─────────────────────────────────────────────────────────
+  // Persist draft
   const isMounted = useRef(false);
   useEffect(() => {
     if (!isMounted.current) {
@@ -1521,7 +1629,7 @@ export default function Campaign_Create() {
     lineItems,
   ]);
 
-  // ── "Next Step" handler ───────────────────────────────────────────────────
+  // "Next Step" handler
   const handleNextStep = () => {
     if (activeStep === 4) {
       const incomplete = lineItems.filter(li => !isLineItemComplete(li));
@@ -1537,7 +1645,7 @@ export default function Campaign_Create() {
     setActiveStep(s => s + 1);
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // Submit 
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitStatus('idle');
@@ -1553,7 +1661,7 @@ export default function Campaign_Create() {
     fd.append('buying_type', buyingType.join(', '));
     fd.append('objective', objective);
     fd.append('age', age.join(', '));
-    fd.append('gender', gender);
+    fd.append('gender', gender.join(', '));
     fd.append('geo_targeting', JSON.stringify(
       geoLocations.map(loc => ({
         country: loc.country || '',
@@ -1568,13 +1676,13 @@ export default function Campaign_Create() {
     fd.append('start_date', startDate);
     fd.append('end_date', endDate);
     if (websiteUrl) fd.append('website_url', websiteUrl);
-    if (clientCampaignId) fd.append('client_campaign_id', clientCampaignId);
-    if (purchaseOrderId) fd.append('purchase_order_id', purchaseOrderId);
+    if (clientCampaignId) fd.append('client_campaign_ID', clientCampaignId);
+    if (purchaseOrderId) fd.append('purchase_order_ID', purchaseOrderId);
     if (notes) fd.append('notes', notes);
     if (freqCap) fd.append('frequency_cap', freqCap);
     if (viewability) fd.append('viewability_goal', viewability);
 
-    // ── Merge image + video creatives per line item ────────────────────────
+    // Merge image + video creatives per line item 
     fd.append('line_items', JSON.stringify(
       lineItems.map((li) => {
         const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
@@ -1592,29 +1700,69 @@ export default function Campaign_Create() {
           ctr: li.ctr,
           viewability: li.viewability,
           vcr: li.vcr,
-          creatives: allCreatives.map((creative: CreativeData) => ({
-            creative_name: creative.creative_name,
-            dimensions: creative.dimensions,
-            aspect_ratio: creative.aspect_ratio,
-            file_size: creative.file_size,
-            click_through_url: creative.click_through_url || '',
-            appended_html_tag: creative.appended_html_tag || '',
-            integration_code: creative.integration_code || '',
-            notes: creative.notes || '',
-          })),
+          // ✅ Standard creatives only
+          creatives: allCreatives
+            .filter(c => c.type !== 'third_party')
+            .map(creative => ({
+              creative_name: creative.creative_name,
+              dimensions: creative.dimensions,
+              aspect_ratio: creative.aspect_ratio,
+              file_size: creative.file_size,
+              click_through_url: creative.click_through_url || '',
+              appended_html_tag: creative.appended_html_tag || '',
+              integration_code: creative.integration_code || '',
+              notes: creative.notes || '',
+            })),
+
+          // ✅ Third-party creatives separately
+          third_party_creatives: allCreatives
+            .filter(c => c.type === 'third_party')
+            .map(creative => ({
+              input_file_name: creative.main_asset?.name ?? '',
+              backup_image_name: creative.backup_image?.name ?? '',
+            })),
+
+
         };
       })
     ));
 
-    // ── Append actual files (image + video assets) ────────────────────────
+    // Append actual files (image + video assets) 
+    // ✅ Fix — use separate counters for standard and third-party
     lineItems.forEach((li, i) => {
       const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
       const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
       const allCreatives = [...imageCreatives, ...videoCreatives];
 
-      allCreatives.forEach((creative: CreativeData, j: number) => {
-        if (creative.main_asset) {
-          fd.append(`line_item_${i}main_asset${j}`, creative.main_asset, creative.main_asset.name);
+      let standardIndex = 0;
+      let tpIndex = 0;
+
+      allCreatives.forEach((creative: CreativeData) => {
+        if (creative.type === 'third_party') {
+          if (creative.main_asset) {
+            fd.append(
+              `line_item_${i}thirdparty_file${tpIndex}`,
+              creative.main_asset,
+              creative.main_asset.name
+            );
+          }
+          if (creative.backup_image) {
+            fd.append(
+              `line_item_${i}thirdparty_backup${tpIndex}`,
+              creative.backup_image,
+              creative.backup_image.name
+            );
+          }
+          tpIndex++;
+        } else {
+          if (creative.main_asset) {
+            fd.append(
+              `line_item_${i}main_asset${standardIndex}`,
+              creative.main_asset,
+              creative.main_asset.name
+            );
+          }
+          standardIndex++;
         }
       });
     });
@@ -1659,7 +1807,7 @@ export default function Campaign_Create() {
 
   const handleCancel = () => {
     clearDraft();
-    navigate('/user_campaigns');
+    navigate('/user_dashboard');
   };
 
   return (
@@ -1792,6 +1940,7 @@ export default function Campaign_Create() {
                     lineItems={lineItems}
                     lineItemCreatives={lineItemCreatives}
                     onEdit={() => setActiveStep(1)}
+                    durationDays={durationDays}
                   />
                 )}
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Form, Input, Select, Switch, Button, Upload, Tabs, Typography, Divider
@@ -16,7 +16,7 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 // API
-const SUBMIT_URL = "https://grinch-revocable-cornflake.ngrok-free.dev/create_client/";
+const SUBMIT_URL = "http://127.0.0.1:8000/create_client/";
 
 // Dropdown choices — all data lives here on the frontend
 const DEFAULT_CHOICES = {
@@ -54,7 +54,7 @@ function getDialCode(idd: { root?: string; suffixes?: string[] }) {
 
 // ─── PhoneInput component ─────────────────────────────────────────────────────
 
-function PhoneInput({
+const PhoneInput = React.memo(function PhoneInput({
   phone, phone_code, phone_cca2, countries, onPhoneChange, onCountryChange,
 }: PhoneInputProps) {
   const [open, setOpen] = useState(false);
@@ -62,7 +62,6 @@ function PhoneInput({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-   // Dynamically derive max length from libphonenumber metadata
   const maxPhoneLength = useMemo(() => {
     try {
       if (!isSupportedCountry(phone_cca2 as any)) return 15;
@@ -71,7 +70,7 @@ function PhoneInput({
     } catch {
       return 15;
     }
-  }, [phone_cca2]); // recalculates whenever country changes
+  }, [phone_cca2]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -88,13 +87,19 @@ function PhoneInput({
     if (open) setTimeout(() => searchRef.current?.focus(), 50);
   }, [open]);
 
-  const selectedCountry = countries.find((c) => c.cca2 === phone_cca2);
+  const selectedCountry = useMemo(
+    () => countries.find((c) => c.cca2 === phone_cca2),
+    [countries, phone_cca2]
+  );
 
-  const filtered = countries.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.includes(search) ||
-      c.cca2.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () => countries.filter(
+      (c) =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.code.includes(search) ||
+        c.cca2.toLowerCase().includes(search.toLowerCase())
+    ),
+    [countries, search]
   );
 
   return (
@@ -162,7 +167,7 @@ function PhoneInput({
 
       <input
         type="tel"
-        placeholder={`Enter ${maxPhoneLength}-digit number`}  // dynamic placeholder
+        placeholder={`Enter ${maxPhoneLength}-digit number`}
         value={phone}
         maxLength={maxPhoneLength}
         onChange={(e) => {
@@ -177,7 +182,7 @@ function PhoneInput({
       />
     </div>
   );
-}
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -189,6 +194,9 @@ function makeContact(): ContactRow {
     contact_name: "", contact_phone: "", contact_email: "",
     contact_designation: "", contact_country: "", contact_zipcode: "",
     contact_address_1: "", contact_address_2: "", digital_signature: null,
+    contact_phone_code: "+91",
+    contact_phone_cca2: "IN",
+
   };
 }
 
@@ -209,7 +217,7 @@ const TABS = [
 
 // ─── AddNewSelect ─────────────────────────────────────────────────────────────
 
-function AddNewSelect({
+const AddNewSelect = React.memo(function AddNewSelect({
   value, onChange, options, setOptions, placeholder, loading = false, showSearch = false,
 }: AddNewSelectProps & { loading?: boolean; showSearch?: boolean }) {
   const [isAdding, setIsAdding] = useState(false);
@@ -224,6 +232,9 @@ function AddNewSelect({
     setNewValue("");
     setIsAdding(false);
   };
+
+  // Memoize options to avoid re-computing on every render
+  const selectOptions = useMemo(() => toOpts(options), [options]);
 
   if (isAdding) {
     return (
@@ -244,6 +255,7 @@ function AddNewSelect({
 
   return (
     <Select
+      virtual  // ✅ enables virtual scrolling for large lists (cities/states)
       placeholder={loading ? "Loading…" : placeholder}
       loading={loading}
       allowClear
@@ -271,10 +283,10 @@ function AddNewSelect({
           </div>
         </>
       )}
-      options={toOpts(options)}
+      options={selectOptions}
     />
   );
-}
+});
 
 // ─── useLocationData ──────────────────────────────────────────────────────────
 
@@ -334,7 +346,7 @@ function useLocationData() {
       .finally(() => setLoadingCities(false));
   }, []);
 
-  const fetchCitiesForCountry = (countryName: string): Promise<string[]> =>
+  const fetchCitiesForCountry = useCallback((countryName: string): Promise<string[]> =>
     fetch("https://countriesnow.space/api/v0.1/countries/cities", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -342,9 +354,9 @@ function useLocationData() {
     })
       .then((r) => r.json())
       .then((data) => (data.data || []).sort())
-      .catch(() => []);
+      .catch(() => []), []);
 
-  const fetchStatesForCountry = (countryName: string): Promise<string[]> =>
+  const fetchStatesForCountry = useCallback((countryName: string): Promise<string[]> =>
     fetch("https://countriesnow.space/api/v0.1/countries/states", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -352,9 +364,9 @@ function useLocationData() {
     })
       .then((r) => r.json())
       .then((data) => (data.data?.states || []).map((s: any) => s.name).sort())
-      .catch(() => []);
+      .catch(() => []), []);
 
-  const fetchCitiesForState = async (countryName: string, stateName: string): Promise<string[]> => {
+  const fetchCitiesForState = useCallback(async (countryName: string, stateName: string): Promise<string[]> => {
     try {
       const res = await fetch("https://countriesnow.space/api/v0.1/countries/state/cities", {
         method: "POST",
@@ -370,9 +382,9 @@ function useLocationData() {
       if (fallback.length > 0) return fallback;
     }
     return allCitiesRef.current;
-  };
+  }, [fetchCitiesForCountry]);
 
-  const handleCountryChange = (
+  const handleCountryChange = useCallback((
     country: string,
     onStateClear: () => void,
     onCityClear: () => void,
@@ -393,9 +405,9 @@ function useLocationData() {
     fetchCitiesForCountry(country)
       .then((cities) => setCityOpts(cities.length > 0 ? cities : allCitiesRef.current))
       .finally(() => setLoadingCities(false));
-  };
+  }, [fetchStatesForCountry, fetchCitiesForCountry]);
 
-  const handleStateChange = (
+  const handleStateChange = useCallback((
     state: string,
     country: string,
     onCityClear: () => void,
@@ -416,7 +428,7 @@ function useLocationData() {
     fetchCitiesForState(country, state)
       .then((cities) => setCityOpts(cities))
       .finally(() => setLoadingCities(false));
-  };
+  }, [fetchCitiesForCountry, fetchCitiesForState]);
 
   return {
     countryOpts, setCountryOpts,
@@ -441,12 +453,12 @@ interface BillingFormProps {
 
 // ─── BillingForm — OUTSIDE Onboarding ────────────────────────────────────────
 
-function BillingForm({
+const BillingForm = React.memo(function BillingForm({
   company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
 }: BillingFormProps) {
   const isPostpaid = company.payment_type === "Postpaid";
 
-  const handlePaymentTypeChange = (v: string) => {
+  const handlePaymentTypeChange = useCallback((v: string) => {
     sf("payment_type", v ?? "");
     if (v === "Prepaid") {
       sf("payment_terms", "Net 0 day"); sf("credit_period_days", "0");
@@ -455,9 +467,9 @@ function BillingForm({
       sf("payment_terms", ""); sf("credit_period_days", "");
       form.setFieldsValue({ payment_terms: undefined, credit_period_days: "" });
     }
-  };
+  }, [sf, form]);
 
-  const handlePaymentTermsChange = (v: string) => {
+  const handlePaymentTermsChange = useCallback((v: string) => {
     sf("payment_terms", v ?? "");
     if (isPostpaid && v) {
       const match = v.match(/\d+/);
@@ -465,7 +477,7 @@ function BillingForm({
       sf("credit_period_days", days);
       form.setFieldsValue({ credit_period_days: days });
     }
-  };
+  }, [sf, form, isPostpaid]);
 
   return (
     <Form form={form} layout="vertical" className="onboarding-form">
@@ -552,7 +564,7 @@ function BillingForm({
       </div>
     </Form>
   );
-}
+});
 
 // ─── ContactsSection props type ───────────────────────────────────────────────
 
@@ -561,10 +573,7 @@ interface ContactsSectionProps {
   addContact: () => void;
   removeContact: (id: number) => void;
   updateContact: (id: number, k: keyof ContactRow, v: string | File | null) => void;
-  company: CompanyForm;
-  sf: (k: keyof CompanyForm, v: string | boolean) => void;
-  form: ReturnType<typeof Form.useForm>[0];
-  countries: Country[];
+  countries: Country[];           // ✅ keep — needed for PhoneInput dropdown
   loadingCountries: boolean;
   countryOpts: string[];
   setCountryOpts: React.Dispatch<React.SetStateAction<string[]>>;
@@ -572,9 +581,9 @@ interface ContactsSectionProps {
 
 // ─── ContactsSection — OUTSIDE Onboarding ────────────────────────────────────
 
-function ContactsSection({
+const ContactsSection = React.memo(function ContactsSection({
   contacts, addContact, removeContact, updateContact,
-  company, sf, form, countries, loadingCountries, countryOpts, setCountryOpts,
+  countries, loadingCountries, countryOpts, setCountryOpts,
 }: ContactsSectionProps) {
   return (
     <FormCard icon="👤" title="Company Contacts"
@@ -605,14 +614,17 @@ function ContactsSection({
                 <Input placeholder="Full name" value={c.contact_name}
                   onChange={(e) => updateContact(c.id, "contact_name", e.target.value)} />
               </Form.Item>
-              <Form.Item label="Phone Number" name="phone"
-                rules={[{ required: true, message: "Phone number is required" }]}
-                getValueProps={() => ({ value: company.phone })}>
+              <Form.Item label="Phone Number" required>
                 <PhoneInput
-                  phone={company.phone} phone_code={company.phone_code}
-                  phone_cca2={company.phone_cca2} countries={countries}
-                  onPhoneChange={(v) => { sf("phone", v); form.setFieldValue("phone", v); }}
-                  onCountryChange={(code, cca2) => { sf("phone_code", code); sf("phone_cca2", cca2); }}
+                  phone={c.contact_phone}
+                  phone_code={c.contact_phone_code ?? "+91"}
+                  phone_cca2={c.contact_phone_cca2 ?? "IN"}
+                  countries={countries}
+                  onPhoneChange={(v) => updateContact(c.id, "contact_phone", v)}
+                  onCountryChange={(code, cca2) => {
+                    updateContact(c.id, "contact_phone_code" as keyof ContactRow, code);
+                    updateContact(c.id, "contact_phone_cca2" as keyof ContactRow, cca2);
+                  }}
                 />
               </Form.Item>
               <Form.Item label="Email" required>
@@ -662,7 +674,7 @@ function ContactsSection({
       ))}
     </FormCard>
   );
-}
+});
 
 // ─── AddressesSection props type ──────────────────────────────────────────────
 
@@ -678,7 +690,7 @@ interface AddressesSectionProps {
 
 // ─── AddressesSection — OUTSIDE Onboarding ───────────────────────────────────
 
-function AddressesSection({
+const AddressesSection = React.memo(function AddressesSection({
   addresses, addAddress, removeAddress, updateAddress,
   loadingCountries, countryOpts, setCountryOpts,
 }: AddressesSectionProps) {
@@ -736,11 +748,11 @@ function AddressesSection({
       ))}
     </FormCard>
   );
-}
+});
 
 // ─── FormCard ─────────────────────────────────────────────────────────────────
 
-function FormCard({
+const FormCard = React.memo(function FormCard({
   icon, title, subtitle, action, badge, children,
 }: {
   icon: string; title: string; subtitle?: string;
@@ -768,7 +780,7 @@ function FormCard({
       {children}
     </div>
   );
-}
+});
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
@@ -844,38 +856,63 @@ export default function Onboarding() {
   const [contacts, setContacts] = useState<ContactRow[]>([makeContact()]);
   const [addresses, setAddresses] = useState<AddressRow[]>([makeAddress()]);
 
-  const sf = (k: keyof CompanyForm, v: string | boolean) =>
-    setCompany((p) => ({ ...p, [k]: v }));
+  // ✅ useCallback so sf reference is stable — prevents child re-renders
+  const sf = useCallback(
+    (k: keyof CompanyForm, v: string | boolean) =>
+      setCompany((p) => ({ ...p, [k]: v })),
+    []
+  );
 
-  const onCompanyCountryChange = (v: string) => {
+  // ✅ useCallback for country/state change handlers
+  const onCompanyCountryChange = useCallback((v: string) => {
     sf("country", v ?? "");
     _handleCountryChange(
       v ?? "",
       () => { sf("state", ""); form.setFieldsValue({ state: undefined }); },
       () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
     );
-  };
+  }, [sf, _handleCountryChange, form]);
 
-  const onCompanyStateChange = (v: string) => {
+  const onCompanyStateChange = useCallback((v: string) => {
     sf("state", v ?? "");
     _handleStateChange(
       v ?? "",
       company.country,
       () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
     );
-  };
+  }, [sf, _handleStateChange, company.country, form]);
 
-  const addContact = () => setContacts((p) => [...p, { ...makeContact(), id: Date.now() }]);
-  const removeContact = (id: number) => setContacts((p) => p.filter((c) => c.id !== id));
-  const updateContact = (id: number, k: keyof ContactRow, v: string | File | null) =>
-    setContacts((p) => p.map((c) => (c.id === id ? { ...c, [k]: v } : c)));
+  // ✅ useCallback for contacts handlers
+  const addContact = useCallback(
+    () => setContacts((p) => [...p, { ...makeContact(), id: Date.now() }]),
+    []
+  );
+  const removeContact = useCallback(
+    (id: number) => setContacts((p) => p.filter((c) => c.id !== id)),
+    []
+  );
+  const updateContact = useCallback(
+    (id: number, k: keyof ContactRow, v: string | File | null) =>
+      setContacts((p) => p.map((c) => (c.id === id ? { ...c, [k]: v } : c))),
+    []
+  );
 
-  const addAddress = () => setAddresses((p) => [...p, { ...makeAddress(), id: Date.now() }]);
-  const removeAddress = (id: number) => setAddresses((p) => p.filter((a) => a.id !== id));
-  const updateAddress = (id: number, k: keyof AddressRow, v: string) =>
-    setAddresses((p) => p.map((a) => (a.id === id ? { ...a, [k]: v } : a)));
+  // ✅ useCallback for addresses handlers
+  const addAddress = useCallback(
+    () => setAddresses((p) => [...p, { ...makeAddress(), id: Date.now() }]),
+    []
+  );
+  const removeAddress = useCallback(
+    (id: number) => setAddresses((p) => p.filter((a) => a.id !== id)),
+    []
+  );
+  const updateAddress = useCallback(
+    (id: number, k: keyof AddressRow, v: string) =>
+      setAddresses((p) => p.map((a) => (a.id === id ? { ...a, [k]: v } : a))),
+    []
+  );
 
-  const buildPayload = () => {
+  const buildPayload = useCallback(() => {
     const clientFields = {
       reporting_id: company.reporting_id,
       name: company.company_name,
@@ -932,7 +969,7 @@ export default function Onboarding() {
 
     const contactsPayload = contacts.map((c) => ({
       name: c.contact_name,
-      phone: `${company.phone_code}${c.contact_phone}`,
+      phone: `${c.contact_phone_code ?? company.phone_code}${c.contact_phone}`,
       email: c.contact_email,
       designation: c.contact_designation,
       country: c.contact_country,
@@ -969,9 +1006,9 @@ export default function Onboarding() {
       body: JSON.stringify(jsonBody),
       headers: { "Content-Type": "application/json" } as Record<string, string>,
     };
-  };
+  }, [company, contacts, addresses]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     try { await form.validateFields(); } catch { return; }
     setSubmitting(true);
     setSubmitStatus("idle");
@@ -994,29 +1031,27 @@ export default function Onboarding() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [form, buildPayload]);
 
-  const tabItems = TABS.map((t) => ({
+  const tabItems = useMemo(() => TABS.map((t) => ({
     key: t.id,
     label: <span className="flex items-center gap-1.5 select-none">{t.emoji} {t.label}</span>,
-  }));
+  })), []);
 
-  // ─── Shared props bundles (avoids repetition at call sites) ───────────────
-
-  const billingFormProps: BillingFormProps = {
+  // ✅ Memoize prop bundles — stable object identity prevents child re-renders
+  const billingFormProps = useMemo<BillingFormProps>(() => ({
     company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
-  };
+  }), [company, sf, form, taxTypes, billingContacts]);
 
-  const contactsSectionProps: ContactsSectionProps = {
-    contacts, addContact, removeContact, updateContact,
-    company, sf, form, countries,
+  const contactsSectionProps = useMemo<ContactsSectionProps>(() => ({
+    contacts, addContact, removeContact, updateContact, countries,
     loadingCountries, countryOpts, setCountryOpts,
-  };
+  }), [contacts, company, sf, form, countries, loadingCountries, countryOpts, addContact, removeContact, updateContact]);
 
-  const addressesSectionProps: AddressesSectionProps = {
+  const addressesSectionProps = useMemo<AddressesSectionProps>(() => ({
     addresses, addAddress, removeAddress, updateAddress,
     loadingCountries, countryOpts, setCountryOpts,
-  };
+  }), [addresses, loadingCountries, countryOpts, addAddress, removeAddress, updateAddress]);
 
   // ─── JSX ──────────────────────────────────────────────────────────────────
   return (

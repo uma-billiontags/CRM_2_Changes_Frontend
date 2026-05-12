@@ -9,6 +9,8 @@ export interface ContactRow {
   contact_address_1: string;
   contact_address_2: string;
   digital_signature: File | null;
+  contact_phone_code: string;
+  contact_phone_cca2: string;
 }
 
 export interface AddressRow {

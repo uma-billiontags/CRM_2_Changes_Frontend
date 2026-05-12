@@ -16,24 +16,14 @@ const NAV = [
       { label: 'Dashboard',       icon: LayoutDashboard, to: '/user_dashboard' },
       { label: 'My Campaigns',    icon: Megaphone,       to: '/user_campaigns' },
       { label: 'Create Campaign', icon: Plus,            to: '/campaign_create' },
-      { label: 'Brief Capture',   icon: FileEdit,        to: '/user_brief' },
       { label: 'My Drafts',       icon: Layers,          to: '/user_drafts' },
-    ],
-  },
-  {
-    g: 'AD OPS',
-    items: [
       { label: 'Insertion Orders', icon: FileText,   to: '/user_io' },
-      { label: 'Line Items',       icon: Layers,     to: '/user_lineitems' },
-      { label: 'Creatives',        icon: Building2,  to: '/user_creatives' },
-      { label: 'Setup Tasks',      icon: Settings,   to: '/user_tasks' },
     ],
   },
   {
     g: 'MONITOR',
     items: [
       { label: 'Live Status',    icon: Radio,    to: '/user_live' },
-      { label: 'Change History', icon: History,  to: '/user_history' },
       { label: 'Approvals',      icon: FileText, to: '/user_approvals' },
     ],
   },

@@ -7,6 +7,9 @@ import Campaign_Create from "./components/forms/Campaign_Create";
 import SampleForm from "./components/forms/sample";
 import Creative_Upload from "./components/pages/Creative_Upload";
 import Creative_Video_Upload from "./components/pages/Creative_Video_Upload";
+import User_Campaigns from "./components/pages/User_Campaigns";
+import View_Campaign from "./components/pages/View_Campaign";
+import Edit_Campaign from "./components/pages/Edit_Campaign";
 
 function App() {
 
@@ -21,6 +24,9 @@ function App() {
         <Route path="/sample" element={<SampleForm />} />
         <Route path="/creative_upload" element={<Creative_Upload />} />
         <Route path="/creative_video_upload" element={<Creative_Video_Upload />} />
+        <Route path="/user_campaigns" element={<User_Campaigns />} />
+        <Route path="/campaign/:campaign_id" element={<View_Campaign />} />
+        <Route path="/update_campaign/:campaign_id" element={<Edit_Campaign/>} />
       </Routes>
     </BrowserRouter>
   )

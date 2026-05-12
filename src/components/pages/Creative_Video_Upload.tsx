@@ -1,5 +1,3 @@
-// Creative_Video_Upload.tsx — Video upload version; all fields use modal editor; validation only on clickThroughUrl & appendedHtmlTag
-
 import React, { useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Checkbox, Input, Table, Tooltip, message, Tag, Modal } from 'antd';
@@ -16,7 +14,7 @@ import {
   PlayCircleOutlined,
 } from '@ant-design/icons';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types 
 interface VideoCreativeRow {
   key: string;
   creativeName: string;
@@ -30,7 +28,7 @@ interface VideoCreativeRow {
   notes: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 function makeRow(): VideoCreativeRow {
   return {
     key: `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -46,6 +44,7 @@ function makeRow(): VideoCreativeRow {
   };
 }
 
+// Reads video metadata (dimensions, aspect ratio, file size) from a File object
 function readVideoMeta(file: File): Promise<{
   dimensions: string;
   aspectRatio: string;
@@ -104,7 +103,7 @@ function validateRows(sourceRows: VideoCreativeRow[]): string[] {
   return errors;
 }
 
-// ── Fields that have tracker validation ───────────────────────────────────────
+// Fields that have tracker validation 
 const VALIDATED_FIELDS = ['clickThroughUrl', 'appendedHtmlTag'];
 
 function getValidationInfo(fieldKey: string, value: string): {
@@ -138,7 +137,7 @@ function getValidationInfo(fieldKey: string, value: string): {
   return { hasValidation: false, isValid: true, validText: '', invalidText: '', hintText: '' };
 }
 
-// ── Modal Cell ────────────────────────────────────────────────────────────────
+// Modal Cell component for editing text fields
 function ModalCell({
   value,
   fieldKey,
@@ -377,7 +376,7 @@ function ModalCell({
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// Main Component 
 export default function Creative_Video_Upload() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -411,10 +410,13 @@ export default function Creative_Video_Upload() {
   const [saved, setSaved] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // ✅ Add this — tracks the rows at the time of last save
+  const savedRowsRef = useRef<VideoCreativeRow[]>([]);
+
   const browseRef = useRef<HTMLInputElement>(null);
   const mainAssetRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // ── Row helpers ───────────────────────────────────────────────────────────
+  // Row helpers 
   const updateRow = (key: string, patch: Partial<VideoCreativeRow>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
@@ -488,7 +490,45 @@ export default function Creative_Video_Upload() {
     setSaved(false);
   };
 
-  const handleBack = () => navigateBack(rows);
+  const handleBack = () => {
+    const filled = rows.filter((r) => r.creativeName || r.mainAsset);
+
+    if (filled.length > 0 && !saved) {
+      // Show confirmation — don't navigate
+      Modal.confirm({
+        title: 'Unsaved Creatives',
+        content: 'You have unsaved video creatives. Please click "Save Creatives" before going back, or discard your changes.',
+        okText: 'Save Now',
+        cancelText: 'Discard & Go Back',
+        okButtonProps: {
+          style: { background: '#2563eb', borderColor: '#2563eb', fontWeight: 600 }
+        },
+        onOk() {
+          // Auto-save then navigate back
+          const validationErrors = validateRows(filled);
+          if (validationErrors.length > 0) {
+            validationErrors.forEach((err, i) => {
+              setTimeout(() => {
+                message.error({ content: err, duration: 6 });
+              }, i * 200);
+            });
+            return Promise.reject(); // Keep modal open
+          }
+          savedRowsRef.current = [...rows]; // Update saved rows reference
+          setSaved(true);
+          message.success(`${filled.length} video creative(s) saved!`);
+          setTimeout(() => navigateBack(rows), 500);
+        },
+        onCancel() {
+          // ✅ Only discard unsaved rows — go back with last saved snapshot
+          navigateBack(savedRowsRef.current);
+        },
+      });
+      return;
+    }
+
+    navigateBack(rows);
+  };
 
   const handleSave = () => {
     const filled = rows.filter((r) => r.creativeName || r.mainAsset);
@@ -505,6 +545,7 @@ export default function Creative_Video_Upload() {
       });
       return;
     }
+    savedRowsRef.current = [...rows]; // Update saved rows reference
     setSaved(true);
     message.success(
       `${filled.length} video creative(s) saved! Click Back to return to the campaign form.`
@@ -538,7 +579,7 @@ export default function Creative_Video_Upload() {
   // Accepted video MIME types
   const ACCEPT_VIDEO = 'video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo,video/mpeg';
 
-  // ── Table columns ─────────────────────────────────────────────────────────
+  // Table columns 
   const columns = [
     {
       title: (
@@ -562,7 +603,7 @@ export default function Creative_Video_Upload() {
       ),
     },
     {
-      title: <span style={{ color: '#64748b', fontSize: 11, fontWeight: 600 }}>#</span>,
+      title: <span style={{ color: '#64748b', fontSize: 11, fontWeight: 600 }}>ID</span>,
       key: 'index',
       width: 40,
       render: (_: any, __: VideoCreativeRow, index: number) => (
@@ -929,7 +970,7 @@ export default function Creative_Video_Upload() {
     },
   ];
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render 
   return (
     <div
       style={{
@@ -1125,78 +1166,6 @@ export default function Creative_Video_Upload() {
               )}
             </p>
           </div>
-
-          {hasRows && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                background: '#fff',
-                border: '1px solid #e2e8f0',
-                borderRadius: 10,
-                padding: '8px 16px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', lineHeight: 1 }}
-                >
-                  {rows.length}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: '#94a3b8',
-                    marginTop: 2,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  Total
-                </div>
-              </div>
-              <div style={{ width: 1, height: 28, background: '#e2e8f0' }} />
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{ fontSize: 18, fontWeight: 700, color: '#2563eb', lineHeight: 1 }}
-                >
-                  {rows.filter((r) => r.mainAsset).length}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: '#94a3b8',
-                    marginTop: 2,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  With Video
-                </div>
-              </div>
-              <div style={{ width: 1, height: 28, background: '#e2e8f0' }} />
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', lineHeight: 1 }}
-                >
-                  {rows.filter((r) => !r.mainAsset).length}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: '#94a3b8',
-                    marginTop: 2,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  Pending
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Main Card ── */}
