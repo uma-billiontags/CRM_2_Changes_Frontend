@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  Form, Input, Select, Button, DatePicker, InputNumber, Divider, message, Spin
+  Form, Input, Select, Button, DatePicker, InputNumber, message, Spin
 } from 'antd';
 import {
   ArrowRightOutlined, CheckOutlined,
-  PlusOutlined, BellOutlined, RightOutlined,
+  PlusOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons';
@@ -19,7 +19,7 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
 
 // ─── Constants (same as Campaign_Create) ──────────────────────────────────────
 
@@ -74,13 +74,21 @@ function apiLineItemToForm(li: any): LineItem {
     ethnicity: parseArray(li.ethnicity),
     startDate: li.start_date ?? '',
     endDate: li.end_date ?? '',
-    adFormat: parseArray(li.ad_format),
+    adFormat: li.ad_format ? (Array.isArray(li.ad_format) ? li.ad_format[0] : li.ad_format) : '',  // ← string, not array
     impressions: li.impressions ? String(li.impressions) : '',
-    units: parseArray(li.units),
+    units: li.units ? (Array.isArray(li.units) ? li.units[0] : li.units) : '',  // ← string, not array
     creatives: [],
     ctr: li.ctr ? String(li.ctr) : '',
     viewability: li.viewability ? String(li.viewability) : '',
     vcr: li.vcr ? String(li.vcr) : '',
+    // ── missing fields ──
+    ctrNotes: '',
+    viewabilityNotes: '',
+    vcrNotes: '',
+    unitCost: '',
+    adSubFormatOpen: false,
+    adSubFormat: li.ad_sub_format ?? '',
+
   };
 }
 
@@ -277,10 +285,9 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Form.Item label={<span style={{ fontSize: 12.5, color: SLATE_500 }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
             <Select
-              mode="multiple" value={item.adFormat}
-              onChange={(vals: string[]) => onChange(item.id, 'adFormat', vals)}
-              placeholder="Select format…" style={{ width: '100%' }}
-              maxTagCount="responsive" menuItemSelectedIcon={null}
+              value={item.adFormat || undefined}                          // ← string, not array
+              onChange={(val: string) => onChange(item.id, 'adFormat', val ?? '')}   // ← single value
+              placeholder="Select format…" style={{ width: '100%', height: 38 }}
               options={AD_FORMAT_OPTIONS}
             />
           </Form.Item>
@@ -308,10 +315,9 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
 
         <Form.Item label={<span style={{ fontSize: 12.5, color: SLATE_500 }}>Units</span>} style={{ marginBottom: 0 }}>
           <Select
-            mode="multiple" value={item.units}
-            onChange={(vals: string[]) => onChange(item.id, 'units', vals)}
-            placeholder="Select units…" style={{ width: '100%' }}
-            maxTagCount="responsive" menuItemSelectedIcon={null}
+            value={item.units || undefined}                             // ← string, not array
+            onChange={(val: string) => onChange(item.id, 'units', val ?? '')}      // ← single value
+            placeholder="Select units…" style={{ width: '100%', height: 38 }}
             options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
           />
         </Form.Item>
@@ -898,7 +904,8 @@ export default function Edit_Campaign() {
                               {[
                                 { label: 'Start Date', value: li.startDate },
                                 { label: 'End Date', value: li.endDate },
-                                { label: 'Ad Format', value: li.adFormat.join(', ') },
+                                { label: 'Ad Format', value: li.adFormat || '—' },       // ← no .join()
+
                                 { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
                                 { label: 'Ethnicity', value: li.ethnicity.join(', ') },
                               ].map((row, j) => (

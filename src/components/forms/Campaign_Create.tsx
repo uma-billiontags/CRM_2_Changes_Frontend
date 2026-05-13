@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Form, Input, Select, Button, DatePicker, InputNumber, Divider, message
@@ -8,7 +8,8 @@ import {
   PlusOutlined, BellOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
-} from '@ant-design/icons'; 
+  SaveOutlined
+} from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import '../styles/Campaign_Create.css';
@@ -19,12 +20,115 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const SUBMIT_URL = 'http://127.0.0.1:8000/create_campaign/';
-const CLIENT_URL = 'http://127.0.0.1:8000/get_client/CLT-2026-00001/';
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
+const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
+
+// DRAFTS STORAGE KEY
+const ALL_DRAFTS_KEY = 'campaign_all_drafts';
+
+const CPM_RATES: Record<string, number> = {
+  banner: 1,
+  Interstitial: 1,
+  video: 1.25,
+  youtube: 1.25,
+};
+
+const CPC_RATES: Record<string, number> = {
+  banner: 1,
+  Interstitial: 1,
+  video: 1.25,
+  youtube: 1.25,
+};
+
+// Country → currency symbol map (extend as needed)
+const COUNTRY_CURRENCY: Record<string, string> = {
+  'India': '₹',
+  'United States': '$',
+  'United Kingdom': '£',
+  'Germany': '€',
+  'France': '€',
+  'Japan': '¥',
+  'Canada': 'CA$',
+  'Australia': 'A$',
+  'Singapore': 'S$',
+  'UAE': 'AED',
+  'Saudi Arabia': 'SAR',
+};
+
+function getCurrencySymbol(geoLocations: GeoLocation[]): string {
+  for (const loc of geoLocations) {
+    if (loc.country && COUNTRY_CURRENCY[loc.country]) {
+      return COUNTRY_CURRENCY[loc.country];
+    }
+  }
+  return '$'; // default
+}
+
+export interface SavedDraft {
+  draftId: string;
+  draftName: string;
+  savedAt: string;
+  activeStep: number;
+  client: string;
+  clientId: string;
+  advertiser: string;
+  websiteUrl: string;
+  campaignName: string;
+  clientCampaignId: string;
+  purchaseOrderId: string;
+  campaignType: string;
+  startDate: string;
+  endDate: string;
+  buyingType: string[];
+  objective: string;
+  notes: string;
+  age: string[];
+  gender: string[];
+  geoLocations: GeoLocation[];
+  platforms: string[];
+  freqCap: string;
+  brandSafety: string;
+  viewability: string;
+  lineItemOffset: number;
+  confirmedLineItemIds: string[];
+  lineItems: LineItem[];
+}
+
+// Draft list helpers 
+export function getAllDrafts(): SavedDraft[] {
+  try {
+    const raw = localStorage.getItem(ALL_DRAFTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveNewDraft(data: Omit<SavedDraft, 'draftId' | 'savedAt'>): string {
+  const drafts = getAllDrafts();
+  const draftId = `DRAFT-${Date.now()}`;
+  const newDraft: SavedDraft = {
+    ...data,
+    draftId,
+    savedAt: new Date().toISOString(),
+  };
+  drafts.push(newDraft);
+  localStorage.setItem(ALL_DRAFTS_KEY, JSON.stringify(drafts));
+  return draftId;
+}
+
+function updateExistingDraft(draftId: string, data: Omit<SavedDraft, 'draftId' | 'savedAt'>): void {
+  const drafts = getAllDrafts();
+  const idx = drafts.findIndex(d => d.draftId === draftId);
+  if (idx >= 0) {
+    drafts[idx] = { ...drafts[idx], ...data, savedAt: new Date().toISOString() };
+    localStorage.setItem(ALL_DRAFTS_KEY, JSON.stringify(drafts));
+  }
+}
 
 // Types
 type LineItemCreativesMap = Record<string, CreativeData[]>;
@@ -44,13 +148,19 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
     ethnicity: [],
     startDate: '',
     endDate: '',
-    adFormat: [],
+    adFormat: '',
     impressions: '',
-    units: [],
+    units: '',
     creatives: [],
-    ctr: '',
-    viewability: '',
-    vcr: '',
+    ctr: '0.4',
+    viewability: '70',
+    vcr: '70',
+    ctrNotes: '',
+    viewabilityNotes: '',
+    vcrNotes: '',
+    unitCost: '',   // ← add this
+    adSubFormatOpen: false,  // ← add
+    adSubFormat: ''
   };
 }
 
@@ -98,16 +208,36 @@ const ETHNICITY_OPTIONS = [
   'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
 ];
 
-const UNITS_OPTIONS = ['CTR', 'CPC', 'CPM'];
+const UNITS_OPTIONS = ['CPM', 'CPC'];
 
 const AD_FORMAT_OPTIONS = [
   { value: 'banner', label: 'Banner' },
   { value: 'video', label: 'Video' },
   { value: 'youtube', label: 'Youtube' },
-  { value: 'intertitial', label: 'Intertitial' },
+  { value: 'Interstitial', label: 'Interstitial' },
 ];
 
-const IMAGE_FORMATS = ['banner', 'intertitial'];
+const AD_FORMAT_SUB_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  banner: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+  video: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+    { value: 'ctv', label: 'CTV' },
+  ],
+  youtube: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+  Interstitial: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+};
+
+const IMAGE_FORMATS = ['banner', 'Interstitial'];
 const VIDEO_FORMATS = ['video', 'youtube'];
 
 const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
@@ -850,17 +980,18 @@ interface ExtendedLineItemCardProps extends LineItemCardProps {
   lineItemCreatives: LineItemCreativesMap;
   allLineItemCreatives: LineItemCreativesMap;
   idConfirmed: boolean;
+  geoLocations: GeoLocation[];
 }
 
 function LineItemCard({
   item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove,
-  lineItemCreatives, allLineItemCreatives, idConfirmed,
+  lineItemCreatives, allLineItemCreatives, idConfirmed, geoLocations
 }: ExtendedLineItemCardProps) {
   const [dateError, setDateError] = useState('');
   const navigate = useNavigate();
 
-  const hasImageFormat = item.adFormat.some((f: string) => IMAGE_FORMATS.includes(f));
-  const hasVideoFormat = item.adFormat.some((f: string) => VIDEO_FORMATS.includes(f));
+  const hasImageFormat = IMAGE_FORMATS.includes(item.adFormat);
+  const hasVideoFormat = VIDEO_FORMATS.includes(item.adFormat);
 
   const showCTR = hasImageFormat || hasVideoFormat;
   const showViewability = hasImageFormat || hasVideoFormat;
@@ -869,6 +1000,33 @@ function LineItemCard({
   // Separate creative lists by type 
   const uploadedImageCreatives = lineItemCreatives[item.id + '_image'] || [];
   const uploadedVideoCreatives = lineItemCreatives[item.id + '_video'] || [];
+
+  const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
+
+  // ── Unit Cost Calculation ──
+  const currencySymbol = getCurrencySymbol(geoLocations);
+
+  const calculatedUnitCost = useMemo(() => {
+    const impressions = parseFloat(item.impressions);
+    const unit = item.units;
+    const adFormat = item.adFormat;
+
+    if (!impressions || !unit || !adFormat) return null;
+
+    if (unit === 'CPM') {
+      const rate = CPM_RATES[adFormat] ?? 1;
+      const budget = (impressions * rate) / 1000;
+      return { budget, rate, formula: `(${impressions.toLocaleString('en-IN')} × ${rate}) / 1000` };
+    }
+
+    if (unit === 'CPC') {
+      const rate = CPC_RATES[adFormat] ?? 1;
+      const budget = impressions * rate;
+      return { budget, rate, formula: `${impressions.toLocaleString('en-IN')} × ${rate}` };
+    }
+
+    return null;
+  }, [item.impressions, item.units, item.adFormat, item.ctr, geoLocations]);
 
   function validateDates(start: string, end: string): string {
     if (!campaignStart || !campaignEnd) return '';
@@ -909,27 +1067,17 @@ function LineItemCard({
     return current.isBefore(dayjs(campaignStart), 'day') || current.isAfter(dayjs(campaignEnd), 'day');
   }
 
-  function handleAdFormatChange(vals: string[]) {
-    onChange(item.id, 'adFormat', vals);
-    const hasVideo = vals.some((f: string) => VIDEO_FORMATS.includes(f));
-    if (!hasVideo) onChange(item.id, 'vcr', '');
-    if (vals.length === 0) {
-      onChange(item.id, 'ctr', '');
-      onChange(item.id, 'viewability', '');
-      onChange(item.id, 'vcr', '');
+  function handleAdFormatChange(val: string) {
+    onChange(item.id, 'adFormat', val ?? '');
+    onChange(item.id, 'adSubFormat', '');
+    onChange(item.id, 'adSubFormatOpen', false);
+    setExpandedFormat(null);   // ← add
+    if (!val) {
+      onChange(item.id, 'ctr', '0.4');
+      onChange(item.id, 'viewability', '70');
+      onChange(item.id, 'vcr', '70');
     }
-    const compatible = item.creatives.filter((f: File) => {
-      const hasImg = vals.includes('image');
-      const hasVid = vals.includes('video');
-      if (hasImg && hasVid) return true;
-      if (hasImg) return f.type.startsWith('image/');
-      if (hasVid) return f.type.startsWith('video/');
-      return false;
-    });
-    if (compatible.length !== item.creatives.length) {
-      onChange(item.id, 'creatives', compatible);
-      message.info('Some creatives were removed due to format change.');
-    }
+    if (!VIDEO_FORMATS.includes(val)) onChange(item.id, 'vcr', '70');
   }
 
   // Navigate to image upload page 
@@ -1063,6 +1211,7 @@ function LineItemCard({
               placeholder={campaignEnd ? `Until ${dayjs(campaignEnd).format('DD MMM YYYY')}` : 'Select date'}
             />
           </Form.Item>
+
         </div>
 
         {dateError && (
@@ -1077,31 +1226,7 @@ function LineItemCard({
           </div>
         )}
 
-        {/* Row: Ad Format + Impressions */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
-            <Select
-              mode="multiple"
-              value={item.adFormat}
-              onChange={handleAdFormatChange}
-              placeholder="Select format…"
-              style={{ width: '100%' }}
-              maxTagCount="responsive"
-              menuItemSelectedIcon={null}
-              optionRender={(option) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    readOnly
-                    checked={item.adFormat.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
-                  />
-                  <span>{option.label}</span>
-                </div>
-              )}
-              options={AD_FORMAT_OPTIONS}
-            />
-          </Form.Item>
           <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
             <Input
               placeholder="e.g. 1000000"
@@ -1111,6 +1236,214 @@ function LineItemCard({
               style={{ height: 38 }}
             />
           </Form.Item>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
+            <Select
+              value={item.units || undefined}
+              onChange={(val: string) => onChange(item.id, 'units', val ?? '')}
+              placeholder="Select unit…"
+              style={{ width: '100%', height: 38 }}
+              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
+            />
+          </Form.Item>
+          <Form.Item
+            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
+            style={{ marginBottom: 14 }}
+          >
+            {(() => {
+              const [expandedFormat, setExpandedFormat] = React.useState<string | null>(null);
+
+              const displayValue = item.adFormat
+                ? item.adSubFormat
+                  ? `${AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label} › ${AD_FORMAT_SUB_OPTIONS[item.adFormat]?.find(s => s.value === item.adSubFormat)?.label}`
+                  : AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label
+                : undefined;
+
+              return (
+                <Select
+                  value={displayValue}
+                  placeholder="Select format…"
+                  style={{ width: '100%', height: 38 }}
+                  open={undefined}
+                  dropdownRender={() => (
+                    <div style={{ padding: '4px 0' }}>
+                      {AD_FORMAT_OPTIONS.map(fmt => {
+                        const isExpanded = expandedFormat === fmt.value;
+                        const isSelected = item.adFormat === fmt.value;
+                        const subOpts = AD_FORMAT_SUB_OPTIONS[fmt.value] || [];
+
+                        return (
+                          <div key={fmt.value}>
+                            {/* Parent row */}
+                            <div
+                              style={{
+                                display: 'flex', alignItems: 'center',
+                                padding: '7px 12px',
+                                cursor: 'pointer',
+                                background: isSelected ? '#eef2ff' : 'transparent',
+                                gap: 8,
+                                userSelect: 'none',
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected)
+                                  (e.currentTarget as HTMLDivElement).style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={e => {
+                                if (!isSelected)
+                                  (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                              }}
+                              onClick={e => {
+                                e.stopPropagation();
+                                if (subOpts.length > 0) {
+                                  setExpandedFormat(isExpanded ? null : fmt.value);
+                                } else {
+                                  handleAdFormatChange(fmt.value);
+                                }
+                              }}
+                            >
+                              {/* +/- expand icon */}
+                              {subOpts.length > 0 ? (
+                                <div style={{
+                                  width: 16, height: 16,
+                                  border: '1px solid #94a3b8',
+                                  borderRadius: 3,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 13, color: '#64748b',
+                                  background: '#fff', flexShrink: 0,
+                                  lineHeight: 1,
+                                  fontWeight: 400,
+                                }}>
+                                  {isExpanded ? '−' : '+'}
+                                </div>
+                              ) : (
+                                <div style={{ width: 16, flexShrink: 0 }} />
+                              )}
+
+                              <span style={{
+                                fontSize: 13,
+                                color: isSelected ? '#4f46e5' : '#1e293b',
+                                fontWeight: isSelected ? 600 : 400,
+                              }}>
+                                {fmt.label}
+                              </span>
+
+                              {/* checkmark if selected with no sub */}
+                              {isSelected && !item.adSubFormat && (
+                                <CheckOutlined style={{ marginLeft: 'auto', fontSize: 11, color: '#4f46e5' }} />
+                              )}
+                            </div>
+
+                            {/* Sub-options — shown when expanded */}
+                            {isExpanded && subOpts.length > 0 && (
+                              <div style={{ background: '#fafbff' }}>
+                                {subOpts.map(sub => {
+                                  const isSubSelected = item.adFormat === fmt.value && item.adSubFormat === sub.value;
+                                  return (
+                                    <div
+                                      key={sub.value}
+                                      style={{
+                                        display: 'flex', alignItems: 'center',
+                                        padding: '6px 12px 6px 36px',
+                                        cursor: 'pointer',
+                                        background: isSubSelected ? '#eef2ff' : 'transparent',
+                                        gap: 8,
+                                      }}
+                                      onMouseEnter={e => {
+                                        if (!isSubSelected)
+                                          (e.currentTarget as HTMLDivElement).style.background = '#f1f5f9';
+                                      }}
+                                      onMouseLeave={e => {
+                                        if (!isSubSelected)
+                                          (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                                      }}
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        handleAdFormatChange(fmt.value);
+                                        onChange(item.id, 'adSubFormat', sub.value);
+                                        setExpandedFormat(null);
+                                      }}
+                                    >
+                                      {/* dot indicator */}
+                                      <div style={{
+                                        width: 6, height: 6, borderRadius: '50%',
+                                        background: isSubSelected ? '#6366f1' : '#cbd5e1',
+                                        flexShrink: 0,
+                                      }} />
+                                      <span style={{
+                                        fontSize: 12.5,
+                                        color: isSubSelected ? '#4f46e5' : '#374151',
+                                        fontWeight: isSubSelected ? 600 : 400,
+                                      }}>
+                                        {sub.label}
+                                      </span>
+                                      {isSubSelected && (
+                                        <CheckOutlined style={{ marginLeft: 'auto', fontSize: 11, color: '#4f46e5' }} />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  allowClear
+                  onClear={() => {
+                    handleAdFormatChange('');
+                    setExpandedFormat(null);
+                  }}
+                />
+              );
+            })()}
+          </Form.Item>
+          {/* Unit Cost Display */}
+          <Form.Item
+            label={
+              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Unit Cost (Budget)
+                {calculatedUnitCost && (
+                  <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                    Auto-calculated
+                  </span>
+                )}
+              </span>
+            }
+            style={{ marginBottom: 0 }}
+          >
+            {calculatedUnitCost ? (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1.5px solid #86efac',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d', fontFamily: 'monospace' }}>
+                    {currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <span style={{ fontSize: 10.5, color: '#4ade80', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                  = {calculatedUnitCost.formula}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center',
+                color: '#94a3b8', fontSize: 12.5, gap: 6,
+              }}>
+                <InfoCircleOutlined style={{ fontSize: 11 }} />
+                Enter impressions, ad format &amp; unit to calculate
+              </div>
+            )}
+          </Form.Item>
+
         </div>
 
         {/* Creatives Upload */}
@@ -1128,7 +1461,7 @@ function LineItemCard({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* ── BANNER / IMAGE ZONE ── */}
-            {item.adFormat.includes('banner') && (
+            {item.adFormat === 'banner' && (
               <div>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <FileImageOutlined /> Images
@@ -1196,7 +1529,7 @@ function LineItemCard({
             )}
 
             {/* ── VIDEO ZONE ── */}
-            {item.adFormat.includes('video') && (
+            {item.adFormat === 'video' && (
               <div>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <VideoCameraOutlined /> Videos
@@ -1256,51 +1589,76 @@ function LineItemCard({
             )}
 
           </div>
-        </Form.Item>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
-            <Select
-              mode="multiple"
-              value={item.units}
-              onChange={(vals: string[]) => onChange(item.id, 'units', vals)}
-              placeholder="Select units…"
-              style={{ width: '100%' }}
-              maxTagCount="responsive"
-              menuItemSelectedIcon={null}
-              optionRender={(option) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    readOnly
-                    checked={item.units.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
-                  />
-                  <span>{option.label}</span>
-                </div>
-              )}
-              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
-            />
-          </Form.Item>
-        </div>
+        </Form.Item>-
 
         {(showCTR || showVCR) && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 14 }}>
-            {showCTR && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>CTR</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 0.5" value={item.ctr} onChange={e => onChange(item.id, 'ctr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
-            {showViewability && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 70" value={item.viewability} onChange={e => onChange(item.id, 'viewability', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
-            {showVCR && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>VCR</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 60" value={item.vcr} onChange={e => onChange(item.id, 'vcr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              {showCTR && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>CTR</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 0.4"
+                    value={item.ctr}
+                    onChange={e => {
+                      onChange(item.id, 'ctr', e.target.value.replace(/[^0-9.]/g, ''));
+                      if (!item.ctrNotes) onChange(item.id, 'ctrNotes', '');
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+              {showViewability && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 70"
+                    value={item.viewability}
+                    onChange={e => {
+                      onChange(item.id, 'viewability', e.target.value.replace(/[^0-9.]/g, ''));
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+              {showVCR && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>VCR</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 60"
+                    value={item.vcr}
+                    onChange={e => {
+                      onChange(item.id, 'vcr', e.target.value.replace(/[^0-9.]/g, ''));
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+            </div>
+
+            {/* Notes — shown only if any value differs from default */}
+            {(
+              (showCTR && item.ctr !== '0.4') ||
+              (showViewability && item.viewability !== '70') ||
+              (showVCR && item.vcr !== '70')
+            ) && (
+                <div style={{
+                  background: '#fffbeb', border: '1px dashed #fcd34d',
+                  borderRadius: 8, padding: '12px 14px',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <InfoCircleOutlined style={{ fontSize: 12, color: '#d97706' }} />
+                    You've changed one or more default values — add a note if needed
+                  </div>
+                  <Input.TextArea
+                    placeholder="e.g. CTR adjusted based on client brief, VCR target revised for mobile inventory…"
+                    value={item.ctrNotes}
+                    onChange={e => onChange(item.id, 'ctrNotes', e.target.value)}
+                    rows={2}
+                    style={{ fontSize: 12.5 }}
+                  />
+                </div>
+              )}
           </div>
         )}
       </Form>
@@ -1317,11 +1675,12 @@ interface Step4Props {
   lineItemCreatives: LineItemCreativesMap;
   lineItemOffset: number;
   confirmedLineItemIds: Set<string>;
+  geoLocations: GeoLocation[];   // ← add
 }
 
 function Step4LineItems({
   campaignStartDate, campaignEndDate, lineItems, setLineItems,
-  lineItemCreatives, lineItemOffset, confirmedLineItemIds,
+  lineItemCreatives, lineItemOffset, confirmedLineItemIds, geoLocations
 }: Step4Props) {
 
   function handleChange(id: string, field: keyof LineItem, value: any) {
@@ -1362,6 +1721,7 @@ function Step4LineItems({
           lineItemCreatives={lineItemCreatives}
           allLineItemCreatives={lineItemCreatives}
           idConfirmed={confirmedLineItemIds.has(item.id)}
+          geoLocations={geoLocations}
         />
       ))}
 
@@ -1460,7 +1820,14 @@ function Step5Review({
                     { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
                     { label: 'Start Date', value: li.startDate || '—' },
                     { label: 'End Date', value: li.endDate || '—' },
-                    { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
+                    {
+                      label: 'Ad Format',
+                      value: li.adFormat
+                        ? li.adSubFormat
+                          ? `${li.adFormat} › ${li.adSubFormat}`
+                          : li.adFormat
+                        : '—'
+                    },
                     { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
                     {
                       label: 'Image Creatives',
@@ -1497,6 +1864,72 @@ function Step5Review({
   );
 }
 
+// ─── Save Draft Modal ─────────────────────────────────────────────────────────
+function SaveDraftModal({ visible, onConfirm, onCancel, defaultName }: {
+  visible: boolean;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+  defaultName: string;
+}) {
+  const [name, setName] = useState(defaultName);
+
+  useEffect(() => {
+    if (visible) setName(defaultName);
+  }, [visible, defaultName]);
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: '28px 32px',
+        width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+        border: '1px solid #e2e8f0',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SaveOutlined style={{ fontSize: 18, color: '#2563eb' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Save as Draft</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>You can continue editing later from My Drafts</div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+            Draft Name <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="e.g. Summer Campaign Draft"
+            style={{ height: 40 }}
+            onPressEnter={() => name.trim() && onConfirm(name.trim())}
+            autoFocus
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <Button onClick={onCancel} style={{ height: 38 }}>Cancel</Button>
+          <Button
+            type="primary"
+            disabled={!name.trim()}
+            onClick={() => onConfirm(name.trim())}
+            icon={<SaveOutlined />}
+            style={{ height: 38, background: '#2563eb', borderColor: '#2563eb' }}
+          >
+            Save Draft
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Main
 export default function Campaign_Create() {
@@ -1511,54 +1944,68 @@ export default function Campaign_Create() {
   const shouldRestoreDraft = isBackNav || isReturnFromCreative;
   const initialDraft = shouldRestoreDraft ? loadDraft() : null;
 
+  // Check if we're editing an existing draft
+  const editingDraftId = locationState?.editDraftId as string | undefined;
+
   if (!shouldRestoreDraft) {
     clearDraft();
   }
 
-  const [activeStep, setActiveStep] = useState<number>(initialDraft?.activeStep ?? 1);
+  // Load from localStorage draft if editing
+  const storedDraft = editingDraftId
+    ? getAllDrafts().find(d => d.draftId === editingDraftId)
+    : null;
+
+  const restoredData = storedDraft || initialDraft;
+
+  const [activeStep, setActiveStep] = useState<number>(restoredData?.activeStep ?? 1);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [lineItemOffset, setLineItemOffset] = useState<number>(initialDraft?.lineItemOffset ?? 1);
+  // Draft state
+  const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(editingDraftId);
+  const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
 
+  const [lineItemOffset, setLineItemOffset] = useState<number>(restoredData?.lineItemOffset ?? 1);
   const [confirmedLineItemIds, setConfirmedLineItemIds] = useState<Set<string>>(
-    () => new Set<string>(initialDraft?.confirmedLineItemIds ?? [])
+    () => new Set<string>(restoredData?.confirmedLineItemIds ?? [])
   );
 
   // Step 1
-  const [client, setClient] = useState<string>(initialDraft?.client ?? '');
-  const [clientId, setClientId] = useState<string>(initialDraft?.clientId ?? '');
-  const [advertiser, setAdvertiser] = useState<string>(initialDraft?.advertiser ?? '');
-  const [websiteUrl, setWebsiteUrl] = useState<string>(initialDraft?.websiteUrl ?? '');
+  const [client, setClient] = useState<string>(restoredData?.client ?? '');
+  const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
+  const [advertiser, setAdvertiser] = useState<string>(restoredData?.advertiser ?? '');
+  const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
 
   // Step 2
-  const [campaignName, setCampaignName] = useState<string>(initialDraft?.campaignName ?? '');
-  const [clientCampaignId, setClientCampaignId] = useState<string>(initialDraft?.clientCampaignId ?? '');
-  const [purchaseOrderId, setPurchaseOrderId] = useState<string>(initialDraft?.purchaseOrderId ?? '');
-  const [campaignType, setCampaignType] = useState<string>(initialDraft?.campaignType ?? '');
-  const [startDate, setStartDate] = useState<string>(initialDraft?.startDate ?? '');
-  const [endDate, setEndDate] = useState<string>(initialDraft?.endDate ?? '');
-  const [buyingType, setBuyingType] = useState<string[]>(initialDraft?.buyingType ?? []);
-  const [objective, setObjective] = useState<string>(initialDraft?.objective ?? '');
-  const [notes, setNotes] = useState<string>(initialDraft?.notes ?? '');
+  const [campaignName, setCampaignName] = useState<string>(restoredData?.campaignName ?? '');
+  const [clientCampaignId, setClientCampaignId] = useState<string>(restoredData?.clientCampaignId ?? '');
+  const [purchaseOrderId, setPurchaseOrderId] = useState<string>(restoredData?.purchaseOrderId ?? '');
+  const [campaignType, setCampaignType] = useState<string>(restoredData?.campaignType ?? '');
+  const [startDate, setStartDate] = useState<string>(restoredData?.startDate ?? '');
+  const [endDate, setEndDate] = useState<string>(restoredData?.endDate ?? '');
+  const [buyingType, setBuyingType] = useState<string[]>(restoredData?.buyingType ?? []);
+  const [objective, setObjective] = useState<string>(restoredData?.objective ?? '');
+  const [notes, setNotes] = useState<string>(restoredData?.notes ?? '');
 
   // Step 3
-  const [age, setAge] = useState<string[]>(initialDraft?.age ?? []);
-  const [gender, setGender] = useState<string[]>(initialDraft?.gender ?? []);
-  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>(initialDraft?.geoLocations ?? []);
-  const [platforms, setPlatforms] = useState<string[]>(initialDraft?.platforms ?? []);
-  const [freqCap, setFreqCap] = useState<string>(initialDraft?.freqCap ?? '');
-  const [brandSafety, setBrandSafety] = useState<string>(initialDraft?.brandSafety ?? '');
-  const [viewability, setViewability] = useState<string>(initialDraft?.viewability ?? '');
+  const [age, setAge] = useState<string[]>(restoredData?.age ?? []);
+  const [gender, setGender] = useState<string[]>(restoredData?.gender ?? []);
+  const [geoLocations, setGeoLocations] = useState<GeoLocation[]>(restoredData?.geoLocations ?? []);
+  const [platforms, setPlatforms] = useState<string[]>(restoredData?.platforms ?? []);
+  const [freqCap, setFreqCap] = useState<string>(restoredData?.freqCap ?? '');
+  const [brandSafety, setBrandSafety] = useState<string>(restoredData?.brandSafety ?? '');
+  const [viewability, setViewability] = useState<string>(restoredData?.viewability ?? '');
 
-  // Step 4 — line items
+  // Step 4
   const [lineItems, setLineItems] = useState<LineItem[]>(() => {
-    if (initialDraft?.lineItems?.length) {
-      return initialDraft.lineItems.map((li: any) => ({ ...li, creatives: [] }));
+    if (restoredData?.lineItems?.length) {
+      return restoredData.lineItems.map((li: any) => ({ ...li, creatives: [] }));
     }
     return [emptyLineItem(1, 1)];
   });
+
 
   const [lineItemCreatives, setLineItemCreatives] = useState<LineItemCreativesMap>(() => {
     if (isReturnFromCreative && locationState?.allLineItemCreatives) {
@@ -1575,13 +2022,12 @@ export default function Campaign_Create() {
 
   // Fetch backend offset on fresh load 
   useEffect(() => {
-    if (!shouldRestoreDraft) {
+    if (!shouldRestoreDraft && !editingDraftId) {
       fetchLastLineItemOffset().then(offset => {
         setLineItemOffset(offset);
         setLineItems([emptyLineItem(1, offset)]);
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // On return from Creative_Upload or Creative_Video_Upload 
@@ -1602,13 +2048,9 @@ export default function Campaign_Create() {
   // Persist draft
   const isMounted = useRef(false);
   useEffect(() => {
-    if (!isMounted.current) {
-      isMounted.current = true;
-      return;
-    }
+    if (!isMounted.current) { isMounted.current = true; return; }
     saveDraft({
-      activeStep,
-      client, clientId, advertiser, websiteUrl,
+      activeStep, client, clientId, advertiser, websiteUrl,
       campaignName, clientCampaignId, purchaseOrderId,
       campaignType, startDate, endDate, buyingType, objective, notes,
       age, gender, geoLocations, platforms,
@@ -1617,7 +2059,11 @@ export default function Campaign_Create() {
       confirmedLineItemIds: [...confirmedLineItemIds],
       lineItems: lineItems.map(li => ({ ...li, creatives: [] })),
     });
-  }, [
+  }, [activeStep, client, clientId, advertiser, websiteUrl, campaignName, clientCampaignId, purchaseOrderId, campaignType, startDate, endDate, buyingType, objective, notes, age, gender, geoLocations, platforms, freqCap, brandSafety, viewability, lineItemOffset, confirmedLineItemIds, lineItems]);
+
+  // ─── Save Draft handler ───────────────────────────────────────────────────
+  const getDraftPayload = (name: string): Omit<SavedDraft, 'draftId' | 'savedAt'> => ({
+    draftName: name,
     activeStep,
     client, clientId, advertiser, websiteUrl,
     campaignName, clientCampaignId, purchaseOrderId,
@@ -1625,9 +2071,21 @@ export default function Campaign_Create() {
     age, gender, geoLocations, platforms,
     freqCap, brandSafety, viewability,
     lineItemOffset,
-    confirmedLineItemIds,
-    lineItems,
-  ]);
+    confirmedLineItemIds: [...confirmedLineItemIds],
+    lineItems: lineItems.map(li => ({ ...li, creatives: [] })),
+  });
+
+  const handleSaveDraft = (name: string) => {
+    if (currentDraftId) {
+      updateExistingDraft(currentDraftId, getDraftPayload(name));
+      message.success({ content: 'Draft updated successfully!', icon: <SaveOutlined style={{ color: '#2563eb' }} /> });
+    } else {
+      const newId = saveNewDraft(getDraftPayload(name));
+      setCurrentDraftId(newId);
+      message.success({ content: 'Draft saved! View it in My Drafts.', icon: <SaveOutlined style={{ color: '#2563eb' }} /> });
+    }
+    setShowSaveDraftModal(false);
+  };
 
   // "Next Step" handler
   const handleNextStep = () => {
@@ -1637,7 +2095,7 @@ export default function Campaign_Create() {
         const names = incomplete.map((li) =>
           li.lineItemName.trim() ? `"${li.lineItemName}"` : `Line Item ${lineItems.indexOf(li) + 1}`
         ).join(', ');
-        message.error(`Please fill all required fields (Name, Start Date, End Date, Ad Format) for: ${names}`);
+        message.error(`Please fill all required fields for: ${names}`);
         return;
       }
       setConfirmedLineItemIds(new Set(lineItems.map(li => li.id)));
@@ -1700,6 +2158,7 @@ export default function Campaign_Create() {
           ctr: li.ctr,
           viewability: li.viewability,
           vcr: li.vcr,
+          adSubFormat: li.adSubFormat,
           // ✅ Standard creatives only
           creatives: allCreatives
             .filter(c => c.type !== 'third_party')
@@ -1810,6 +2269,8 @@ export default function Campaign_Create() {
     navigate('/user_dashboard');
   };
 
+  const defaultDraftName = campaignName.trim() || `Draft ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+
   return (
     <div className="cc-root">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
@@ -1833,10 +2294,21 @@ export default function Campaign_Create() {
         </header>
 
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
           <div className="cc-page-header">
-            <h1 className="cc-page-title">Create New Campaign</h1>
-            <p className="cc-page-sub">Follow the steps below to create a new campaign</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h1 className="cc-page-title">
+                  {editingDraftId ? 'Edit Draft Campaign' : 'Create New Campaign'}
+                </h1>
+                <p className="cc-page-sub">Follow the steps below to create a new campaign</p>
+              </div>
+              {currentDraftId && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#15803d', fontWeight: 600 }}>
+                  <SaveOutlined style={{ fontSize: 12 }} />
+                  Draft saved
+                </div>
+              )}
+            </div>
           </div>
 
           {submitStatus === 'success' && (
@@ -1845,7 +2317,6 @@ export default function Campaign_Create() {
           {submitStatus === 'error' && (
             <div className="cc-banner cc-banner-error">❌ Submission failed: {errorMsg}</div>
           )}
-
           {/* Stepper */}
           <div className="cc-stepper-wrap">
             <div className="cc-stepper">
@@ -1869,6 +2340,7 @@ export default function Campaign_Create() {
               })}
             </div>
           </div>
+
 
           {/* Step Content */}
           <div className="cc-content-wrap" key={activeStep}>
@@ -1924,6 +2396,7 @@ export default function Campaign_Create() {
                     lineItemCreatives={lineItemCreatives}
                     lineItemOffset={lineItemOffset}
                     confirmedLineItemIds={confirmedLineItemIds}
+                    geoLocations={geoLocations}
                   />
                 )}
                 {activeStep === 5 && (
@@ -1950,28 +2423,40 @@ export default function Campaign_Create() {
           {/* Bottom Bar */}
           <div className="cc-bottom-bar">
             <Button className="cc-btn-cancel" onClick={handleCancel}>Cancel</Button>
+
             <div className="cc-bottom-bar-actions">
+              {/* Save Draft Button */}
+              <Button
+                onClick={() => setShowSaveDraftModal(true)}
+                icon={<SaveOutlined />}
+                style={{
+                  height: 40,
+                  paddingLeft: 18,
+                  paddingRight: 18,
+                  borderRadius: 8,
+                  border: '1.5px solid #2563eb',
+                  color: '#2563eb',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  background: '#eff6ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {currentDraftId ? 'Update Draft' : 'Save Draft'}
+              </Button>
+
               {activeStep > 1 && (
                 <Button className="cc-btn-back" onClick={() => setActiveStep(s => s - 1)}>← Back</Button>
               )}
+
               {activeStep < 5 ? (
-                <Button
-                  type="primary"
-                  className="cc-btn-next"
-                  onClick={handleNextStep}
-                  icon={<ArrowRightOutlined />}
-                  iconPosition="end"
-                >
+                <Button type="primary" className="cc-btn-next" onClick={handleNextStep} icon={<ArrowRightOutlined />} iconPosition="end">
                   Next Step
                 </Button>
               ) : (
-                <Button
-                  type="primary"
-                  className="cc-btn-submit"
-                  loading={submitting}
-                  onClick={handleSubmit}
-                  icon={<CheckOutlined />}
-                >
+                <Button type="primary" className="cc-btn-submit" loading={submitting} onClick={handleSubmit} icon={<CheckOutlined />}>
                   {submitting ? 'Creating…' : 'Create Campaign'}
                 </Button>
               )}
@@ -1980,6 +2465,13 @@ export default function Campaign_Create() {
 
         </main>
       </div>
+      {/* Save Draft Modal */}
+      <SaveDraftModal
+        visible={showSaveDraftModal}
+        defaultName={defaultDraftName}
+        onConfirm={handleSaveDraft}
+        onCancel={() => setShowSaveDraftModal(false)}
+      />
     </div>
   );
 }

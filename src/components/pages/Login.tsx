@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
-// ✅ Updated to your new backend URL
-const LOGIN_URL = "https://crm-backend-4-ppjs.onrender.com/login_view/";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,70 +12,58 @@ export default function Login() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   
-  const handleSignIn = async () => {
-    navigate("/user_dashboard");
+  const USERS = [
+  {
+    email: 'creative@gmail.com',
+    password: '123',
+    role: 'creative',
+    redirect: '/creative_dashboard',
+  },
+  {
+    email: 'campaign@gmail.com',
+    password: '123',
+    role: 'campaign',
+    redirect: '/campaign_dashboard',
+  },
+  {
+    email: 'client@gmail.com',
+    password: '123',
+    role: 'client',
+    redirect: '/user_dashboard',
+  },
+];
+
+const handleSignIn = async () => {
+  setError('');
+
+  if (!email.trim()) {
+    setError('Please enter your email address.');
+    return;
   }
-  // const handleSignIn = async () => {
-  //   setError("");
+  if (!password.trim()) {
+    setError('Please enter your password.');
+    return;
+  }
 
-  //   // Basic client-side validation
-  //   if (!email.trim()) {
-  //     setError("Please enter your email address.");
-  //     return;
-  //   }
-  //   if (!password.trim()) {
-  //     setError("Please enter your password.");
-  //     return;
-  //   }
+  const matched = USERS.find(
+    u => u.email === email.trim().toLowerCase() && u.password === password
+  );
 
-  //   setLoading(true);
-  //   try {
-  //     const fd = new FormData();
-  //     fd.append("user_email", email.trim());    // ✅ matches Django: request.data.get("user_email")
-  //     fd.append("user_password", password);     // ✅ matches Django: request.data.get("user_password")
-
-  //     const res = await fetch(LOGIN_URL, {
-  //       method: "POST",
-  //       body: fd,
-  //     });
-
-  //     if (res.ok) {
-  //       // ✅ FIXED: only navigate on successful login
-  //       if (remember) {
-  //         localStorage.setItem("remembered_email", email.trim());
-  //       } else {
-  //         localStorage.removeItem("remembered_email");
-  //       }
-  //       navigate("/user_dashboard");
-  //     } else {
-  //       // Parse backend response: { status: false, message: "Invalid Email" | "Invalid Password" }
-  //       let msg = `Login failed (${res.status})`;
-  //       try {
-  //         const data = await res.json();
-  //         // Your Django view returns { status: false, message: "..." }
-  //         if (data.message) {
-  //           msg = data.message;
-  //         } else {
-  //           msg = data.error || data.detail || data.non_field_errors?.[0] || msg;
-  //         }
-  //       } catch {
-  //         const text = await res.text().catch(() => "");
-  //         if (text) msg = text;
-  //       }
-  //       setError(msg);
-  //     }
-  //   } catch (err: unknown) {
-  //     // Network/connection error
-  //     setError(
-  //       err instanceof Error
-  //         ? `Connection error: ${err.message}`
-  //         : "Network error — please check your connection and try again."
-  //     );
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
+  if (matched) {
+    if (remember) {
+      localStorage.setItem('remembered_email', email.trim());
+    } else {
+      localStorage.removeItem('remembered_email');
+    }
+    // Store role for use across the app
+    localStorage.setItem('user_role', matched.role);
+    localStorage.setItem('user_email', matched.email);
+    navigate(matched.redirect);
+  } else {
+    setError('Invalid email or password. Please try again.');
+  }
+};
+ 
   // Submit on Enter key
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSignIn();
@@ -133,7 +119,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-          <p className="text-sm text-muted-foreground mt-1.5">
+          <p className="text-smx text-muted-foreground mt-1.5">
             Sign in with your registered credentials
           </p>
 

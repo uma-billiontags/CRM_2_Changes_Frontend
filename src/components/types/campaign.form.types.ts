@@ -4,13 +4,19 @@ export interface LineItem {
   ethnicity: string[];
   startDate: string;
   endDate: string;
-  adFormat: string[];
+  adFormat: string;
   impressions: string;
-  units: string[];
+  units: string;
   creatives: File[];
   ctr: string;
   viewability: string;
   vcr: string;
+  ctrNotes: string;    // new
+  viewabilityNotes: string;  // new (optional, kept for future use)
+  vcrNotes: string;    // new (optional, kept for future use)
+  unitCost: string;  // ← add this
+  adSubFormatOpen: boolean;   // ← add
+  adSubFormat: string; 
 }
 
 export interface GeoLocation {

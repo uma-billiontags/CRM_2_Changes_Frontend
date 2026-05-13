@@ -2,14 +2,18 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./components/pages/Home";
 import Login from "./components/pages/Login";
 import Onboarding from "./components/forms/Onboarding";
-import User_Dashboard from "./components/pages/User_Dashboard";
+import User_Dashboard from "./components/sidebar/User_Dashboard";
 import Campaign_Create from "./components/forms/Campaign_Create";
 import SampleForm from "./components/forms/sample";
 import Creative_Upload from "./components/pages/Creative_Upload";
 import Creative_Video_Upload from "./components/pages/Creative_Video_Upload";
-import User_Campaigns from "./components/pages/User_Campaigns";
+import User_Campaigns from "./components/sidebar/User_Campaigns";
 import View_Campaign from "./components/pages/View_Campaign";
 import Edit_Campaign from "./components/pages/Edit_Campaign";
+import User_Drafts from "./components/sidebar/User_Drafts";
+import Creative_Dashboard from "./components/pages/Creative_Dashboard";
+import Image_Creatives from "./components/pages/Image_Creatives";
+import Video_Creatives from "./components/pages/Video_Creatives";
 
 function App() {
 
@@ -27,6 +31,10 @@ function App() {
         <Route path="/user_campaigns" element={<User_Campaigns />} />
         <Route path="/campaign/:campaign_id" element={<View_Campaign />} />
         <Route path="/update_campaign/:campaign_id" element={<Edit_Campaign/>} />
+        <Route path="/user_drafts" element={<User_Drafts />} />
+        <Route path="/creative_dashboard" element={<Creative_Dashboard/>} />
+        <Route path="/image_creatives" element={<Image_Creatives/>} />
+        <Route path="/video_creatives" element={<Video_Creatives />} />
       </Routes>
     </BrowserRouter>
   )

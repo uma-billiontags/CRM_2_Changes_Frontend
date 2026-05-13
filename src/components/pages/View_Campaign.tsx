@@ -6,7 +6,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Title, Text } = Typography;
 
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
 
 const BLUE = '#2563EB';
 const BLUE_LIGHT = '#EFF6FF';
@@ -27,18 +27,30 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: 'red',
 };
 
+// Add to LineItem interface in View_Campaign.tsx
+interface CreativeDetail {
+  type?: 'standard' | 'third_party';
+  creative_name?: string;
+  dimensions?: string;
+  click_through_url?: string;
+  appended_html_tag?: string;
+  input_file_name?: string;
+  backup_image_name?: string;
+}
+
 interface LineItem {
   line_item_id: string;
   line_item_name: string;
   start_date: string;
   end_date: string;
   ad_format: string | string[];
-  impressions: string | number;
   status?: string;
   ethnicity?: string;
   image_creatives?: string[];
   video_creatives?: string[];
   total_creatives?: string | number;
+  creatives?: CreativeDetail[];
+  third_party_creatives?: { input_file_name?: string; backup_image_name?: string }[];
 }
 
 interface Campaign {
@@ -360,21 +372,96 @@ export default function View_Campaign() {
                                   ? formats.map(f => <Tag key={f} color="blue" style={{ fontSize: 11 }}>{f}</Tag>)
                                   : null
                               } />
-                              <InfoRow label="Impressions" value={
-                                li.impressions != null
-                                  ? Number(li.impressions).toLocaleString('en-IN')
-                                  : null
-                              } />
+
+                              {/* ── Image Creatives ── */}
                               <InfoRow label="Image Creatives" value={
-                                imageCreatives.length > 0
-                                  ? `${imageCreatives.length} file(s): ${imageCreatives.join(', ')}`
-                                  : null
+                                (li.image_creatives?.length ?? 0) > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {li.image_creatives!.map((name, i) => (
+                                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>IMG</span>
+                                        <span style={{ fontSize: 12, color: '#1e293b' }}>{name}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null
                               } />
+
+                              {/* ── Video Creatives ── */}
                               <InfoRow label="Video Creatives" value={
-                                videoCreatives.length > 0
-                                  ? `${videoCreatives.length} file(s): ${videoCreatives.join(', ')}`
-                                  : null
+                                (li.video_creatives?.length ?? 0) > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {li.video_creatives!.map((name, i) => (
+                                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: 10, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>VID</span>
+                                        <span style={{ fontSize: 12, color: '#1e293b' }}>{name}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null
                               } />
+
+                              {/* ── Standard Creatives Detail (click URL, tag) ── */}
+                              {(li.creatives?.filter(c => !c.type || c.type === 'standard') ?? []).length > 0 && (
+                                <InfoRow label="Creative Details" value={
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {li.creatives!.filter(c => !c.type || c.type === 'standard').map((c, i) => (
+                                      <div key={i} style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: 7, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
+                                          {c.creative_name || `Creative ${i + 1}`}
+                                          {c.dimensions && <span style={{ fontSize: 10, color: '#64748b', marginLeft: 8 }}>{c.dimensions}</span>}
+                                        </div>
+                                        {c.click_through_url && (
+                                          <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+                                            <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', minWidth: 26 }}>URL</span>
+                                            <span style={{ fontSize: 11, color: '#2563eb', wordBreak: 'break-all' }}>{c.click_through_url}</span>
+                                          </div>
+                                        )}
+                                        {c.appended_html_tag && (
+                                          <div style={{ display: 'flex', gap: 6 }}>
+                                            <span style={{ fontSize: 10, fontWeight: 600, color: '#7c3aed', minWidth: 26 }}>TAG</span>
+                                            <span style={{ fontSize: 11, color: '#7c3aed', wordBreak: 'break-all' }}>{c.appended_html_tag}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                } />
+                              )}
+
+                              {/* ── Third Party Creatives ── */}
+                              {(() => {
+                                const tpFromCreatives = (li.creatives ?? []).filter(c => c.type === 'third_party');
+                                const tpFromArray = li.third_party_creatives ?? [];
+                                const allTp = tpFromCreatives.length > 0 ? tpFromCreatives : tpFromArray;
+                                if (allTp.length === 0) return null;
+                                return (
+                                  <InfoRow label="Third Party Creatives" value={
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      {allTp.map((tp, i) => (
+                                        <div key={i} style={{ padding: '8px 10px', background: '#faf5ff', borderRadius: 7, border: '1px solid #ddd6fe' }}>
+                                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>
+                                            Third Party {i + 1}
+                                          </div>
+                                          {(tp.input_file_name) && (
+                                            <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+                                              <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', minWidth: 40 }}>FILE</span>
+                                              <span style={{ fontSize: 11, color: '#1e293b' }}>{tp.input_file_name}</span>
+                                            </div>
+                                          )}
+                                          {(tp.backup_image_name) && (
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                              <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', minWidth: 40 }}>BACKUP</span>
+                                              <span style={{ fontSize: 11, color: '#059669' }}>{tp.backup_image_name}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  } />
+                                );
+                              })()}
+
                               <InfoRow label="Total Creatives" value={
                                 totalCreatives != null ? `${totalCreatives} file(s)` : null
                               } />

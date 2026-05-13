@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Tag, Button, Input, Select, Typography, Space, Badge } from 'antd';
-import { SearchOutlined, PlusOutlined, ReloadOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Sidebar from '../shared/Sidebar';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns_by_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00001/';
 
 interface LineItem {
   line_item_id: string;

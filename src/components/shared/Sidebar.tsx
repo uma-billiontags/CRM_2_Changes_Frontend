@@ -1,30 +1,29 @@
-// src/components/shared/Sidebar.tsx
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Megaphone, Plus, FileEdit, Layers,
-  FileText, Settings, LogOut, Building2, Wallet,
-  Radio, History,
+  LayoutDashboard, Megaphone, Plus, Layers,
+  FileText, Settings, LogOut, Wallet,
+  Radio, Image, Video
 } from 'lucide-react';
 
 const BLUE = '#2563EB';
 const WHITE = '#FFFFFF';
 
-const NAV = [
+const CAMPAIGN_NAV = [
   {
     g: 'WORKSPACE',
     items: [
-      { label: 'Dashboard',       icon: LayoutDashboard, to: '/user_dashboard' },
-      { label: 'My Campaigns',    icon: Megaphone,       to: '/user_campaigns' },
-      { label: 'Create Campaign', icon: Plus,            to: '/campaign_create' },
-      { label: 'My Drafts',       icon: Layers,          to: '/user_drafts' },
-      { label: 'Insertion Orders', icon: FileText,   to: '/user_io' },
+      { label: 'Dashboard',        icon: LayoutDashboard, to: '/user_dashboard' },
+      { label: 'My Campaigns',     icon: Megaphone,       to: '/user_campaigns' },
+      { label: 'Create Campaign',  icon: Plus,            to: '/campaign_create' },
+      { label: 'My Drafts',        icon: Layers,          to: '/user_drafts' },
+      { label: 'Insertion Orders', icon: FileText,        to: '/user_io' },
     ],
   },
   {
     g: 'MONITOR',
     items: [
-      { label: 'Live Status',    icon: Radio,    to: '/user_live' },
-      { label: 'Approvals',      icon: FileText, to: '/user_approvals' },
+      { label: 'Live Status', icon: Radio,    to: '/user_live' },
+      { label: 'Approvals',   icon: FileText, to: '/user_approvals' },
     ],
   },
   {
@@ -36,6 +35,23 @@ const NAV = [
   },
 ];
 
+const CREATIVE_NAV = [
+  {
+    g: 'WORKSPACE',
+    items: [
+      { label: 'Dashboard',         icon: LayoutDashboard, to: '/creative_dashboard' },
+      { label: 'Image Creatives',   icon: Image,           to: '/image_creatives' },
+      { label: 'Video Creatives',   icon: Video,           to: '/video_creatives' },
+    ],
+  },
+  {
+    g: 'ACCOUNT',
+    items: [
+      { label: 'Reports', icon: FileText, to: '/creative_reports' },
+    ],
+  },
+];
+
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -43,6 +59,16 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
+  const role = localStorage.getItem('user_role') ?? 'campaign';
+  const userEmail = localStorage.getItem('user_email') ?? '';
+
+  const NAV = role === 'creative' ? CREATIVE_NAV : CAMPAIGN_NAV;
+
+  // Display info per role
+  const avatarInitials = role === 'creative' ? 'CT' : 'AK';
+  const displayName    = role === 'creative' ? 'Creative Team' : 'Aarav Shah';
+  const displayRole    = role === 'creative' ? 'CREATIVE TEAM' : 'CAMPAIGN MANAGER';
+  const accentColor    = role === 'creative' ? '#7c3aed' : BLUE;
 
   return (
     <aside style={{
@@ -64,7 +90,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 9, background: BLUE,
+              width: 34, height: 34, borderRadius: 9, background: accentColor,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, fontWeight: 900, color: WHITE,
             }}>N</div>
@@ -73,14 +99,14 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 Billion <span style={{ color: '#60A5FA' }}>Tags</span>
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
-                CAMPAIGN PLATFORM
+                {role === 'creative' ? 'CREATIVE PLATFORM' : 'CAMPAIGN PLATFORM'}
               </div>
             </div>
           </Link>
         )}
         {collapsed && (
           <div style={{
-            width: 34, height: 34, borderRadius: 9, background: BLUE,
+            width: 34, height: 34, borderRadius: 9, background: accentColor,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 900, color: WHITE,
           }}>N</div>
@@ -119,7 +145,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     fontSize: 13, fontWeight: active ? 600 : 400,
                     marginBottom: 1,
                     color: active ? WHITE : 'rgba(255,255,255,0.45)',
-                    background: active ? 'rgba(37,99,235,0.85)' : 'transparent',
+                    background: active ? `rgba(${role === 'creative' ? '124,58,237' : '37,99,235'},0.85)` : 'transparent',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.15s',
                   }}>
@@ -142,13 +168,13 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             background: 'rgba(255,255,255,0.05)', marginBottom: 6,
           }}>
             <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: BLUE,
+              width: 32, height: 32, borderRadius: '50%', background: accentColor,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: WHITE, fontSize: 12, fontWeight: 800, flexShrink: 0,
-            }}>AS</div>
+            }}>{avatarInitials}</div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: WHITE }}>Aarav Shah</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CAMPAIGN MANAGER</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: WHITE }}>{displayName}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{displayRole}</div>
             </div>
           </div>
         )}
