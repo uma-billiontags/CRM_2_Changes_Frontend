@@ -21,7 +21,7 @@ dayjs.extend(isBetween);
 const { TextArea } = Input;
 
 const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
+const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00003/';
 const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
@@ -156,8 +156,6 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
     viewability: '70',
     vcr: '70',
     ctrNotes: '',
-    viewabilityNotes: '',
-    vcrNotes: '',
     unitCost: '',   // ← add this
     adSubFormatOpen: false,  // ← add
     adSubFormat: ''
@@ -673,15 +671,13 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
         </Form.Item>
 
         <Form.Item label="Advertiser (Brand)" required>
-          <Select
-            value={advertiser || undefined}
-            onChange={setAdvertiser}
-            placeholder="Select an advertiser…"
-            options={toOpts(['Unilever India', 'Tata Digital', 'HDFC Bank', 'Myntra', 'Reliance Retail', 'Mahindra Group', 'Airtel India'])}
+          <Input
+            value={advertiser}
+            onChange={(e) => setAdvertiser(e.target.value)}
+            placeholder="Enter advertiser name…"
             style={{ width: '100%', height: 38 }}
           />
         </Form.Item>
-
         <InfoBox variant="blue">
           All campaigns, line items, creatives and reports will be mapped under the selected client and advertiser. This cannot be changed after creation.
         </InfoBox>
@@ -1823,9 +1819,13 @@ function Step5Review({
                     {
                       label: 'Ad Format',
                       value: li.adFormat
-                        ? li.adSubFormat
-                          ? `${li.adFormat} › ${li.adSubFormat}`
-                          : li.adFormat
+                        ? (() => {
+                          const formatLabel = AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat;
+                          const subLabel = li.adSubFormat
+                            ? AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(s => s.value === li.adSubFormat)?.label
+                            : null;
+                          return subLabel ? `${formatLabel} › ${subLabel}` : formatLabel;
+                        })()
                         : '—'
                     },
                     { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
@@ -1975,7 +1975,7 @@ export default function Campaign_Create() {
   // Step 1
   const [client, setClient] = useState<string>(restoredData?.client ?? '');
   const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
-  const [advertiser, setAdvertiser] = useState<string>(restoredData?.advertiser ?? '');
+  const [advertiser, setAdvertiser] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
 
   // Step 2
@@ -2146,19 +2146,44 @@ export default function Campaign_Create() {
         const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
         const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
         const allCreatives = [...imageCreatives, ...videoCreatives];
+
+        // ── Calculate unit cost inline ──
+        const impressions = parseFloat(li.impressions);
+        const rawAdFormat = li.adFormat;  // raw value: 'banner', 'video' etc.
+        const unit = li.units;
+        let unitCostBudget: number | string = '';
+        if (impressions && unit && rawAdFormat) {
+          if (unit === 'CPM') {
+            const rate = CPM_RATES[rawAdFormat] ?? 1;
+            unitCostBudget = (impressions * rate) / 1000;
+          } else if (unit === 'CPC') {
+            const rate = CPC_RATES[rawAdFormat] ?? 1;
+            unitCostBudget = impressions * rate;
+          }
+        }
+
+        // Build display adFormat string separately
+        const adFormatDisplay = li.adFormat
+          ? li.adSubFormat
+            ? `${AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat} › ${AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(s => s.value === li.adSubFormat)?.label ?? li.adSubFormat}`
+            : AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat
+          : '';
         return {
           line_item_id: li.id,
           lineItemName: li.lineItemName,
           ethnicity: li.ethnicity,
           startDate: li.startDate,
           endDate: li.endDate,
-          adFormat: li.adFormat,
           impressions: li.impressions,
           units: li.units,
           ctr: li.ctr,
           viewability: li.viewability,
           vcr: li.vcr,
-          adSubFormat: li.adSubFormat,
+          kpi_notes: li.ctrNotes || '',       // single combined KPI notes field
+          adFormat: adFormatDisplay,   // combined label for display/storage
+          unit_cost: unitCostBudget,   // now correctly calculated
+
+
           // ✅ Standard creatives only
           creatives: allCreatives
             .filter(c => c.type !== 'third_party')

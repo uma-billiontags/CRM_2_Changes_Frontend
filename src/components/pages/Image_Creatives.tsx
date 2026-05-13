@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Table, Tag, Input, Button, Typography, Tooltip, Modal } from 'antd';
+import { Table, Input, Button, Typography, Tooltip, Modal, message } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, FileImageOutlined,
-  EyeOutlined, DownloadOutlined,
+  CopyOutlined, CheckOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -29,7 +28,6 @@ const GREEN_BORDER = '#86efac';
 
 interface Creative {
   creative_name: string;
-  main_asset?: File | null;
   main_asset_url?: string;
   dimensions?: string;
   aspect_ratio?: string;
@@ -55,9 +53,9 @@ interface Campaign {
   line_items?: LineItem[];
 }
 
-// Flattened row for the table
 interface ImageCreativeRow {
   key: string;
+  creativeId?: number;   // ← add this
   campaignId: string;
   campaignName: string;
   advertiser: string;
@@ -75,7 +73,12 @@ interface ImageCreativeRow {
   notes?: string;
 }
 
-// Validation helpers
+function isImageFormat(fmt: string | string[]): boolean {
+  const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
+  const lower = raw.toLowerCase();
+  return lower.includes('banner') || lower.includes('interstitial') || lower.includes('image');
+}
+
 function isValidClickUrl(url: string): boolean {
   return !!url && url.toLowerCase().includes('trackclk');
 }
@@ -83,7 +86,7 @@ function isValidHtmlTag(tag: string): boolean {
   return !!tag && (tag.toLowerCase().includes('trackimpi') || tag.toLowerCase().includes('trackimp'));
 }
 
-// Truncated cell with tooltip
+// ── TruncCell ────────────────────────────────────────────────────────────────
 function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?: number; mono?: boolean }) {
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
   return (
@@ -98,32 +101,75 @@ function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?:
   );
 }
 
-// Tracker field with validation dot
+// ── TrackerCell — with copy icon ─────────────────────────────────────────────
 function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }) {
-  if (!value) {
-    return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
-  }
+  const [copied, setCopied] = useState(false);
+
+  if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
+
   const isValid = type === 'click' ? isValidClickUrl(value) : isValidHtmlTag(value);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      message.success({ content: 'Copied to clipboard!', duration: 1.5 });
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      message.error('Failed to copy');
+    });
+  };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 60 }}>
+      {/* Validation dot */}
       <div style={{
         width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
         background: isValid ? '#16a34a' : '#ef4444',
       }} />
+
+      {/* Truncated value */}
       <Tooltip title={value} placement="topLeft">
         <span style={{
           fontSize: 12, color: SLATE,
           fontFamily: '"Fira Code", monospace',
           overflow: 'hidden', textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap', maxWidth: 150, cursor: 'default',
+          whiteSpace: 'nowrap', maxWidth: 110, cursor: 'default',
         }}>{value}</span>
+      </Tooltip>
+
+      {/* Copy button */}
+      <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'}>
+        <button
+          onClick={handleCopy}
+          style={{
+            background: copied ? '#f0fdf4' : '#f8fafc',
+            border: `1px solid ${copied ? '#86efac' : '#e2e8f0'}`,
+            borderRadius: 4,
+            cursor: 'pointer',
+            padding: '2px 5px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            outline: 'none',
+          }}
+        >
+          {copied
+            ? <CheckOutlined style={{ fontSize: 10, color: '#16a34a' }} />
+            : <CopyOutlined style={{ fontSize: 10, color: SLATE_500 }} />
+          }
+        </button>
       </Tooltip>
     </div>
   );
 }
 
-// Preview modal for image
-function ImagePreviewModal({ visible, url, name, onClose }: { visible: boolean; url?: string; name?: string; onClose: () => void }) {
+// ── Image Preview Modal ──────────────────────────────────────────────────────
+function ImagePreviewModal({ visible, url, name, onClose }: {
+  visible: boolean; url?: string; name?: string; onClose: () => void;
+}) {
   return (
     <Modal
       open={visible}
@@ -139,7 +185,11 @@ function ImagePreviewModal({ visible, url, name, onClose }: { visible: boolean; 
       centered
     >
       {url ? (
-        <img src={url} alt={name} style={{ width: '100%', borderRadius: 8, border: `1px solid ${SLATE_300}` }} />
+        <img
+          src={url}
+          alt={name}
+          style={{ width: '100%', borderRadius: 8, border: `1px solid ${SLATE_300}` }}
+        />
       ) : (
         <div style={{ textAlign: 'center', padding: '40px 0', color: SLATE_500 }}>
           <FileImageOutlined style={{ fontSize: 40, marginBottom: 12 }} />
@@ -150,8 +200,15 @@ function ImagePreviewModal({ visible, url, name, onClose }: { visible: boolean; 
   );
 }
 
+function colHead(): React.CSSProperties {
+  return {
+    fontSize: 11, fontWeight: 700, color: SLATE_500,
+    textTransform: 'uppercase', letterSpacing: '0.05em',
+  };
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
 export default function Image_Creatives() {
-  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const sideWidth = collapsed ? 64 : 240;
 
@@ -161,6 +218,7 @@ export default function Image_Creatives() {
   const [search, setSearch] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewRow, setPreviewRow] = useState<ImageCreativeRow | null>(null);
+
 
   const fetchData = () => {
     setLoading(true);
@@ -172,15 +230,12 @@ export default function Image_Creatives() {
 
         campaigns.forEach(campaign => {
           (campaign.line_items ?? []).forEach(li => {
-            const fmt = Array.isArray(li.ad_format) ? li.ad_format[0] : li.ad_format;
-            // Only include image-type line items (banner / Interstitial)
-            const isImage = ['banner', 'Interstitial', 'image'].includes((fmt ?? '').toLowerCase());
-            if (!isImage) return;
-
+            if (!isImageFormat(li.ad_format)) return;
             (li.creatives ?? []).forEach((cr, idx) => {
-              if (cr.type === 'third_party') return; // skip third-party
+              if (cr.type === 'third_party') return;
               flat.push({
                 key: `${campaign.campaign_id}_${li.line_item_id}_${idx}`,
+                creativeId: (cr as any).id,   // ← add this — id comes from serializer
                 campaignId: campaign.campaign_id,
                 campaignName: campaign.campaign_name,
                 advertiser: campaign.advertiser ?? '',
@@ -222,7 +277,25 @@ export default function Image_Creatives() {
     ));
   }, [search, rows]);
 
-  // Stats
+  // ── Download handler ─────────────────────────────────────────────────────
+  const handleDownload = (e: React.MouseEvent, record: ImageCreativeRow) => {
+    e.stopPropagation();
+
+    if (!record.creativeId) {
+      message.warning('No asset available to download');
+      return;
+    }
+
+    // Direct browser download — no fetch needed
+    const downloadUrl = `https://grinch-revocable-cornflake.ngrok-free.dev/download_creative/${record.creativeId}/`;
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank';   // opens in new tab if browser decides to preview instead
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const withAsset = rows.filter(r => r.mainAssetUrl || r.mainAssetName).length;
   const withClickUrl = rows.filter(r => r.clickThroughUrl && isValidClickUrl(r.clickThroughUrl)).length;
   const withHtmlTag = rows.filter(r => r.appendedHtmlTag && isValidHtmlTag(r.appendedHtmlTag)).length;
@@ -230,9 +303,7 @@ export default function Image_Creatives() {
   const columns: ColumnsType<ImageCreativeRow> = [
     {
       title: <span style={colHead()}>#</span>,
-      key: 'index',
-      width: 52,
-      fixed: 'left',
+      key: 'index', width: 52, fixed: 'left',
       render: (_: any, __: ImageCreativeRow, index: number) => (
         <div style={{
           width: 24, height: 24, borderRadius: '50%',
@@ -242,26 +313,67 @@ export default function Image_Creatives() {
       ),
     },
     {
+      title: <span style={colHead()}>Campaign</span>,
+      dataIndex: 'campaignId',
+      key: 'campaignId',
+      width: 160,
+      fixed: 'left',
+      render: (v: string, record: ImageCreativeRow) => (
+        <div>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: PURPLE,
+            background: PURPLE_LIGHT, padding: '2px 6px',
+            borderRadius: 4, fontFamily: 'monospace',
+            display: 'block', marginBottom: 2,
+          }}>{v}</span>
+          <Tooltip title={record.campaignName}>
+            <span style={{
+              fontSize: 10, color: SLATE_500,
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap', display: 'block', maxWidth: 140,
+            }}>{record.campaignName}</span>
+          </Tooltip>
+        </div>
+      ),
+    },
+    {
       title: <span style={colHead()}>Creative Name</span>,
       dataIndex: 'creativeName',
       key: 'creativeName',
-      width: 200,
+      width: 240,
       fixed: 'left',
       render: (v: string, record: ImageCreativeRow) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 6, background: BLUE_LIGHT,
-            border: `1px solid #bfdbfe`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', flexShrink: 0,
-          }}>
-            <FileImageOutlined style={{ fontSize: 13, color: BLUE }} />
-          </div>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+          onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
+        >
+          {record.mainAssetUrl ? (
+            <img
+              src={record.mainAssetUrl}
+              alt={v}
+              style={{
+                width: 32, height: 32, objectFit: 'cover',
+                borderRadius: 6, border: `1px solid #bfdbfe`, flexShrink: 0,
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div style={{
+              width: 32, height: 32, borderRadius: 6, background: BLUE_LIGHT,
+              border: `1px solid #bfdbfe`, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0,
+            }}>
+              <FileImageOutlined style={{ fontSize: 14, color: BLUE }} />
+            </div>
+          )}
           <div>
-            <Tooltip title={v} placement="topLeft">
+            <Tooltip title="Click to preview" placement="topLeft">
               <span style={{
-                fontSize: 12, fontWeight: 600, color: SLATE,
+                fontSize: 12, fontWeight: 600, color: BLUE,
                 display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', maxWidth: 140,
+                whiteSpace: 'nowrap', maxWidth: 170,
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+                textUnderlineOffset: 3,
               }}>{v}</span>
             </Tooltip>
             <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
@@ -270,86 +382,33 @@ export default function Image_Creatives() {
       ),
     },
     {
-      title: <span style={colHead()}>Main Asset</span>,
-      key: 'mainAsset',
-      width: 180,
-      render: (_: any, record: ImageCreativeRow) => {
-        const hasAsset = record.mainAssetUrl || record.mainAssetName;
-        return hasAsset ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {record.mainAssetUrl && (
-              <img
-                src={record.mainAssetUrl}
-                alt={record.mainAssetName}
-                style={{
-                  width: 30, height: 30, objectFit: 'cover',
-                  borderRadius: 4, border: `1px solid ${SLATE_300}`, flexShrink: 0,
-                }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
-            <Tooltip title={record.mainAssetName} placement="topLeft">
-              <Tag
-                icon={<FileImageOutlined />}
-                color="blue"
-                style={{
-                  cursor: 'pointer', maxWidth: 130,
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap', fontSize: 11,
-                }}
-                onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
-              >
-                {record.mainAssetName}
-              </Tag>
-            </Tooltip>
-          </div>
-        ) : (
-          <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>
-        );
-      },
-    },
-    {
       title: <span style={colHead()}>Dimensions</span>,
-      dataIndex: 'dimensions',
-      key: 'dimensions',
-      width: 120,
+      dataIndex: 'dimensions', key: 'dimensions', width: 120,
       render: (v: string) => v
         ? <span style={{ fontSize: 12, color: SLATE, fontFeatureSettings: '"tnum"' }}>{v}</span>
         : <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>,
     },
     {
       title: <span style={colHead()}>Aspect Ratio</span>,
-      dataIndex: 'aspectRatio',
-      key: 'aspectRatio',
-      width: 110,
+      dataIndex: 'aspectRatio', key: 'aspectRatio', width: 110,
       render: (v: string) => v
-        ? (
-          <span style={{
-            fontSize: 11, color: BLUE, background: BLUE_LIGHT,
-            padding: '2px 8px', borderRadius: 4, fontWeight: 600,
-            border: `1px solid #bfdbfe`,
-          }}>{v}</span>
-        )
+        ? <span style={{
+          fontSize: 11, color: BLUE, background: BLUE_LIGHT,
+          padding: '2px 8px', borderRadius: 4, fontWeight: 600,
+          border: `1px solid #bfdbfe`,
+        }}>{v}</span>
         : <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>,
     },
     {
       title: <span style={colHead()}>File Size</span>,
-      dataIndex: 'fileSize',
-      key: 'fileSize',
-      width: 100,
+      dataIndex: 'fileSize', key: 'fileSize', width: 100,
       render: (v: string) => v
         ? <span style={{ fontSize: 12, color: SLATE_500 }}>{v}</span>
         : <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>,
     },
     {
-      title: (
-        <span style={colHead()}>
-          Click-through URL
-        </span>
-      ),
-      dataIndex: 'clickThroughUrl',
-      key: 'clickThroughUrl',
-      width: 200,
+      title: <span style={colHead()}>Click-through URL</span>,
+      dataIndex: 'clickThroughUrl', key: 'clickThroughUrl', width: 220,
       render: (v: string) => <TrackerCell value={v} type="click" />,
     },
     {
@@ -359,9 +418,7 @@ export default function Image_Creatives() {
           <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8', textTransform: 'none' }}>optional</span>
         </span>
       ),
-      dataIndex: 'appendedHtmlTag',
-      key: 'appendedHtmlTag',
-      width: 200,
+      dataIndex: 'appendedHtmlTag', key: 'appendedHtmlTag', width: 220,
       render: (v: string) => <TrackerCell value={v} type="html" />,
     },
     {
@@ -371,9 +428,7 @@ export default function Image_Creatives() {
           <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8', textTransform: 'none' }}>optional</span>
         </span>
       ),
-      dataIndex: 'integrationCode',
-      key: 'integrationCode',
-      width: 180,
+      dataIndex: 'integrationCode', key: 'integrationCode', width: 180,
       render: (v: string) => <TruncCell value={v} mono />,
     },
     {
@@ -383,68 +438,47 @@ export default function Image_Creatives() {
           <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8', textTransform: 'none' }}>optional</span>
         </span>
       ),
-      dataIndex: 'notes',
-      key: 'notes',
-      width: 160,
+      dataIndex: 'notes', key: 'notes', width: 160,
       render: (v: string) => <TruncCell value={v} />,
     },
-    {
-      title: <span style={colHead()}>Campaign</span>,
-      dataIndex: 'campaignId',
-      key: 'campaignId',
-      width: 150,
-      render: (v: string, record: ImageCreativeRow) => (
-        <div>
-          <span style={{
-            fontSize: 11, fontWeight: 700, color: PURPLE,
-            background: PURPLE_LIGHT, padding: '2px 6px',
-            borderRadius: 4, fontFamily: 'monospace', display: 'block', marginBottom: 2,
-          }}>{v}</span>
-          <Tooltip title={record.campaignName}>
-            <span style={{
-              fontSize: 10, color: SLATE_500,
-              overflow: 'hidden', textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap', display: 'block', maxWidth: 130,
-            }}>{record.campaignName}</span>
-          </Tooltip>
-        </div>
-      ),
-    },
-    {
-      title: <span style={colHead()}>Actions</span>,
-      key: 'actions',
-      width: 90,
-      fixed: 'right',
-      render: (_: any, record: ImageCreativeRow) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Tooltip title="Preview">
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
-              style={{
-                fontSize: 11, color: BLUE, background: BLUE_LIGHT,
-                border: `1px solid #bfdbfe`, borderRadius: 6, width: 28, height: 28, padding: 0,
-              }}
-            />
-          </Tooltip>
-          {record.mainAssetUrl && (
-            <Tooltip title="Download">
-              <Button
-                size="small"
-                icon={<DownloadOutlined />}
-                href={record.mainAssetUrl}
-                download
-                style={{
-                  fontSize: 11, color: GREEN, background: GREEN_LIGHT,
-                  border: `1px solid ${GREEN_BORDER}`, borderRadius: 6, width: 28, height: 28, padding: 0,
-                }}
-              />
-            </Tooltip>
-          )}
-        </div>
-      ),
-    },
+    // ── Actions column ──────────────────────────────────────────────────────
+   {
+  title: <span style={colHead()}>Actions</span>,
+  key: 'actions',
+  width: 130,
+  fixed: 'right',
+  render: (_: any, record: ImageCreativeRow) => {
+    const hasAsset = !!record.creativeId;  // ← use creativeId, not mainAssetUrl
+
+    return (
+      <Tooltip title={hasAsset ? 'Download image asset' : 'No asset available'}>
+        <Button
+          size="small"
+          icon={<DownloadOutlined style={{ fontSize: 12 }} />}
+          onClick={(e) => handleDownload(e, record)}
+          disabled={!hasAsset}
+          style={{
+            height: 30,
+            padding: '0 12px',
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            color: hasAsset ? BLUE : SLATE_300,
+            background: hasAsset ? BLUE_LIGHT : '#f8fafc',
+            border: `1px solid ${hasAsset ? '#bfdbfe' : SLATE_300}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            cursor: hasAsset ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s',
+          }}
+        >
+          Download
+        </Button>
+      </Tooltip>
+    );
+  },
+},
   ];
 
   return (
@@ -464,13 +498,11 @@ export default function Image_Creatives() {
             <div style={{ fontSize: 16, fontWeight: 700, color: SLATE }}>Image Creatives</div>
             <div style={{ fontSize: 11, color: SLATE_500, letterSpacing: '0.04em' }}>ALL IMAGE CREATIVES ACROSS CAMPAIGNS</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%', background: BLUE,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: WHITE, fontSize: 13, fontWeight: 700,
-            }}>CT</div>
-          </div>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%', background: BLUE,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: WHITE, fontSize: 13, fontWeight: 700,
+          }}>CT</div>
         </header>
 
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
@@ -500,7 +532,7 @@ export default function Image_Creatives() {
             ))}
           </div>
 
-          {/* Filters bar */}
+          {/* Filters */}
           <div style={{
             background: WHITE, borderRadius: 12, padding: '14px 20px',
             border: `1px solid ${SLATE_300}`, marginBottom: 16,
@@ -514,11 +546,8 @@ export default function Image_Creatives() {
               style={{ width: 320, height: 36 }}
               allowClear
             />
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={fetchData}
-              style={{ height: 36, color: SLATE_500, border: `1px solid ${SLATE_300}` }}
-            >
+            <Button icon={<ReloadOutlined />} onClick={fetchData}
+              style={{ height: 36, color: SLATE_500, border: `1px solid ${SLATE_300}` }}>
               Refresh
             </Button>
             <Text style={{ marginLeft: 'auto', fontSize: 12, color: SLATE_500 }}>
@@ -527,10 +556,7 @@ export default function Image_Creatives() {
           </div>
 
           {/* Legend */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            marginBottom: 12, fontSize: 11.5, color: SLATE_500,
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, fontSize: 11.5, color: SLATE_500 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a' }} />
               Valid tracker detected
@@ -538,6 +564,14 @@ export default function Image_Creatives() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
               Invalid / missing tracker
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <CopyOutlined style={{ fontSize: 11, color: SLATE_500 }} />
+              <span>Click copy icon to copy URL / tag</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
+              <FileImageOutlined style={{ fontSize: 11, color: BLUE }} />
+              <span>Click creative name to preview</span>
             </div>
           </div>
 
@@ -552,12 +586,8 @@ export default function Image_Creatives() {
               dataSource={filtered}
               rowKey="key"
               loading={loading}
-              scroll={{ x: 1800 }}
-              pagination={{
-                pageSize: 15,
-                showSizeChanger: true,
-                showTotal: (t, r) => `${r[0]}–${r[1]} of ${t}`,
-              }}
+              scroll={{ x: 1900 }}
+              pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t, r) => `${r[0]}–${r[1]} of ${t}` }}
               locale={{
                 emptyText: (
                   <div style={{ padding: '48px 0', textAlign: 'center', color: SLATE_500 }}>
@@ -575,7 +605,6 @@ export default function Image_Creatives() {
         </main>
       </div>
 
-      {/* Image Preview Modal */}
       <ImagePreviewModal
         visible={previewVisible}
         url={previewRow?.mainAssetUrl}
@@ -585,25 +614,12 @@ export default function Image_Creatives() {
 
       <style>{`
         .ant-table-thead > tr > th {
-          background: #F1F5F9 !important;
-          font-size: 11px !important;
-          font-weight: 700 !important;
-          color: #64748B !important;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
+          background: #F1F5F9 !important; font-size: 11px !important;
+          font-weight: 700 !important; color: #64748B !important;
+          text-transform: uppercase; letter-spacing: 0.04em;
         }
         .ant-table-tbody > tr:hover > td { background: #fafbff !important; }
       `}</style>
     </div>
   );
-}
-
-function colHead(): React.CSSProperties {
-  return {
-    fontSize: 11,
-    fontWeight: 700,
-    color: SLATE_500,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  };
 }

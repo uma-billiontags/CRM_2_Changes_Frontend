@@ -12,8 +12,6 @@ export interface LineItem {
   viewability: string;
   vcr: string;
   ctrNotes: string;    // new
-  viewabilityNotes: string;  // new (optional, kept for future use)
-  vcrNotes: string;    // new (optional, kept for future use)
   unitCost: string;  // ← add this
   adSubFormatOpen: boolean;   // ← add
   adSubFormat: string; 

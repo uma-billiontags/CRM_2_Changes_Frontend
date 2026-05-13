@@ -7,7 +7,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -26,7 +26,6 @@ interface CreativeDetail {
   dimensions?: string;
   click_through_url?: string;
   appended_html_tag?: string;
-  // third party
   input_file_name?: string;
   backup_image_name?: string;
 }
@@ -63,6 +62,122 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'gold', draft: 'default', completed: 'purple', cancelled: 'red',
 };
 
+// ── Renders all creative file names as badge + name chips ──
+function CreativesCell({ li }: { li: LineItem }) {
+  const imageNames = li.image_creatives ?? [];
+  const videoNames = li.video_creatives ?? [];
+
+  const standardCreatives = (li.creatives ?? []).filter(c => !c.type || c.type === 'standard');
+  const thirdPartyFromCreatives = (li.creatives ?? []).filter(c => c.type === 'third_party');
+  const thirdPartyFromArray = li.third_party_creatives ?? [];
+  const allThirdParty = thirdPartyFromCreatives.length > 0 ? thirdPartyFromCreatives : thirdPartyFromArray;
+
+  const hasAny =
+    imageNames.length > 0 ||
+    videoNames.length > 0 ||
+    standardCreatives.length > 0 ||
+    allThirdParty.length > 0;
+
+  if (!hasAny) {
+    return <Text style={{ color: SLATE_500, fontSize: 11 }}>—</Text>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* Image files */}
+      {imageNames.map((name, i) => (
+        <div key={`img-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: BLUE,
+            background: BLUE_LIGHT, padding: '1px 5px',
+            borderRadius: 3, border: `1px solid #bfdbfe`,
+            flexShrink: 0,
+          }}>IMG</span>
+          <span style={{ fontSize: 11, color: SLATE }}>{name}</span>
+        </div>
+      ))}
+
+      {/* Standard creatives (treat as image) */}
+      {/* Standard creatives */}
+      {standardCreatives.map((c, i) => {
+
+        const adFormats = Array.isArray(li.ad_format)
+          ? li.ad_format.map(a => a.toLowerCase())
+          : [li.ad_format?.toLowerCase()];
+
+        const isVideo = adFormats.some(a => a?.includes('video'));
+
+        return (
+          <div
+            key={`std-${i}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: isVideo ? PURPLE : BLUE,
+                background: isVideo ? PURPLE_LIGHT : BLUE_LIGHT,
+                padding: '1px 5px',
+                borderRadius: 3,
+                border: isVideo
+                  ? `1px solid ${PURPLE_MID}`
+                  : `1px solid #bfdbfe`,
+                flexShrink: 0,
+              }}
+            >
+              {isVideo ? 'VID' : 'IMG'}
+            </span>
+
+            <span style={{ fontSize: 11, color: SLATE }}>
+              {c.creative_name || `Creative ${i + 1}`}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* Video files */}
+      {videoNames.map((name, i) => (
+        <div key={`vid-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: PURPLE,
+            background: PURPLE_LIGHT, padding: '1px 5px',
+            borderRadius: 3, border: `1px solid ${PURPLE_MID}`,
+            flexShrink: 0,
+          }}>VID</span>
+          <span style={{ fontSize: 11, color: SLATE }}>{name}</span>
+        </div>
+      ))}
+
+      {/* Third party */}
+      {/* Third party */}
+      {allThirdParty.map((tp, i) => {
+        const fileName = tp.input_file_name || `Third Party ${i + 1}`;
+        const ext = fileName.split('.').pop()?.toUpperCase();
+        return (
+          <div key={`tp-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, color: '#92400e',
+              background: '#fef3c7', padding: '1px 5px',
+              borderRadius: 3, border: '1px solid #fcd34d',
+              flexShrink: 0,
+            }}>3P</span>
+            {ext && ext !== fileName.toUpperCase() && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: '#92400e',
+                background: '#fff7ed', padding: '1px 5px',
+                borderRadius: 3, border: '1px solid #fed7aa',
+                flexShrink: 0, fontFamily: 'monospace',
+              }}>{ext}</span>
+            )}
+            <span style={{ fontSize: 11, color: SLATE }}>{fileName}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Creative_Dashboard() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -98,11 +213,14 @@ export default function Creative_Dashboard() {
     ));
   }, [search, campaigns]);
 
-  // Stats
   const totalCampaigns = campaigns.length;
   const totalLineItems = campaigns.reduce((acc, c) => acc + (c.line_items?.length ?? 0), 0);
   const totalCreatives = campaigns.reduce((acc, c) =>
-    acc + (c.line_items?.reduce((a, li) => a + (li.creatives?.length ?? 0), 0) ?? 0), 0);
+    acc + (c.line_items?.reduce((a, li) =>
+      a + (li.image_creatives?.length ?? 0) +
+      (li.video_creatives?.length ?? 0) +
+      (li.creatives?.length ?? 0) +
+      (li.third_party_creatives?.length ?? 0), 0) ?? 0), 0);
 
   const columns: ColumnsType<Campaign> = [
     {
@@ -182,11 +300,92 @@ export default function Creative_Dashboard() {
         <Button
           size="small"
           icon={<EyeOutlined />}
-          onClick={() => navigate(`/campaign/${r.campaign_id}`)}
+          onClick={() => navigate(`/creative/${r.campaign_id}`)}
           style={{ fontSize: 11, fontWeight: 600, color: PURPLE, background: PURPLE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
         >
           View
         </Button>
+      ),
+    },
+  ];
+
+  // ── Expanded line items columns — with Creatives column ──
+  const lineItemColumns: ColumnsType<LineItem> = [
+    {
+      title: 'Line Item ID',
+      dataIndex: 'line_item_id',
+      width: 140,
+      render: (v: string) => (
+        <span style={{
+          fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+          color: PURPLE, background: PURPLE_LIGHT,
+          padding: '2px 6px', borderRadius: 4,
+        }}>{v}</span>
+      ),
+    },
+    {
+      title: 'Line Item Name',
+      dataIndex: 'line_item_name',
+      width: 180,
+      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
+    },
+    {
+      title: 'Start Date',
+      dataIndex: 'start_date',
+      width: 110,
+      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
+    },
+    {
+      title: 'End Date',
+      dataIndex: 'end_date',
+      width: 110,
+      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
+    },
+    {
+      title: 'Ad Format',
+      dataIndex: 'ad_format',
+      width: 140,
+      render: (v: string | string[], r: LineItem) => {
+        const fmt = Array.isArray(v) ? v[0] : v;
+        const sub = r.ad_sub_format;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {fmt && <Tag color="blue" style={{ fontSize: 10, width: 'fit-content' }}>{fmt}</Tag>}
+            {sub && <Tag color="purple" style={{ fontSize: 10, width: 'fit-content' }}>{sub}</Tag>}
+            {!fmt && <Text style={{ color: SLATE_500 }}>—</Text>}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Ethnicity',
+      dataIndex: 'ethnicity',
+      width: 140,
+      render: (v: string | string[]) => {
+        const arr = Array.isArray(v) ? v : (v ? [v] : []);
+        return arr.length > 0
+          ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {arr.map((e: string) => <Tag key={e} style={{ fontSize: 10 }}>{e}</Tag>)}
+          </div>
+          : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
+      },
+    },
+    {
+      // ── NEW: Creatives column ──
+      title: 'Creatives',
+      key: 'creatives',
+      width: 220,
+      render: (_: any, r: LineItem) => <CreativesCell li={r} />,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      width: 100,
+      render: (v: string) => (
+        <Badge
+          color={STATUS_COLOR[v ?? 'pending'] ?? 'default'}
+          text={<span style={{ fontSize: 11, textTransform: 'uppercase' }}>{v ?? 'pending'}</span>}
+        />
       ),
     },
   ];
@@ -293,71 +492,8 @@ export default function Creative_Dashboard() {
                         dataSource={record.line_items}
                         rowKey="line_item_id"
                         pagination={false}
-                        columns={[
-                          {
-                            title: 'Line Item ID',
-                            dataIndex: 'line_item_id',
-                            width: 140,
-                            render: (v: string) => (
-                              <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: PURPLE, background: PURPLE_LIGHT, padding: '2px 6px', borderRadius: 4 }}>{v}</span>
-                            ),
-                          },
-                          {
-                            title: 'Line Item Name',
-                            dataIndex: 'line_item_name',
-                            width: 200,
-                            render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-                          },
-                          {
-                            title: 'Start Date',
-                            dataIndex: 'start_date',
-                            width: 120,
-                            render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-                          },
-                          {
-                            title: 'End Date',
-                            dataIndex: 'end_date',
-                            width: 120,
-                            render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-                          },
-                          {
-                            title: 'Ad Format',
-                            dataIndex: 'ad_format',
-                            width: 130,
-                            render: (v: string | string[], r: LineItem) => {
-                              const fmt = Array.isArray(v) ? v[0] : v;
-                              const sub = r.ad_sub_format;
-                              return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                  {fmt && <Tag color="blue" style={{ fontSize: 10, width: 'fit-content' }}>{fmt}</Tag>}
-                                  {sub && <Tag color="purple" style={{ fontSize: 10, width: 'fit-content' }}>{sub}</Tag>}
-                                  {!fmt && <Text style={{ color: SLATE_500 }}>—</Text>}
-                                </div>
-                              );
-                            },
-                          },
-                          {
-                            title: 'Ethnicity',
-                            dataIndex: 'ethnicity',
-                            width: 150,
-                            render: (v: string | string[]) => {
-                              const arr = Array.isArray(v) ? v : (v ? [v] : []);
-                              return arr.length > 0
-                                ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{arr.map((e: string) => <Tag key={e} style={{ fontSize: 10 }}>{e}</Tag>)}</div>
-                                : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
-                            },
-                          },
-                          
-                         
-                          {
-                            title: 'Status',
-                            dataIndex: 'status',
-                            width: 100,
-                            render: (v: string) => (
-                              <Badge color={STATUS_COLOR[v ?? 'pending'] ?? 'default'} text={<span style={{ fontSize: 11, textTransform: 'uppercase' }}>{v ?? 'pending'}</span>} />
-                            ),
-                          },
-                        ]}
+                        columns={lineItemColumns}
+                        scroll={{ x: 1100 }}
                         style={{ background: '#fafbff', borderRadius: 8 }}
                       />
                     </div>

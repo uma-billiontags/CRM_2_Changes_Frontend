@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Table, Tag, Input, Button, Typography, Tooltip, Modal } from 'antd';
+import { Table, Input, Button, Typography, Tooltip, Modal, message } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, VideoCameraOutlined,
-  EyeOutlined, DownloadOutlined, PlayCircleOutlined,
+  PlayCircleOutlined, CopyOutlined, CheckOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00001/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -55,6 +56,7 @@ interface Campaign {
 
 interface VideoCreativeRow {
   key: string;
+  creativeId?: number;   // ← add this
   campaignId: string;
   campaignName: string;
   advertiser: string;
@@ -72,6 +74,12 @@ interface VideoCreativeRow {
   notes?: string;
 }
 
+function isVideoFormat(fmt: string | string[]): boolean {
+  const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
+  const lower = raw.toLowerCase();
+  return lower.includes('video') || lower.includes('youtube');
+}
+
 function isValidClickUrl(url: string): boolean {
   return !!url && url.toLowerCase().includes('trackclk');
 }
@@ -79,6 +87,26 @@ function isValidVideoTag(tag: string): boolean {
   return !!tag && /^https?:\/\/.*\?$/.test(tag.trim());
 }
 
+// ── Download helper ──────────────────────────────────────────────────────────
+async function downloadFile(url: string, fileName: string) {
+  try {
+    const res = await fetch(url, { headers: { 'ngrok-skip-browser-warning': '1' } });
+    if (!res.ok) throw new Error('Network response was not ok');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName || 'creative';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    message.error('Download failed. Please try again.');
+  }
+}
+
+// ── TruncCell ────────────────────────────────────────────────────────────────
 function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?: number; mono?: boolean }) {
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
   return (
@@ -93,27 +121,72 @@ function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?:
   );
 }
 
+// ── TrackerCell — with copy icon ─────────────────────────────────────────────
 function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }) {
+  const [copied, setCopied] = useState(false);
+
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
+
   const isValid = type === 'click' ? isValidClickUrl(value) : isValidVideoTag(value);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      message.success({ content: 'Copied to clipboard!', duration: 1.5 });
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      message.error('Failed to copy');
+    });
+  };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 60 }}>
+      {/* Validation dot */}
       <div style={{
         width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
         background: isValid ? '#16a34a' : '#ef4444',
       }} />
+
+      {/* Truncated value */}
       <Tooltip title={value} placement="topLeft">
         <span style={{
           fontSize: 12, color: SLATE,
           fontFamily: '"Fira Code", monospace',
           overflow: 'hidden', textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap', maxWidth: 150, cursor: 'default',
+          whiteSpace: 'nowrap', maxWidth: 110, cursor: 'default',
         }}>{value}</span>
+      </Tooltip>
+
+      {/* Copy button */}
+      <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'}>
+        <button
+          onClick={handleCopy}
+          style={{
+            background: copied ? '#f0fdf4' : '#f8fafc',
+            border: `1px solid ${copied ? '#86efac' : '#e2e8f0'}`,
+            borderRadius: 4,
+            cursor: 'pointer',
+            padding: '2px 5px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            outline: 'none',
+          }}
+        >
+          {copied
+            ? <CheckOutlined style={{ fontSize: 10, color: '#16a34a' }} />
+            : <CopyOutlined style={{ fontSize: 10, color: SLATE_500 }} />
+          }
+        </button>
       </Tooltip>
     </div>
   );
 }
 
+// ── Video Preview Modal ──────────────────────────────────────────────────────
 function VideoPreviewModal({ visible, url, name, onClose }: {
   visible: boolean; url?: string; name?: string; onClose: () => void;
 }) {
@@ -124,17 +197,18 @@ function VideoPreviewModal({ visible, url, name, onClose }: {
       footer={null}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <PlayCircleOutlined style={{ color: BLUE }} />
+          <PlayCircleOutlined style={{ color: PURPLE }} />
           <span style={{ fontSize: 13, fontWeight: 700 }}>{name || 'Preview'}</span>
         </div>
       }
-      width={680}
+      width={720}
       centered
     >
       {url ? (
         <video
           src={url}
           controls
+          autoPlay
           style={{ width: '100%', borderRadius: 8, border: `1px solid ${SLATE_300}` }}
         />
       ) : (
@@ -154,6 +228,7 @@ function colHead(): React.CSSProperties {
   };
 }
 
+// ── Main Component ───────────────────────────────────────────────────────────
 export default function Video_Creatives() {
   const [collapsed, setCollapsed] = useState(false);
   const sideWidth = collapsed ? 64 : 240;
@@ -175,13 +250,11 @@ export default function Video_Creatives() {
 
         campaigns.forEach(campaign => {
           (campaign.line_items ?? []).forEach(li => {
-            const fmt = Array.isArray(li.ad_format) ? li.ad_format[0] : li.ad_format;
-            const isVideo = ['video', 'youtube'].includes((fmt ?? '').toLowerCase());
-            if (!isVideo) return;
-
+            if (!isVideoFormat(li.ad_format)) return;
             (li.creatives ?? []).forEach((cr, idx) => {
               flat.push({
                 key: `${campaign.campaign_id}_${li.line_item_id}_${idx}`,
+                creativeId: (cr as any).id,   // ← add this
                 campaignId: campaign.campaign_id,
                 campaignName: campaign.campaign_name,
                 advertiser: campaign.advertiser ?? '',
@@ -222,6 +295,21 @@ export default function Video_Creatives() {
     ));
   }, [search, rows]);
 
+  // ── Download handler ─────────────────────────────────────────────────────
+  const handleDownload = (e: React.MouseEvent, record: VideoCreativeRow) => {
+    e.stopPropagation();
+    if (!record.creativeId) {
+      message.warning('No asset available to download');
+      return;
+    }
+    const downloadUrl = `https://grinch-revocable-cornflake.ngrok-free.dev/download_creative/${record.creativeId}/`;
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
   const withAsset = rows.filter(r => r.mainAssetUrl).length;
   const withClickUrl = rows.filter(r => r.clickThroughUrl && isValidClickUrl(r.clickThroughUrl)).length;
   const withTag = rows.filter(r => r.appendedHtmlTag && isValidVideoTag(r.appendedHtmlTag)).length;
@@ -239,54 +327,56 @@ export default function Video_Creatives() {
       ),
     },
     {
-      title: <span style={colHead()}>Creative Name</span>,
-      dataIndex: 'creativeName',
-      key: 'creativeName',
-      width: 200, fixed: 'left',
+      title: <span style={colHead()}>Campaign</span>,
+      dataIndex: 'campaignId', key: 'campaignId', width: 160, fixed: 'left',
       render: (v: string, record: VideoCreativeRow) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: PURPLE,
+            background: PURPLE_LIGHT, padding: '2px 6px',
+            borderRadius: 4, fontFamily: 'monospace',
+            display: 'block', marginBottom: 2,
+          }}>{v}</span>
+          <Tooltip title={record.campaignName}>
+            <span style={{
+              fontSize: 10, color: SLATE_500,
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap', display: 'block', maxWidth: 140,
+            }}>{record.campaignName}</span>
+          </Tooltip>
+        </div>
+      ),
+    },
+    {
+      title: <span style={colHead()}>Creative Name</span>,
+      dataIndex: 'creativeName', key: 'creativeName', width: 240, fixed: 'left',
+      render: (v: string, record: VideoCreativeRow) => (
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+          onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
+        >
           <div style={{
-            width: 28, height: 28, borderRadius: 6, background: '#faf5ff',
-            border: `1px solid ${PURPLE_MID}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', flexShrink: 0,
+            width: 32, height: 32, borderRadius: 6,
+            background: PURPLE_LIGHT, border: `1px solid ${PURPLE_MID}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <PlayCircleOutlined style={{ fontSize: 13, color: PURPLE }} />
+            <PlayCircleOutlined style={{ fontSize: 16, color: PURPLE }} />
           </div>
           <div>
-            <Tooltip title={v} placement="topLeft">
+            <Tooltip title="Click to preview" placement="topLeft">
               <span style={{
-                fontSize: 12, fontWeight: 600, color: SLATE,
+                fontSize: 12, fontWeight: 600, color: PURPLE,
                 display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', maxWidth: 140,
+                whiteSpace: 'nowrap', maxWidth: 170,
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+                textUnderlineOffset: 3,
               }}>{v}</span>
             </Tooltip>
             <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
           </div>
         </div>
       ),
-    },
-    {
-      title: <span style={colHead()}>Main Asset</span>,
-      key: 'mainAsset', width: 180,
-      render: (_: any, record: VideoCreativeRow) => {
-        const hasAsset = record.mainAssetUrl || record.mainAssetName;
-        return hasAsset ? (
-          <Tooltip title={record.mainAssetName} placement="topLeft">
-            <Tag
-              icon={<PlayCircleOutlined />}
-              color="purple"
-              style={{
-                cursor: 'pointer', maxWidth: 155,
-                overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', fontSize: 11,
-              }}
-              onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
-            >
-              {record.mainAssetName}
-            </Tag>
-          </Tooltip>
-        ) : <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
-      },
     },
     {
       title: <span style={colHead()}>Dimensions</span>,
@@ -315,7 +405,7 @@ export default function Video_Creatives() {
     },
     {
       title: <span style={colHead()}>Click-through URL</span>,
-      dataIndex: 'clickThroughUrl', key: 'clickThroughUrl', width: 200,
+      dataIndex: 'clickThroughUrl', key: 'clickThroughUrl', width: 220,
       render: (v: string) => <TrackerCell value={v} type="click" />,
     },
     {
@@ -325,7 +415,7 @@ export default function Video_Creatives() {
           <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8', textTransform: 'none' }}>optional</span>
         </span>
       ),
-      dataIndex: 'appendedHtmlTag', key: 'appendedHtmlTag', width: 200,
+      dataIndex: 'appendedHtmlTag', key: 'appendedHtmlTag', width: 220,
       render: (v: string) => <TrackerCell value={v} type="html" />,
     },
     {
@@ -348,57 +438,43 @@ export default function Video_Creatives() {
       dataIndex: 'notes', key: 'notes', width: 160,
       render: (v: string) => <TruncCell value={v} />,
     },
-    {
-      title: <span style={colHead()}>Campaign</span>,
-      dataIndex: 'campaignId', key: 'campaignId', width: 150,
-      render: (v: string, record: VideoCreativeRow) => (
-        <div>
-          <span style={{
-            fontSize: 11, fontWeight: 700, color: PURPLE,
-            background: PURPLE_LIGHT, padding: '2px 6px',
-            borderRadius: 4, fontFamily: 'monospace', display: 'block', marginBottom: 2,
-          }}>{v}</span>
-          <Tooltip title={record.campaignName}>
-            <span style={{
-              fontSize: 10, color: SLATE_500,
-              overflow: 'hidden', textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap', display: 'block', maxWidth: 130,
-            }}>{record.campaignName}</span>
-          </Tooltip>
-        </div>
-      ),
-    },
+    // ── Actions column ──────────────────────────────────────────────────────
     {
       title: <span style={colHead()}>Actions</span>,
-      key: 'actions', width: 90, fixed: 'right',
-      render: (_: any, record: VideoCreativeRow) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Tooltip title="Preview">
+      key: 'actions',
+      width: 130,
+      fixed: 'right',
+      render: (_: any, record: VideoCreativeRow) => {
+        const hasAsset = !!record.creativeId;  // ← creativeId, not mainAssetUrl
+
+        return (
+          <Tooltip title={hasAsset ? 'Download video asset' : 'No asset available'}>
             <Button
-              size="small" icon={<EyeOutlined />}
-              onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
+              size="small"
+              icon={<DownloadOutlined style={{ fontSize: 12 }} />}
+              onClick={(e) => handleDownload(e, record)}
+              disabled={!hasAsset}
               style={{
-                color: PURPLE, background: PURPLE_LIGHT,
-                border: `1px solid ${PURPLE_MID}`, borderRadius: 6,
-                width: 28, height: 28, padding: 0,
+                height: 30,
+                padding: '0 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: hasAsset ? PURPLE : SLATE_300,
+                background: hasAsset ? PURPLE_LIGHT : '#f8fafc',
+                border: `1px solid ${hasAsset ? PURPLE_MID : SLATE_300}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: hasAsset ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
               }}
-            />
+            >
+              Download
+            </Button>
           </Tooltip>
-          {record.mainAssetUrl && (
-            <Tooltip title="Download">
-              <Button
-                size="small" icon={<DownloadOutlined />}
-                href={record.mainAssetUrl} download
-                style={{
-                  color: GREEN, background: GREEN_LIGHT,
-                  border: `1px solid ${GREEN_BORDER}`, borderRadius: 6,
-                  width: 28, height: 28, padding: 0,
-                }}
-              />
-            </Tooltip>
-          )}
-        </div>
-      ),
+        );
+      },
     },
   ];
 
@@ -419,13 +495,11 @@ export default function Video_Creatives() {
             <div style={{ fontSize: 16, fontWeight: 700, color: SLATE }}>Video Creatives</div>
             <div style={{ fontSize: 11, color: SLATE_500, letterSpacing: '0.04em' }}>ALL VIDEO CREATIVES ACROSS CAMPAIGNS</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%', background: PURPLE,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: WHITE, fontSize: 13, fontWeight: 700,
-            }}>CT</div>
-          </div>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%', background: PURPLE,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: WHITE, fontSize: 13, fontWeight: 700,
+          }}>CT</div>
         </header>
 
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
@@ -455,7 +529,7 @@ export default function Video_Creatives() {
             ))}
           </div>
 
-          {/* Filters bar */}
+          {/* Filters */}
           <div style={{
             background: WHITE, borderRadius: 12, padding: '14px 20px',
             border: `1px solid ${SLATE_300}`, marginBottom: 16,
@@ -488,6 +562,14 @@ export default function Video_Creatives() {
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
               Invalid / missing tracker
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <CopyOutlined style={{ fontSize: 11, color: SLATE_500 }} />
+              <span>Click copy icon to copy URL / tag</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
+              <PlayCircleOutlined style={{ fontSize: 11, color: PURPLE }} />
+              <span>Click creative name to preview</span>
+            </div>
           </div>
 
           {/* Table */}
@@ -501,7 +583,7 @@ export default function Video_Creatives() {
               dataSource={filtered}
               rowKey="key"
               loading={loading}
-              scroll={{ x: 1800 }}
+              scroll={{ x: 1900 }}
               pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t, r) => `${r[0]}–${r[1]} of ${t}` }}
               locale={{
                 emptyText: (
