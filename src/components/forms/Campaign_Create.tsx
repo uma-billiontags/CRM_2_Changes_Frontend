@@ -10,7 +10,7 @@ import {
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs'; 
 import isBetween from 'dayjs/plugin/isBetween';
 import '../styles/Campaign_Create.css';
 import Sidebar from '../shared/Sidebar';
@@ -21,7 +21,7 @@ dayjs.extend(isBetween);
 const { TextArea } = Input;
 
 const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00003/';
+const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00007/';
 const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
@@ -44,29 +44,8 @@ const CPC_RATES: Record<string, number> = {
   youtube: 1.25,
 };
 
-// Country → currency symbol map (extend as needed)
-const COUNTRY_CURRENCY: Record<string, string> = {
-  'India': '₹',
-  'United States': '$',
-  'United Kingdom': '£',
-  'Germany': '€',
-  'France': '€',
-  'Japan': '¥',
-  'Canada': 'CA$',
-  'Australia': 'A$',
-  'Singapore': 'S$',
-  'UAE': 'AED',
-  'Saudi Arabia': 'SAR',
-};
-
-function getCurrencySymbol(geoLocations: GeoLocation[]): string {
-  for (const loc of geoLocations) {
-    if (loc.country && COUNTRY_CURRENCY[loc.country]) {
-      return COUNTRY_CURRENCY[loc.country];
-    }
-  }
-  return '$'; // default
-}
+// Keep the old one for backward compat but it won't be used:
+// function getCurrencySymbol(geoLocations: GeoLocation[]): string { ... }
 
 export interface SavedDraft {
   draftId: string;
@@ -158,7 +137,8 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
     ctrNotes: '',
     unitCost: '',   // ← add this
     adSubFormatOpen: false,  // ← add
-    adSubFormat: ''
+    adSubFormat: [],
+    rate: '',   // ← add this
   };
 }
 
@@ -233,6 +213,14 @@ const AD_FORMAT_SUB_OPTIONS: Record<string, { value: string; label: string }[]> 
     { value: 'desktop', label: 'Desktop' },
     { value: 'mobile', label: 'Mobile' },
   ],
+};
+
+// Add this constant
+const AD_FORMAT_DEFAULT_SUBS: Record<string, string[]> = {
+  banner: ['desktop', 'mobile'],
+  video: ['desktop', 'mobile'],
+  youtube: ['desktop', 'mobile'],
+  Interstitial: ['desktop', 'mobile'],
 };
 
 const IMAGE_FORMATS = ['banner', 'Interstitial'];
@@ -644,7 +632,7 @@ function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; c
 }
 
 // Step 1 
-function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
+function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl, setClientCountry, setClientCurrencySymbol }: any) {
   const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -654,10 +642,38 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => res.json())
-      .then(data => {
+      .then(async (data) => {
+        console.log('Client API response:', data);  // ← add this
+        console.log('Country field:', data.country); // ← add this
+
         setClientName(data.name || '');
         setClient(data.name || '');
         setClientId(data.client_id || '');
+
+        const country = data.country || '';
+        setClientCountry(country);
+
+        // ── Fetch currency symbol from REST Countries API ──
+        if (country) {
+          try {
+            const r = await fetch(
+              `https://restcountries.com/v3.1/name/${encodeURIComponent(country)}?fields=currencies`
+            );
+            const countryData = await r.json();
+            console.log('REST Countries response:', countryData);  // ← add this
+            console.log('Country searched:', country);             // ← add this
+            // currencies is { "INR": { name: "...", symbol: "₹" }, ... }
+            const currencies = countryData?.[0]?.currencies ?? {};
+            const firstCurrency = Object.values(currencies)[0] as { name: string; symbol: string } | undefined;
+            console.log('Currency found:', firstCurrency);         // ← add this
+
+            setClientCurrencySymbol(firstCurrency?.symbol ?? '$');
+          } catch (e) {
+            console.error('Currency fetch failed:', e);            // ← add this
+
+            setClientCurrencySymbol('$'); // fallback
+          }
+        }
       })
       .catch(() => setClientName('Failed to load'))
       .finally(() => setLoading(false));
@@ -977,11 +993,14 @@ interface ExtendedLineItemCardProps extends LineItemCardProps {
   allLineItemCreatives: LineItemCreativesMap;
   idConfirmed: boolean;
   geoLocations: GeoLocation[];
+  clientCountry: string;
+  clientCurrencySymbol: string;
 }
 
 function LineItemCard({
   item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove,
-  lineItemCreatives, allLineItemCreatives, idConfirmed, geoLocations
+  lineItemCreatives, allLineItemCreatives, idConfirmed, geoLocations,
+  clientCountry, clientCurrencySymbol   // ← add
 }: ExtendedLineItemCardProps) {
   const [dateError, setDateError] = useState('');
   const navigate = useNavigate();
@@ -1000,30 +1019,33 @@ function LineItemCard({
   const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
 
   // ── Unit Cost Calculation ──
-  const currencySymbol = getCurrencySymbol(geoLocations);
+  const currencySymbol = clientCurrencySymbol;  // ← comes directly from API now
+
 
   const calculatedUnitCost = useMemo(() => {
     const impressions = parseFloat(item.impressions);
     const unit = item.units;
     const adFormat = item.adFormat;
 
+    // Use edited rate if available, otherwise fall back to constant
+    const rate = parseFloat(item.rate) || (
+      unit === 'CPM' ? (CPM_RATES[adFormat] ?? 1) : (CPC_RATES[adFormat] ?? 1)
+    );
+
     if (!impressions || !unit || !adFormat) return null;
 
     if (unit === 'CPM') {
-      const rate = CPM_RATES[adFormat] ?? 1;
       const budget = (impressions * rate) / 1000;
       return { budget, rate, formula: `(${impressions.toLocaleString('en-IN')} × ${rate}) / 1000` };
     }
 
     if (unit === 'CPC') {
-      const rate = CPC_RATES[adFormat] ?? 1;
       const budget = impressions * rate;
       return { budget, rate, formula: `${impressions.toLocaleString('en-IN')} × ${rate}` };
     }
 
     return null;
-  }, [item.impressions, item.units, item.adFormat, item.ctr, geoLocations]);
-
+  }, [item.impressions, item.units, item.adFormat, item.rate, geoLocations]);  // ← add item.rate
   function validateDates(start: string, end: string): string {
     if (!campaignStart || !campaignEnd) return '';
     const cStart = dayjs(campaignStart);
@@ -1065,15 +1087,39 @@ function LineItemCard({
 
   function handleAdFormatChange(val: string) {
     onChange(item.id, 'adFormat', val ?? '');
-    onChange(item.id, 'adSubFormat', '');
+    // Auto-select default sub-formats for this format
+    onChange(item.id, 'adSubFormat', val ? (AD_FORMAT_DEFAULT_SUBS[val] ?? []) : []);
     onChange(item.id, 'adSubFormatOpen', false);
-    setExpandedFormat(null);   // ← add
+    setExpandedFormat(null);
+
+    if (val && item.units) {
+      const defaultRate = item.units === 'CPM'
+        ? (CPM_RATES[val] ?? 1)
+        : (CPC_RATES[val] ?? 1);
+      onChange(item.id, 'rate', String(defaultRate));
+    } else {
+      onChange(item.id, 'rate', '');
+    }
     if (!val) {
       onChange(item.id, 'ctr', '0.4');
       onChange(item.id, 'viewability', '70');
       onChange(item.id, 'vcr', '70');
     }
     if (!VIDEO_FORMATS.includes(val)) onChange(item.id, 'vcr', '70');
+  }
+
+  function handleUnitsChange(val: string) {
+    onChange(item.id, 'units', val ?? '');
+
+    // Auto-fill rate based on new units + current format
+    if (val && item.adFormat) {
+      const defaultRate = val === 'CPM'
+        ? (CPM_RATES[item.adFormat] ?? 1)
+        : (CPC_RATES[item.adFormat] ?? 1);
+      onChange(item.id, 'rate', String(defaultRate));
+    } else {
+      onChange(item.id, 'rate', '');
+    }
   }
 
   // Navigate to image upload page 
@@ -1223,24 +1269,7 @@ function LineItemCard({
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
-            <Input
-              placeholder="e.g. 1000000"
-              value={item.impressions}
-              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
-              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>}
-              style={{ height: 38 }}
-            />
-          </Form.Item>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
-            <Select
-              value={item.units || undefined}
-              onChange={(val: string) => onChange(item.id, 'units', val ?? '')}
-              placeholder="Select unit…"
-              style={{ width: '100%', height: 38 }}
-              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
-            />
-          </Form.Item>
+
           <Form.Item
             label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
             style={{ marginBottom: 14 }}
@@ -1248,9 +1277,14 @@ function LineItemCard({
             {(() => {
               const [expandedFormat, setExpandedFormat] = React.useState<string | null>(null);
 
+              // Build display value string
               const displayValue = item.adFormat
-                ? item.adSubFormat
-                  ? `${AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label} › ${AD_FORMAT_SUB_OPTIONS[item.adFormat]?.find(s => s.value === item.adSubFormat)?.label}`
+                ? item.adSubFormat.length > 0
+                  ? `${AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label} › ${(item.adSubFormat as string[])
+                    .map(s => AD_FORMAT_SUB_OPTIONS[item.adFormat]?.find(o => o.value === s)?.label)
+                    .filter(Boolean)
+                    .join(', ')
+                  }`
                   : AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label
                 : undefined;
 
@@ -1259,25 +1293,23 @@ function LineItemCard({
                   value={displayValue}
                   placeholder="Select format…"
                   style={{ width: '100%', height: 38 }}
-                  open={undefined}
                   dropdownRender={() => (
                     <div style={{ padding: '4px 0' }}>
                       {AD_FORMAT_OPTIONS.map(fmt => {
                         const isExpanded = expandedFormat === fmt.value;
                         const isSelected = item.adFormat === fmt.value;
                         const subOpts = AD_FORMAT_SUB_OPTIONS[fmt.value] || [];
+                        const selectedSubs: string[] = Array.isArray(item.adSubFormat) ? item.adSubFormat : [];
 
                         return (
                           <div key={fmt.value}>
-                            {/* Parent row */}
+                            {/* ── Parent row ── */}
                             <div
                               style={{
                                 display: 'flex', alignItems: 'center',
-                                padding: '7px 12px',
-                                cursor: 'pointer',
+                                padding: '7px 12px', cursor: 'pointer',
                                 background: isSelected ? '#eef2ff' : 'transparent',
-                                gap: 8,
-                                userSelect: 'none',
+                                gap: 8, userSelect: 'none',
                               }}
                               onMouseEnter={e => {
                                 if (!isSelected)
@@ -1296,17 +1328,14 @@ function LineItemCard({
                                 }
                               }}
                             >
-                              {/* +/- expand icon */}
+                              {/* Expand toggle */}
                               {subOpts.length > 0 ? (
                                 <div style={{
                                   width: 16, height: 16,
-                                  border: '1px solid #94a3b8',
-                                  borderRadius: 3,
+                                  border: '1px solid #94a3b8', borderRadius: 3,
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   fontSize: 13, color: '#64748b',
-                                  background: '#fff', flexShrink: 0,
-                                  lineHeight: 1,
-                                  fontWeight: 400,
+                                  background: '#fff', flexShrink: 0, lineHeight: 1, fontWeight: 400,
                                 }}>
                                   {isExpanded ? '−' : '+'}
                                 </div>
@@ -1317,28 +1346,66 @@ function LineItemCard({
                               <span style={{
                                 fontSize: 13,
                                 color: isSelected ? '#4f46e5' : '#1e293b',
-                                fontWeight: isSelected ? 600 : 400,
+                                fontWeight: isSelected ? 600 : 400, flex: 1,
                               }}>
                                 {fmt.label}
                               </span>
 
-                              {/* checkmark if selected with no sub */}
-                              {isSelected && !item.adSubFormat && (
-                                <CheckOutlined style={{ marginLeft: 'auto', fontSize: 11, color: '#4f46e5' }} />
+                              {/* Sub-selection summary badges */}
+                              {isSelected && selectedSubs.length > 0 && (
+                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                  {selectedSubs.map(s => {
+                                    const subLabel = AD_FORMAT_SUB_OPTIONS[fmt.value]?.find(o => o.value === s)?.label;
+                                    return (
+                                      <span key={s} style={{
+                                        fontSize: 9, fontWeight: 700,
+                                        color: '#4f46e5', background: '#eef2ff',
+                                        padding: '1px 5px', borderRadius: 3,
+                                        border: '1px solid #c7d2fe',
+                                      }}>{subLabel}</span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Checkmark if format selected with no subs */}
+                              {isSelected && subOpts.length === 0 && (
+                                <CheckOutlined style={{ fontSize: 11, color: '#4f46e5' }} />
                               )}
                             </div>
 
-                            {/* Sub-options — shown when expanded */}
+                            {/* ── Sub-options with checkboxes ── */}
                             {isExpanded && subOpts.length > 0 && (
                               <div style={{ background: '#fafbff' }}>
                                 {subOpts.map(sub => {
-                                  const isSubSelected = item.adFormat === fmt.value && item.adSubFormat === sub.value;
+                                  const isSubSelected = isSelected
+                                    ? selectedSubs.includes(sub.value)
+                                    : true; // pre-check all when previewing
+                                  const handleSubToggle = (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+
+                                    // First: select the parent format if not already
+                                    if (!isSelected) {
+                                      handleAdFormatChange(fmt.value);
+
+                                      return;
+                                    }
+
+                                    // Toggle this sub-option
+                                    const newSubs = isSubSelected
+                                      ? selectedSubs.filter(s => s !== sub.value)
+                                      : [...selectedSubs, sub.value];
+
+                                    onChange(item.id, 'adSubFormat', newSubs);
+                                  };
+
                                   return (
                                     <div
                                       key={sub.value}
+                                      onClick={handleSubToggle}
                                       style={{
                                         display: 'flex', alignItems: 'center',
-                                        padding: '6px 12px 6px 36px',
+                                        padding: '7px 12px 7px 36px',
                                         cursor: 'pointer',
                                         background: isSubSelected ? '#eef2ff' : 'transparent',
                                         gap: 8,
@@ -1351,19 +1418,20 @@ function LineItemCard({
                                         if (!isSubSelected)
                                           (e.currentTarget as HTMLDivElement).style.background = 'transparent';
                                       }}
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        handleAdFormatChange(fmt.value);
-                                        onChange(item.id, 'adSubFormat', sub.value);
-                                        setExpandedFormat(null);
-                                      }}
                                     >
-                                      {/* dot indicator */}
+                                      {/* Checkbox */}
                                       <div style={{
-                                        width: 6, height: 6, borderRadius: '50%',
-                                        background: isSubSelected ? '#6366f1' : '#cbd5e1',
-                                        flexShrink: 0,
-                                      }} />
+                                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                                        border: `2px solid ${isSubSelected ? '#4f46e5' : '#94a3b8'}`,
+                                        background: isSubSelected ? '#4f46e5' : '#fff',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.15s',
+                                      }}>
+                                        {isSubSelected && (
+                                          <CheckOutlined style={{ fontSize: 8, color: '#fff' }} />
+                                        )}
+                                      </div>
+
                                       <span style={{
                                         fontSize: 12.5,
                                         color: isSubSelected ? '#4f46e5' : '#374151',
@@ -1371,9 +1439,6 @@ function LineItemCard({
                                       }}>
                                         {sub.label}
                                       </span>
-                                      {isSubSelected && (
-                                        <CheckOutlined style={{ marginLeft: 'auto', fontSize: 11, color: '#4f46e5' }} />
-                                      )}
                                     </div>
                                   );
                                 })}
@@ -1393,53 +1458,6 @@ function LineItemCard({
               );
             })()}
           </Form.Item>
-          {/* Unit Cost Display */}
-          <Form.Item
-            label={
-              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-                Unit Cost (Budget)
-                {calculatedUnitCost && (
-                  <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
-                    Auto-calculated
-                  </span>
-                )}
-              </span>
-            }
-            style={{ marginBottom: 0 }}
-          >
-            {calculatedUnitCost ? (
-              <div style={{
-                height: 38, padding: '0 12px',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                border: '1.5px solid #86efac',
-                borderRadius: 6,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 8,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d', fontFamily: 'monospace' }}>
-                    {currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <span style={{ fontSize: 10.5, color: '#4ade80', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-                  = {calculatedUnitCost.formula}
-                </span>
-              </div>
-            ) : (
-              <div style={{
-                height: 38, padding: '0 12px',
-                background: '#f8fafc',
-                border: '1px dashed #cbd5e1',
-                borderRadius: 6,
-                display: 'flex', alignItems: 'center',
-                color: '#94a3b8', fontSize: 12.5, gap: 6,
-              }}>
-                <InfoCircleOutlined style={{ fontSize: 11 }} />
-                Enter impressions, ad format &amp; unit to calculate
-              </div>
-            )}
-          </Form.Item>
-
         </div>
 
         {/* Creatives Upload */}
@@ -1585,7 +1603,106 @@ function LineItemCard({
             )}
 
           </div>
-        </Form.Item>-
+        </Form.Item>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
+            <Input
+              placeholder="e.g. 1000000"
+              value={item.impressions}
+              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
+              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>}
+              style={{ height: 38 }}
+            />
+          </Form.Item>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
+            <Select
+              value={item.units || undefined}
+              onChange={handleUnitsChange}
+              placeholder="Select unit…"
+              style={{ width: '100%', height: 38 }}
+              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
+            />
+          </Form.Item>
+          {/* Rate input — shown only when units is selected */}
+
+          <Form.Item
+            label={
+              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Rate ({item.units})
+                <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                  Editable
+                </span>
+              </span>
+            }
+            style={{ marginBottom: 14 }}
+          >
+            <Input
+              placeholder={item.units === 'CPM' ? 'e.g. 1.25' : 'e.g. 1.00'}
+              value={item.rate}
+              onChange={e => {
+                const val = e.target.value.replace(/[^0-9.]/g, '');
+                onChange(item.id, 'rate', val);
+              }}
+              prefix={<span style={{ fontSize: 11, color: '#94a3b8' }}>{currencySymbol}</span>}
+              suffix={
+                <span style={{ fontSize: 10, color: '#94a3b8' }}>
+                  {item.units === 'CPM' ? 'per 1000 impr.' : 'per click'}
+                </span>
+              }
+              style={{ height: 38 }}
+            />
+          </Form.Item>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+          {/* Unit Cost Display */}
+          <Form.Item
+            label={
+              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Unit Cost (Budget)
+                {calculatedUnitCost && (
+                  <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                    Auto-calculated
+                  </span>
+                )}
+              </span>
+            }
+            style={{ marginBottom: 0 }}
+          >
+            {calculatedUnitCost ? (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1.5px solid #86efac',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d', fontFamily: 'monospace' }}>
+                    {currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <span style={{ fontSize: 10.5, color: '#4ade80', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                  = {calculatedUnitCost.formula}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center',
+                color: '#94a3b8', fontSize: 12.5, gap: 6,
+              }}>
+                <InfoCircleOutlined style={{ fontSize: 11 }} />
+                Enter impressions, ad format &amp; unit to calculate
+              </div>
+            )}
+          </Form.Item>
+        </div>
 
         {(showCTR || showVCR) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
@@ -1672,11 +1789,14 @@ interface Step4Props {
   lineItemOffset: number;
   confirmedLineItemIds: Set<string>;
   geoLocations: GeoLocation[];   // ← add
+  clientCountry: string;
+  clientCurrencySymbol: string;
 }
 
 function Step4LineItems({
   campaignStartDate, campaignEndDate, lineItems, setLineItems,
-  lineItemCreatives, lineItemOffset, confirmedLineItemIds, geoLocations
+  lineItemCreatives, lineItemOffset, confirmedLineItemIds, geoLocations,
+  clientCountry, clientCurrencySymbol      // ← add
 }: Step4Props) {
 
   function handleChange(id: string, field: keyof LineItem, value: any) {
@@ -1718,6 +1838,8 @@ function Step4LineItems({
           allLineItemCreatives={lineItemCreatives}
           idConfirmed={confirmedLineItemIds.has(item.id)}
           geoLocations={geoLocations}
+          clientCountry={clientCountry}   // ← add
+          clientCurrencySymbol={clientCurrencySymbol}   // ← add
         />
       ))}
 
@@ -1821,9 +1943,13 @@ function Step5Review({
                       value: li.adFormat
                         ? (() => {
                           const formatLabel = AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat;
-                          const subLabel = li.adSubFormat
-                            ? AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(s => s.value === li.adSubFormat)?.label
-                            : null;
+                          const subLabel =
+                            li.adSubFormat?.length
+                              ? AD_FORMAT_SUB_OPTIONS[li.adFormat]
+                                ?.filter(s => li.adSubFormat.includes(s.value))
+                                .map(s => s.label)
+                                .join(', ')
+                              : null;
                           return subLabel ? `${formatLabel} › ${subLabel}` : formatLabel;
                         })()
                         : '—'
@@ -1977,6 +2103,11 @@ export default function Campaign_Create() {
   const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
   const [advertiser, setAdvertiser] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
+
+  // After clientId state, add:
+  const [clientCountry, setClientCountry] = useState<string>('');
+  // Add alongside clientCountry state:
+  const [clientCurrencySymbol, setClientCurrencySymbol] = useState<string>('$');
 
   // Step 2
   const [campaignName, setCampaignName] = useState<string>(restoredData?.campaignName ?? '');
@@ -2163,9 +2294,13 @@ export default function Campaign_Create() {
         }
 
         // Build display adFormat string separately
+        // In Step5Review and handleSubmit adFormatDisplay:
         const adFormatDisplay = li.adFormat
-          ? li.adSubFormat
-            ? `${AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat} › ${AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(s => s.value === li.adSubFormat)?.label ?? li.adSubFormat}`
+          ? Array.isArray(li.adSubFormat) && li.adSubFormat.length > 0
+            ? `${AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat} › ${li.adSubFormat
+              .map((s: string) => AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(o => o.value === s)?.label ?? s)
+              .join(', ')
+            }`
             : AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat
           : '';
         return {
@@ -2181,7 +2316,10 @@ export default function Campaign_Create() {
           vcr: li.vcr,
           kpi_notes: li.ctrNotes || '',       // single combined KPI notes field
           adFormat: adFormatDisplay,   // combined label for display/storage
-          unit_cost: unitCostBudget,   // now correctly calculated
+          unit_cost: unitCostBudget !== ''
+            ? `${clientCurrencySymbol}${unitCostBudget}`
+            : '',
+          unit_value: li.rate || '',   // ← add this
 
 
           // ✅ Standard creatives only
@@ -2383,6 +2521,8 @@ export default function Campaign_Create() {
                   <Step1
                     client={client} setClient={setClient}
                     setClientId={setClientId}
+                    setClientCountry={setClientCountry}
+                    setClientCurrencySymbol={setClientCurrencySymbol}   // ← add
                     advertiser={advertiser} setAdvertiser={setAdvertiser}
                     websiteUrl={websiteUrl} setWebsiteUrl={setWebsiteUrl}
                   />
@@ -2422,6 +2562,8 @@ export default function Campaign_Create() {
                     lineItemOffset={lineItemOffset}
                     confirmedLineItemIds={confirmedLineItemIds}
                     geoLocations={geoLocations}
+                    clientCountry={clientCountry}   // ← add
+                    clientCurrencySymbol={clientCurrencySymbol}   // ← add
                   />
                 )}
                 {activeStep === 5 && (

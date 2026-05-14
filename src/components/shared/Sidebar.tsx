@@ -42,6 +42,7 @@ const CREATIVE_NAV = [
       { label: 'Dashboard',         icon: LayoutDashboard, to: '/creative_dashboard' },
       { label: 'Image Creatives',   icon: Image,           to: '/image_creatives' },
       { label: 'Video Creatives',   icon: Video,           to: '/video_creatives' },
+      { label: 'Third-Party Creatives', icon: FileText,    to: '/third_party_creatives' },
     ],
   },
   {

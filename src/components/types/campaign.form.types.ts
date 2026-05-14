@@ -14,7 +14,8 @@ export interface LineItem {
   ctrNotes: string;    // new
   unitCost: string;  // ← add this
   adSubFormatOpen: boolean;   // ← add
-  adSubFormat: string; 
+  adSubFormat: string[]; 
+  rate: string;  // editable rate field
 }
 
 export interface GeoLocation {

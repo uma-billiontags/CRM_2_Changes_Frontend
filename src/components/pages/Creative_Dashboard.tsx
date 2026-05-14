@@ -26,7 +26,7 @@ interface CreativeDetail {
   dimensions?: string;
   click_through_url?: string;
   appended_html_tag?: string;
-  input_file_name?: string;
+  input_file?: string;
   backup_image_name?: string;
 }
 
@@ -43,7 +43,7 @@ interface LineItem {
   creatives?: CreativeDetail[];
   image_creatives?: string[];
   video_creatives?: string[];
-  third_party_creatives?: { input_file_name?: string; backup_image_name?: string }[];
+  third_party_creatives?: { input_file?: string; backup_image_name?: string }[];
 }
 
 interface Campaign {
@@ -150,19 +150,16 @@ function CreativesCell({ li }: { li: LineItem }) {
       ))}
 
       {/* Third party */}
-      {/* Third party */}
       {allThirdParty.map((tp, i) => {
-        const fileName = tp.input_file_name || `Third Party ${i + 1}`;
-        const ext = fileName.split('.').pop()?.toUpperCase();
+        const fileName = (tp.input_file ? tp.input_file.split('/').pop() : undefined)
+          || `Third Party ${i + 1}`;
+
+        const ext = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : null;
+
         return (
           <div key={`tp-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{
-              fontSize: 9, fontWeight: 700, color: '#92400e',
-              background: '#fef3c7', padding: '1px 5px',
-              borderRadius: 3, border: '1px solid #fcd34d',
-              flexShrink: 0,
-            }}>3P</span>
-            {ext && ext !== fileName.toUpperCase() && (
+           
+            {ext && (
               <span style={{
                 fontSize: 9, fontWeight: 700, color: '#92400e',
                 background: '#fff7ed', padding: '1px 5px',

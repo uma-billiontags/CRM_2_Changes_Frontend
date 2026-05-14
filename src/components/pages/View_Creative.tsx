@@ -1,4 +1,4 @@
-import React,{ useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Spin, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
@@ -35,7 +35,7 @@ interface CreativeDetail {
     appended_html_tag?: string;
     integration_code?: string;
     notes?: string;
-    input_file_name?: string;
+    input_file?: string;
     backup_image_name?: string;
 }
 
@@ -55,7 +55,7 @@ interface LineItem {
     creatives?: CreativeDetail[];
     image_creatives?: string[];
     video_creatives?: string[];
-    third_party_creatives?: { input_file_name?: string; backup_image_name?: string }[];
+    third_party_creatives?: { input_file: string; backup_image_name?: string }[];
 }
 
 interface Campaign {
@@ -84,14 +84,6 @@ const VidBadge = () => (
         background: PURPLE_LIGHT, padding: '1px 6px',
         borderRadius: 4, border: `1px solid ${PURPLE_MID}`, flexShrink: 0,
     }}>VID</span>
-);
-
-const ThirdPartyBadge = () => (
-    <span style={{
-        fontSize: 10, fontWeight: 700, color: '#92400e',
-        background: '#fef3c7', padding: '1px 7px',
-        borderRadius: 4, border: '1px solid #fcd34d', flexShrink: 0,
-    }}>3P</span>
 );
 
 // ── Same InfoRow / SectionHeader style as View_Campaign ──
@@ -398,7 +390,8 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
                             <>
                                 <SectionHeader title={`Third Party Creatives (${allThirdParty.length})`} />
                                 {allThirdParty.map((tp, i) => {
-                                    const fileName = tp.input_file_name || '';
+                                    const fileName = (tp.input_file ? tp.input_file.split('/').pop() : undefined)
+                                        || `Third Party ${i + 1}`;
                                     const ext = fileName.split('.').pop()?.toUpperCase() || '';
                                     const backupFileName = tp.backup_image_name || '';
 
@@ -414,7 +407,7 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
                                                 alt={i % 2 === 0}
                                                 value={
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                                        <ThirdPartyBadge />
+
                                                         {fileName ? (
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                                 {/* File extension pill */}

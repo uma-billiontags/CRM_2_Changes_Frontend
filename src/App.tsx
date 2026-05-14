@@ -15,6 +15,7 @@ import Creative_Dashboard from "./components/pages/Creative_Dashboard";
 import Image_Creatives from "./components/pages/Image_Creatives";
 import Video_Creatives from "./components/pages/Video_Creatives";
 import View_Creative from "./components/pages/View_Creative";
+import Third_Party_Creative from "./components/pages/Third_Party_Creative";
 
 function App() {
 
@@ -37,6 +38,7 @@ function App() {
         <Route path="/image_creatives" element={<Image_Creatives/>} />
         <Route path="/video_creatives" element={<Video_Creatives />} />
         <Route path="/creative/:campaign_id" element={<View_Creative />} />
+        <Route path="/third_party_creatives" element={<Third_Party_Creative />} />
       </Routes>
     </BrowserRouter>
   )
