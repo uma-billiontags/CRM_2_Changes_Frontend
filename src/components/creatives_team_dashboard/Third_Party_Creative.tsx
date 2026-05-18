@@ -14,8 +14,7 @@ import Sidebar from '../shared/Sidebar';
 const { Text } = Typography;
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const GET_CAMPAIGNS_URL =
-    'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/';
+const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 const BASE = 'https://grinch-revocable-cornflake.ngrok-free.dev';
 const MEDIA_BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Form, Input, Select, Button, DatePicker, InputNumber, Divider, message
@@ -8,7 +8,7 @@ import {
   PlusOutlined, BellOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
-  SaveOutlined,
+  SaveOutlined
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -21,24 +21,31 @@ dayjs.extend(isBetween);
 const { TextArea } = Input;
 
 const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00001/';
+// const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00007/';
 const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
 
-// ─── DRAFTS STORAGE KEY ───────────────────────────────────────────────────────
+// DRAFTS STORAGE KEY
 const ALL_DRAFTS_KEY = 'campaign_all_drafts';
 
-// ─── Draft list helpers ───────────────────────────────────────────────────────
-export function getAllDrafts(): SavedDraft[] {
-  try {
-    const raw = localStorage.getItem(ALL_DRAFTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+const CPM_RATES: Record<string, number> = {
+  banner: 1,
+  Interstitial: 1,
+  video: 1.25,
+  youtube: 1.25,
+};
+
+const CPC_RATES: Record<string, number> = {
+  banner: 1,
+  Interstitial: 1,
+  video: 1.25,
+  youtube: 1.25,
+};
+
+// Keep the old one for backward compat but it won't be used:
+// function getCurrencySymbol(geoLocations: GeoLocation[]): string { ... }
 
 export interface SavedDraft {
   draftId: string;
@@ -70,6 +77,16 @@ export interface SavedDraft {
   lineItems: LineItem[];
 }
 
+// Draft list helpers 
+export function getAllDrafts(): SavedDraft[] {
+  try {
+    const raw = localStorage.getItem(ALL_DRAFTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 function saveNewDraft(data: Omit<SavedDraft, 'draftId' | 'savedAt'>): string {
   const drafts = getAllDrafts();
   const draftId = `DRAFT-${Date.now()}`;
@@ -95,12 +112,17 @@ function updateExistingDraft(draftId: string, data: Omit<SavedDraft, 'draftId' |
 // Types
 type LineItemCreativesMap = Record<string, CreativeData[]>;
 
+// Line Item ID generator
 function generateLineItemId(index: number, offset: number = 1): string {
-  const userPrefix = 'USER';
+  const clientName = localStorage.getItem('client_name') ?? '';
+  const prefix = clientName
+    ? clientName.replace(/\s+/g, '').substring(0, 4).toUpperCase()
+    : 'USER';
   const paddedIndex = String(offset + index - 1).padStart(3, '0');
-  return `LI${userPrefix}${paddedIndex}`;
+  return `LI${prefix}${paddedIndex}`;
 }
 
+// Generate an empty line item with a unique ID based on the index and offset
 function emptyLineItem(index: number, offset: number = 1): LineItem {
   return {
     id: generateLineItemId(index, offset),
@@ -108,22 +130,29 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
     ethnicity: [],
     startDate: '',
     endDate: '',
-    adFormat: [],
+    adFormat: '',
     impressions: '',
-    units: [],
+    units: '',
     creatives: [],
-    ctr: '',
-    viewability: '',
-    vcr: '',
+    ctr: '0.4',
+    viewability: '70',
+    vcr: '70',
+    ctrNotes: '',
+    unitCost: '',   // ← add this
+    adSubFormatOpen: false,  // ← add
+    adSubFormat: [],
+    rate: '',   // ← add this
   };
 }
 
+// Draft management using sessionStorage
 function saveDraft(data: object) {
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
   } catch (e) { /* ignore */ }
 }
 
+// Returns the draft data or null if not found or on error
 function loadDraft(): Record<string, any> | null {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
@@ -133,6 +162,7 @@ function loadDraft(): Record<string, any> | null {
   }
 }
 
+// Clears the saved draft from sessionStorage
 function clearDraft() {
   try {
     sessionStorage.removeItem(DRAFT_KEY);
@@ -153,25 +183,55 @@ function consumeNavFlag(): boolean {
   }
 }
 
+// Line Item helpers 
 const ETHNICITY_OPTIONS = [
   'General', 'Asian', 'South Asian', 'African American',
   'Hispanic / Latino', 'Middle Eastern', 'Caucasian', 'Other',
 ];
 
-const UNITS_OPTIONS = ['CTR', 'CPC', 'CPM'];
+const UNITS_OPTIONS = ['CPM', 'CPC'];
 
 const AD_FORMAT_OPTIONS = [
   { value: 'banner', label: 'Banner' },
   { value: 'video', label: 'Video' },
   { value: 'youtube', label: 'Youtube' },
-  { value: 'intertitial', label: 'Intertitial' },
+  { value: 'Interstitial', label: 'Interstitial' },
 ];
 
-const IMAGE_FORMATS = ['banner', 'intertitial'];
+const AD_FORMAT_SUB_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  banner: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+  video: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+    { value: 'ctv', label: 'CTV' },
+  ],
+  youtube: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+  Interstitial: [
+    { value: 'desktop', label: 'Desktop' },
+    { value: 'mobile', label: 'Mobile' },
+  ],
+};
+
+// Add this constant
+const AD_FORMAT_DEFAULT_SUBS: Record<string, string[]> = {
+  banner: ['desktop', 'mobile'],
+  video: ['desktop', 'mobile'],
+  youtube: ['desktop', 'mobile'],
+  Interstitial: ['desktop', 'mobile'],
+};
+
+const IMAGE_FORMATS = ['banner', 'Interstitial'];
 const VIDEO_FORMATS = ['video', 'youtube'];
 
 const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
 
+// Validation helper to check if a line item has all required fields filled
 function isLineItemComplete(item: LineItem): boolean {
   return !!(
     item.lineItemName.trim() &&
@@ -181,24 +241,32 @@ function isLineItemComplete(item: LineItem): boolean {
   );
 }
 
+// Fetches all campaigns and their line items to determine the next available line item offset for unique ID generation
 async function fetchLastLineItemOffset(): Promise<number> {
   try {
+    const clientName = localStorage.getItem('client_name') ?? '';
+    const prefix = clientName
+      ? `LI${clientName.replace(/\s+/g, '').substring(0, 4).toUpperCase()}`
+      : 'LIUSER';
+
     const res = await fetch(GET_CAMPAIGNS_URL, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     });
     if (!res.ok) return 1;
     const data = await res.json();
+
     const allIds: string[] = [];
     (data || []).forEach((campaign: any) => {
       (campaign.line_items || []).forEach((li: any) => {
-        if (li.line_item_id && li.line_item_id.startsWith('LIUSER')) {
+        if (li.line_item_id && li.line_item_id.startsWith(prefix)) {
           allIds.push(li.line_item_id);
         }
       });
     });
+
     if (allIds.length === 0) return 1;
     const nums = allIds
-      .map(id => parseInt(id.replace('LIUSER', ''), 10))
+      .map(id => parseInt(id.replace(prefix, ''), 10))
       .filter(n => !isNaN(n));
     if (nums.length === 0) return 1;
     return Math.max(...nums) + 1;
@@ -207,7 +275,7 @@ async function fetchLastLineItemOffset(): Promise<number> {
   }
 }
 
-// ─── GeoTargeting ─────────────────────────────────────────────────────────────
+// GeoTargeting component for managing location-based targeting with dynamic country/state/city selection and addition
 function GeoTargeting({ locations, onAdd, onRemove }: {
   locations: GeoLocation[];
   onAdd: (l: GeoLocation & { zipcode: string; range: string }) => void;
@@ -402,12 +470,16 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+        {/* Country */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />Country
           </div>
           {addingCountry ? (
-            <Input autoFocus placeholder="Type and press Enter to save" value={newCountry}
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newCountry}
               suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
               style={{ height: 38 }}
               onChange={e => setNewCountry(e.target.value)}
@@ -418,21 +490,30 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
               onBlur={() => { setNewCountry(''); setAddingCountry(false); }}
             />
           ) : (
-            <Select showSearch allowClear placeholder={loadingCountries ? 'Loading…' : 'Select country…'}
-              loading={loadingCountries} style={{ width: '100%', height: 38 }}
-              value={country || undefined} onChange={v => handleCountryChange(v ?? '')}
+            <Select
+              showSearch allowClear
+              placeholder={loadingCountries ? 'Loading…' : 'Select country…'}
+              loading={loadingCountries}
+              style={{ width: '100%', height: 38 }}
+              value={country || undefined}
+              onChange={v => handleCountryChange(v ?? '')}
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
               dropdownRender={menu => dropdownFooter(setAddingCountry, menu)}
               options={countryOpts.map(c => ({ value: c, label: c }))}
             />
           )}
         </div>
+
+        {/* State */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />State
           </div>
           {addingState ? (
-            <Input autoFocus placeholder="Type and press Enter to save" value={newState}
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newState}
               suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
               style={{ height: 38 }}
               onChange={e => setNewState(e.target.value)}
@@ -443,21 +524,30 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
               onBlur={() => { setNewState(''); setAddingState(false); }}
             />
           ) : (
-            <Select showSearch allowClear placeholder={loadingStates ? 'Loading…' : 'Select state…'}
-              loading={loadingStates} style={{ width: '100%', height: 38 }}
-              value={state || undefined} onChange={v => handleStateChange(v ?? '')}
+            <Select
+              showSearch allowClear
+              placeholder={loadingStates ? 'Loading…' : 'Select state…'}
+              loading={loadingStates}
+              style={{ width: '100%', height: 38 }}
+              value={state || undefined}
+              onChange={v => handleStateChange(v ?? '')}
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
               dropdownRender={menu => dropdownFooter(setAddingState, menu)}
               options={stateOpts.map(s => ({ value: s, label: s }))}
             />
           )}
         </div>
+
+        {/* City */}
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: 'var(--blue)', marginRight: 4 }} />City
           </div>
           {addingCity ? (
-            <Input autoFocus placeholder="Type and press Enter to save" value={newCity}
+            <Input
+              autoFocus
+              placeholder="Type and press Enter to save"
+              value={newCity}
               suffix={<span style={{ fontSize: 11, color: '#aaa' }}>↵ Enter</span>}
               style={{ height: 38 }}
               onChange={e => setNewCity(e.target.value)}
@@ -468,9 +558,13 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
               onBlur={() => { setNewCity(''); setAddingCity(false); }}
             />
           ) : (
-            <Select showSearch allowClear placeholder={loadingCities ? 'Loading…' : 'Select city…'}
-              loading={loadingCities} style={{ width: '100%', height: 38 }}
-              value={city || undefined} onChange={v => setCity(v ?? '')}
+            <Select
+              showSearch allowClear
+              placeholder={loadingCities ? 'Loading…' : 'Select city…'}
+              loading={loadingCities}
+              style={{ width: '100%', height: 38 }}
+              value={city || undefined}
+              onChange={v => setCity(v ?? '')}
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
               dropdownRender={menu => dropdownFooter(setAddingCity, menu)}
               options={cityOpts.map(c => ({ value: c, label: c }))}
@@ -479,6 +573,7 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
         </div>
       </div>
 
+      {/* Row 2: Address, Zip, Range, Add */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 8 }}>
         <div>
           <div className="cc-geo-sub-label" style={{ color: 'var(--slate-500)', marginBottom: 4, fontSize: 12 }}>
@@ -496,7 +591,10 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
           <div className="cc-geo-sub-label" style={{ color: rangeEnabled ? 'var(--slate-500)' : 'var(--slate-300)', marginBottom: 4, fontSize: 12 }}>
             <EnvironmentOutlined style={{ color: rangeEnabled ? 'var(--blue)' : 'var(--slate-300)', marginRight: 4 }} />Range
           </div>
-          <Input placeholder="e.g. 10 km" value={range} disabled={!rangeEnabled}
+          <Input
+            placeholder="e.g. 10 km"
+            value={range}
+            disabled={!rangeEnabled}
             onChange={e => setRange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && rangeEnabled) handleAdd(); }}
             style={{ width: 100, height: 38, backgroundColor: rangeEnabled ? '#fff' : '#f5f5f5', cursor: rangeEnabled ? 'text' : 'not-allowed' }}
@@ -531,6 +629,7 @@ function GeoTargeting({ locations, onAdd, onRemove }: {
   );
 }
 
+// InfoBox component for displaying informational messages with variant styling (blue or amber)
 function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; children: React.ReactNode }) {
   return (
     <div className={`cc-info-box ${variant}`}>
@@ -540,21 +639,58 @@ function InfoBox({ variant = 'blue', children }: { variant?: 'blue' | 'amber'; c
   );
 }
 
-// ─── Step 1 ───────────────────────────────────────────────────────────────────
-function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl }: any) {
+// Step 1 
+function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, setWebsiteUrl, setClientCountry, setClientCurrencySymbol }: any) {
   const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(CLIENT_URL, {
-      method: 'GET',
+    const clientId = localStorage.getItem('client_id');
+    if (!clientId) {
+      setClientName('No client linked');
+      setLoading(false);
+      return;
+    }
+
+    fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/get_client/${clientId}/`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => res.json())
-      .then(data => {
+      .then(async (data) => {
+        console.log('Client API response:', data);  // ← add this
+        console.log('Country field:', data.country); // ← add this
+
         setClientName(data.name || '');
         setClient(data.name || '');
         setClientId(data.client_id || '');
+
+        // ← Add this line
+        localStorage.setItem('client_name', data.name || '');
+
+        const country = data.country || '';
+        setClientCountry(country);
+
+        // ── Fetch currency symbol from REST Countries API ──
+        if (country) {
+          try {
+            const r = await fetch(
+              `https://restcountries.com/v3.1/name/${encodeURIComponent(country)}?fields=currencies`
+            );
+            const countryData = await r.json();
+            console.log('REST Countries response:', countryData);  // ← add this
+            console.log('Country searched:', country);             // ← add this
+            // currencies is { "INR": { name: "...", symbol: "₹" }, ... }
+            const currencies = countryData?.[0]?.currencies ?? {};
+            const firstCurrency = Object.values(currencies)[0] as { name: string; symbol: string } | undefined;
+            console.log('Currency found:', firstCurrency);         // ← add this
+
+            setClientCurrencySymbol(firstCurrency?.symbol ?? '$');
+          } catch (e) {
+            console.error('Currency fetch failed:', e);            // ← add this
+
+            setClientCurrencySymbol('$'); // fallback
+          }
+        }
       })
       .catch(() => setClientName('Failed to load'))
       .finally(() => setLoading(false));
@@ -566,30 +702,52 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
         <Form.Item label="Company Name" required>
           <Input className="cc-company-name-input" value={loading ? 'Loading…' : clientName} disabled style={{ fontWeight: 600 }} />
         </Form.Item>
+
         <Form.Item label="Advertiser (Brand)" required>
-          <Select
-            value={advertiser || undefined}
-            onChange={setAdvertiser}
-            placeholder="Select an advertiser…"
-            options={toOpts(['Unilever India', 'Tata Digital', 'HDFC Bank', 'Myntra', 'Reliance Retail', 'Mahindra Group', 'Airtel India'])}
+          <Input
+            value={advertiser}
+            onChange={(e) => setAdvertiser(e.target.value)}
+            placeholder="Enter advertiser name…"
             style={{ width: '100%', height: 38 }}
           />
         </Form.Item>
         <InfoBox variant="blue">
           All campaigns, line items, creatives and reports will be mapped under the selected client and advertiser. This cannot be changed after creation.
         </InfoBox>
-        <Form.Item label="Website URL" name="websiteUrl" validateTrigger="onChange"
-          rules={[{ pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/, message: "Enter a valid URL starting with http:// or https://" }]}
+
+        <Form.Item
+          label="Website URL"
+          name="websiteUrl"
+          validateTrigger="onChange"
+          rules={[
+            {
+              pattern: /^(https?:\/\/)(localhost|\d{1,3}(\.\d{1,3}){3}|[\w\-]+(\.[\w\-]+)+)(:\d+)?(\/[^\s]*)?$/,
+              message: "Enter a valid URL starting with http:// or https://",
+            },
+          ]}
         >
-          <Input placeholder="https://" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} style={{ height: 38 }} />
+          <Input
+            placeholder="https://"
+            value={websiteUrl}
+            onChange={e => setWebsiteUrl(e.target.value)}
+            style={{ height: 38 }}
+          />
         </Form.Item>
       </Form>
     </div>
   );
 }
 
-// ─── Step 2 ───────────────────────────────────────────────────────────────────
-function Step2({ campaignId, campaignName, setCampaignName, clientCampaignId, setClientCampaignId, purchaseOrderId, setPurchaseOrderId, campaignType, setCampaignType, buyingType, setBuyingType, objective, setObjective, notes, setNotes, startDate, setStartDate, endDate, setEndDate }: any) {
+// Step 2
+function Step2({
+  campaignId, campaignName, setCampaignName,
+  clientCampaignId, setClientCampaignId,
+  purchaseOrderId, setPurchaseOrderId,
+  campaignType, setCampaignType,
+  buyingType, setBuyingType,
+  objective, setObjective,
+  notes, setNotes, startDate, setStartDate, endDate, setEndDate
+}: any) {
   return (
     <div className="cc-form-section-sm">
       <Form layout="vertical" className="cc-form">
@@ -604,6 +762,7 @@ function Step2({ campaignId, campaignName, setCampaignName, clientCampaignId, se
             </div>
           </Form.Item>
         </div>
+
         <div className="cc-row-grid">
           <Form.Item label="Client Campaign ID">
             <Input placeholder="Enter Client Campaign ID" value={clientCampaignId} onChange={e => setClientCampaignId(e.target.value)} style={{ height: 38 }} />
@@ -615,26 +774,45 @@ function Step2({ campaignId, campaignName, setCampaignName, clientCampaignId, se
             <Input placeholder="e.g. Summer Awareness 2024" value={campaignName} onChange={e => setCampaignName(e.target.value)} style={{ height: 38 }} />
           </Form.Item>
           <Form.Item label="Campaign Type" required>
-            <Select value={campaignType || undefined} onChange={setCampaignType} placeholder="Select type…"
+            <Select
+              value={campaignType || undefined}
+              onChange={setCampaignType}
+              placeholder="Select type…"
               options={toOpts(['Brand Awareness', 'Performance', 'Retargeting', 'Prospecting', 'Lead Generation'])}
               style={{ width: '100%', height: 38 }}
             />
           </Form.Item>
           <Form.Item label="Campaign Start Date" required>
-            <DatePicker style={{ width: '100%', height: 38 }} value={startDate ? dayjs(startDate) : null}
-              onChange={(_, ds) => setStartDate(typeof ds === 'string' ? ds : '')} />
+            <DatePicker
+              style={{ width: '100%', height: 38 }}
+              value={startDate ? dayjs(startDate) : null}
+              onChange={(_, ds) => setStartDate(typeof ds === 'string' ? ds : '')}
+            />
           </Form.Item>
           <Form.Item label="Campaign End Date" required>
-            <DatePicker style={{ width: '100%', height: 38 }} value={endDate ? dayjs(endDate) : null}
-              onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')} />
+            <DatePicker
+              style={{ width: '100%', height: 38 }}
+              value={endDate ? dayjs(endDate) : null}
+              onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')}
+            />
           </Form.Item>
           <Form.Item label="Buying Type" required>
-            <Select mode="multiple" value={buyingType} onChange={(vals: string[]) => setBuyingType(vals)}
-              placeholder="Select buying type…" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
+            <Select
+              mode="multiple"
+              value={buyingType}
+              onChange={(vals: string[]) => setBuyingType(vals)}
+              placeholder="Select buying type…"
+              style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
               optionRender={(option) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" readOnly checked={buyingType.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={buyingType.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
                   <span>{option.label}</span>
                 </div>
               )}
@@ -648,12 +826,16 @@ function Step2({ campaignId, campaignName, setCampaignName, clientCampaignId, se
             />
           </Form.Item>
           <Form.Item label="Campaign Objective" required>
-            <Select value={objective || undefined} onChange={setObjective} placeholder="Select objective…"
+            <Select
+              value={objective || undefined}
+              onChange={setObjective}
+              placeholder="Select objective…"
               options={toOpts(['Increase Brand Awareness', 'Drive Website Traffic', 'Generate Leads', 'Boost Sales', 'App Installs'])}
               style={{ width: '100%', height: 38 }}
             />
           </Form.Item>
         </div>
+
         <Form.Item label="Notes">
           <TextArea placeholder="Add any notes for internal reference" value={notes} onChange={e => setNotes(e.target.value)} rows={4} />
         </Form.Item>
@@ -662,40 +844,66 @@ function Step2({ campaignId, campaignName, setCampaignName, clientCampaignId, se
   );
 }
 
-// ─── Step 3 ───────────────────────────────────────────────────────────────────
+// Step 3 
 function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, platforms, setPlatforms, freqCap, setFreqCap, brandSafety, setBrandSafety, viewability, setViewability }: any) {
   return (
     <div className="cc-form-section">
       <Form layout="vertical" className="cc-form">
         <div className="cc-row-grid">
           <Form.Item label="Age" required>
-            <Select mode="multiple" value={age} onChange={(vals: string[]) => setAge(vals)}
-              placeholder="Select Age" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
+            <Select
+              mode="multiple"
+              value={age}
+              onChange={(vals: string[]) => setAge(vals)}
+              placeholder="Select Age"
+              style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
               optionRender={(option) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" readOnly checked={age.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={age.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
                   <span>{option.label}</span>
                 </div>
               )}
               options={[
-                { value: '18 to 24', label: '18 to 24' }, { value: '25 to 34', label: '25 to 34' },
-                { value: '35 to 44', label: '35 to 44' }, { value: '45 to 54', label: '45 to 54' },
-                { value: '55 to 64', label: '55 to 64' }, { value: 'Others', label: 'Others' },
+                { value: '18 to 24', label: '18 to 24' },
+                { value: '25 to 34', label: '25 to 34' },
+                { value: '35 to 44', label: '35 to 44' },
+                { value: '45 to 54', label: '45 to 54' },
+                { value: '55 to 64', label: '55 to 64' },
+                { value: 'Others', label: 'Others' },
               ]}
             />
           </Form.Item>
           <Form.Item label="Gender" required>
-            <Select mode='multiple' value={gender} onChange={(vals: string[]) => setGender(vals)}
-              placeholder="Select Gender" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
+            <Select
+              mode='multiple'
+              value={gender}
+              onChange={(vals: string[]) => setGender(vals)}
+              placeholder="Select Gender"
+              style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
               optionRender={(option) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" readOnly checked={gender.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={gender.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
                   <span>{option.label}</span>
                 </div>
               )}
-              options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]}
+              options={[
+                { value: 'Male', label: 'Male' },
+                { value: 'Female', label: 'Female' },
+              ]}
             />
           </Form.Item>
         </div>
@@ -723,20 +931,34 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
         </Form.Item>
 
         <Form.Item label="Platform / Inventory" required>
-          <Select mode="multiple" value={platforms} onChange={(vals: string[]) => setPlatforms(vals)}
-            placeholder="Select Platforms" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
+          <Select
+            mode="multiple"
+            value={platforms}
+            onChange={(vals: string[]) => setPlatforms(vals)}
+            placeholder="Select Platforms"
+            style={{ width: '100%' }}
+            maxTagCount="responsive"
+            menuItemSelectedIcon={null}
             optionRender={(option) => (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" readOnly checked={platforms.includes(option.value as string)}
-                  style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={platforms.includes(option.value as string)}
+                  style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                />
                 <span>{option.label}</span>
               </div>
             )}
             options={[
-              { value: 'Display', label: 'Display' }, { value: 'Video', label: 'Video' },
-              { value: 'PMP', label: 'PMP' }, { value: 'CTV', label: 'CTV' },
-              { value: 'Audio', label: 'Audio' }, { value: 'Native', label: 'Native' },
-              { value: 'DOOH', label: 'DOOH' }, { value: 'Mobile', label: 'Mobile' },
+              { value: 'Display', label: 'Display' },
+              { value: 'Video', label: 'Video' },
+              { value: 'PMP', label: 'PMP' },
+              { value: 'CTV', label: 'CTV' },
+              { value: 'Audio', label: 'Audio' },
+              { value: 'Native', label: 'Native' },
+              { value: 'DOOH', label: 'DOOH' },
+              { value: 'Mobile', label: 'Mobile' },
             ]}
           />
         </Form.Item>
@@ -744,21 +966,36 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
         <div className="cc-row-grid">
           <Form.Item label="Frequency Cap">
             <div className="cc-unit-input">
-              <InputNumber min={1} placeholder="e.g. 3" value={freqCap ? Number(freqCap) : undefined}
-                onChange={v => setFreqCap(String(v ?? ''))} style={{ width: 80, height: 38 }} />
+              <InputNumber
+                min={1}
+                placeholder="e.g. 3"
+                value={freqCap ? Number(freqCap) : undefined}
+                onChange={v => setFreqCap(String(v ?? ''))}
+                style={{ width: 80, height: 38 }}
+              />
               <span className="cc-unit-label">impressions / user</span>
             </div>
           </Form.Item>
           <Form.Item label="Brand Safety Level" required>
-            <Select value={brandSafety || undefined} onChange={setBrandSafety} placeholder="Select level…"
-              options={toOpts(['Standard', 'Strict', 'Custom'])} style={{ width: '100%', height: 38 }} />
+            <Select
+              value={brandSafety || undefined}
+              onChange={setBrandSafety}
+              placeholder="Select level…"
+              options={toOpts(['Standard', 'Strict', 'Custom'])}
+              style={{ width: '100%', height: 38 }}
+            />
           </Form.Item>
         </div>
 
         <Form.Item label="Viewability Goal">
           <div className="cc-unit-input">
-            <InputNumber min={0} max={100} placeholder="e.g. 70" value={viewability ? Number(viewability) : undefined}
-              onChange={v => setViewability(String(v ?? ''))} style={{ width: 80, height: 38 }} />
+            <InputNumber
+              min={0} max={100}
+              placeholder="e.g. 70"
+              value={viewability ? Number(viewability) : undefined}
+              onChange={v => setViewability(String(v ?? ''))}
+              style={{ width: 80, height: 38 }}
+            />
             <span className="cc-unit-label">%</span>
           </div>
         </Form.Item>
@@ -767,26 +1004,65 @@ function Step3({ age, setAge, gender, setGender, geoLocations, setGeoLocations, 
   );
 }
 
-// ─── LineItemCard ─────────────────────────────────────────────────────────────
+// LineItemCard 
 interface ExtendedLineItemCardProps extends LineItemCardProps {
   lineItemCreatives: LineItemCreativesMap;
   allLineItemCreatives: LineItemCreativesMap;
   idConfirmed: boolean;
+  geoLocations: GeoLocation[];
+  clientCountry: string;
+  clientCurrencySymbol: string;
 }
 
-function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove, lineItemCreatives, allLineItemCreatives, idConfirmed }: ExtendedLineItemCardProps) {
+function LineItemCard({
+  item, index, campaignStart, campaignEnd, onChange, onRemove, canRemove,
+  lineItemCreatives, allLineItemCreatives, idConfirmed, geoLocations,
+  clientCurrencySymbol   // ← add
+}: ExtendedLineItemCardProps) {
   const [dateError, setDateError] = useState('');
   const navigate = useNavigate();
 
-  const hasImageFormat = item.adFormat.some((f: string) => IMAGE_FORMATS.includes(f));
-  const hasVideoFormat = item.adFormat.some((f: string) => VIDEO_FORMATS.includes(f));
+  const hasImageFormat = IMAGE_FORMATS.includes(item.adFormat);
+  const hasVideoFormat = VIDEO_FORMATS.includes(item.adFormat);
+
   const showCTR = hasImageFormat || hasVideoFormat;
   const showViewability = hasImageFormat || hasVideoFormat;
   const showVCR = hasVideoFormat;
 
+  // Separate creative lists by type 
   const uploadedImageCreatives = lineItemCreatives[item.id + '_image'] || [];
   const uploadedVideoCreatives = lineItemCreatives[item.id + '_video'] || [];
 
+  const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
+
+  // ── Unit Cost Calculation ──
+  const currencySymbol = clientCurrencySymbol;  // ← comes directly from API now
+
+
+  const calculatedUnitCost = useMemo(() => {
+    const impressions = parseFloat(item.impressions);
+    const unit = item.units;
+    const adFormat = item.adFormat;
+
+    // Use edited rate if available, otherwise fall back to constant
+    const rate = parseFloat(item.rate) || (
+      unit === 'CPM' ? (CPM_RATES[adFormat] ?? 1) : (CPC_RATES[adFormat] ?? 1)
+    );
+
+    if (!impressions || !unit || !adFormat) return null;
+
+    if (unit === 'CPM') {
+      const budget = (impressions * rate) / 1000;
+      return { budget, rate, formula: `(${impressions.toLocaleString('en-IN')} × ${rate}) / 1000` };
+    }
+
+    if (unit === 'CPC') {
+      const budget = impressions * rate;
+      return { budget, rate, formula: `${impressions.toLocaleString('en-IN')} × ${rate}` };
+    }
+
+    return null;
+  }, [item.impressions, item.units, item.adFormat, item.rate, geoLocations]);  // ← add item.rate
   function validateDates(start: string, end: string): string {
     if (!campaignStart || !campaignEnd) return '';
     const cStart = dayjs(campaignStart);
@@ -826,33 +1102,72 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
     return current.isBefore(dayjs(campaignStart), 'day') || current.isAfter(dayjs(campaignEnd), 'day');
   }
 
-  function handleAdFormatChange(vals: string[]) {
-    onChange(item.id, 'adFormat', vals);
-    const hasVideo = vals.some((f: string) => VIDEO_FORMATS.includes(f));
-    if (!hasVideo) onChange(item.id, 'vcr', '');
-    if (vals.length === 0) {
-      onChange(item.id, 'ctr', '');
-      onChange(item.id, 'viewability', '');
-      onChange(item.id, 'vcr', '');
+  function handleAdFormatChange(val: string) {
+    onChange(item.id, 'adFormat', val ?? '');
+    // Auto-select default sub-formats for this format
+    onChange(item.id, 'adSubFormat', val ? (AD_FORMAT_DEFAULT_SUBS[val] ?? []) : []);
+    onChange(item.id, 'adSubFormatOpen', false);
+    setExpandedFormat(null);
+
+    if (val && item.units) {
+      const defaultRate = item.units === 'CPM'
+        ? (CPM_RATES[val] ?? 1)
+        : (CPC_RATES[val] ?? 1);
+      onChange(item.id, 'rate', String(defaultRate));
+    } else {
+      onChange(item.id, 'rate', '');
+    }
+    if (!val) {
+      onChange(item.id, 'ctr', '0.4');
+      onChange(item.id, 'viewability', '70');
+      onChange(item.id, 'vcr', '70');
+    }
+    if (!VIDEO_FORMATS.includes(val)) onChange(item.id, 'vcr', '70');
+  }
+
+  function handleUnitsChange(val: string) {
+    onChange(item.id, 'units', val ?? '');
+
+    // Auto-fill rate based on new units + current format
+    if (val && item.adFormat) {
+      const defaultRate = val === 'CPM'
+        ? (CPM_RATES[item.adFormat] ?? 1)
+        : (CPC_RATES[item.adFormat] ?? 1);
+      onChange(item.id, 'rate', String(defaultRate));
+    } else {
+      onChange(item.id, 'rate', '');
     }
   }
 
+  // Navigate to image upload page 
   const handleUploadCreatives = () => {
     setNavFlag();
-    navigate('/creative_upload', {
-      state: { lineItemId: item.id + '_image', returnTo: '/campaign_create', existingCreatives: uploadedImageCreatives, allLineItemCreatives }
+    navigate('/creative_image_upload', {
+      state: {
+        lineItemId: item.id + '_image',
+        returnTo: '/campaign_create',
+        existingCreatives: uploadedImageCreatives,
+        allLineItemCreatives,
+      }
     });
   };
 
+  // Navigate to video upload page 
   const handleUploadVideoCreatives = () => {
     setNavFlag();
     navigate('/creative_video_upload', {
-      state: { lineItemId: item.id + '_video', returnTo: '/campaign_create', existingCreatives: uploadedVideoCreatives, allLineItemCreatives }
+      state: {
+        lineItemId: item.id + '_video',
+        returnTo: '/campaign_create',
+        existingCreatives: uploadedVideoCreatives,
+        allLineItemCreatives,
+      }
     });
   };
 
   return (
     <div style={{ border: '0.5px solid var(--color-border-secondary, #e2e8f0)', borderRadius: 12, background: '#fff', padding: '20px 24px', marginBottom: 16 }}>
+      {/* ── Card Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
@@ -863,22 +1178,28 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </span>
         </div>
         {canRemove && (
-          <button onClick={() => onRemove(item.id)}
-            style={{ background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            onClick={() => onRemove(item.id)}
+            style={{ background: 'none', border: '0.5px solid #fca5a5', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
             <DeleteOutlined style={{ fontSize: 12 }} /> Remove
           </button>
         )}
       </div>
 
+      {/* ── Line Item ID Badge ── */}
       {idConfirmed && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '4px 10px' }}>
-            <span style={{ fontSize: 10.5, color: '#15803d', fontWeight: 500, letterSpacing: '0.05em', marginRight: 8 }}>Line Item ID:</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#14532d', fontFamily: 'monospace', letterSpacing: '0.03em' }}>{item.id}</span>
+            <div>
+              <span style={{ fontSize: 10.5, color: '#15803d', fontWeight: 500, letterSpacing: '0.05em', marginRight: 8 }}>Line Item ID:</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#14532d', fontFamily: 'monospace', letterSpacing: '0.03em' }}>{item.id}</span>
+            </div>
           </div>
         </div>
       )}
 
+      {/* ── Incomplete hint ── */}
       {!idConfirmed && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fffbeb', border: '1px dashed #fcd34d', borderRadius: 8, padding: '4px 10px' }}>
@@ -891,17 +1212,28 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
       )}
 
       <Form layout="vertical">
+        {/* Row: Line Item Name + Ethnicity */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Line Item Name <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
             <Input placeholder="e.g. Mumbai Display — 18-34" value={item.lineItemName} onChange={e => onChange(item.id, 'lineItemName', e.target.value)} style={{ height: 38 }} />
           </Form.Item>
           <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ethnicity</span>} style={{ marginBottom: 14 }}>
-            <Select mode="multiple" value={item.ethnicity} onChange={(vals: string[]) => onChange(item.id, 'ethnicity', vals)}
-              placeholder="Select ethnicity…" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
+            <Select
+              mode="multiple"
+              value={item.ethnicity}
+              onChange={(vals: string[]) => onChange(item.id, 'ethnicity', vals)}
+              placeholder="Select ethnicity…"
+              style={{ width: '100%' }}
+              maxTagCount="responsive"
+              menuItemSelectedIcon={null}
               optionRender={(option) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" readOnly checked={item.ethnicity.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={item.ethnicity.includes(option.value as string)}
+                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
+                  />
                   <span>{option.label}</span>
                 </div>
               )}
@@ -910,19 +1242,35 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </Form.Item>
         </div>
 
+        {/* Row: Start Date + End Date */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Start Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }} validateStatus={dateError ? 'error' : ''}>
-            <DatePicker style={{ width: '100%', height: 38 }} value={item.startDate ? dayjs(item.startDate) : null}
-              onChange={handleStartDate} disabledDate={disabledDate}
-              placeholder={campaignStart ? `From ${dayjs(campaignStart).format('DD MMM YYYY')}` : 'Select date'} />
+          <Form.Item
+            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Start Date <span style={{ color: '#ef4444' }}>*</span></span>}
+            style={{ marginBottom: dateError ? 4 : 14 }}
+            validateStatus={dateError ? 'error' : ''}
+          >
+            <DatePicker
+              style={{ width: '100%', height: 38 }}
+              value={item.startDate ? dayjs(item.startDate) : null}
+              onChange={handleStartDate}
+              disabledDate={disabledDate}
+              placeholder={campaignStart ? `From ${dayjs(campaignStart).format('DD MMM YYYY')}` : 'Select date'}
+            />
           </Form.Item>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>End Date <span style={{ color: '#ef4444' }}>*</span></span>}
-            style={{ marginBottom: dateError ? 4 : 14 }} validateStatus={dateError ? 'error' : ''}>
-            <DatePicker style={{ width: '100%', height: 38 }} value={item.endDate ? dayjs(item.endDate) : null}
-              onChange={handleEndDate} disabledDate={disabledDate}
-              placeholder={campaignEnd ? `Until ${dayjs(campaignEnd).format('DD MMM YYYY')}` : 'Select date'} />
+          <Form.Item
+            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>End Date <span style={{ color: '#ef4444' }}>*</span></span>}
+            style={{ marginBottom: dateError ? 4 : 14 }}
+            validateStatus={dateError ? 'error' : ''}
+          >
+            <DatePicker
+              style={{ width: '100%', height: 38 }}
+              value={item.endDate ? dayjs(item.endDate) : null}
+              onChange={handleEndDate}
+              disabledDate={disabledDate}
+              placeholder={campaignEnd ? `Until ${dayjs(campaignEnd).format('DD MMM YYYY')}` : 'Select date'}
+            />
           </Form.Item>
+
         </div>
 
         {dateError && (
@@ -931,42 +1279,244 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </div>
         )}
 
+        {campaignStart && campaignEnd && (
+          <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 14, background: '#f8fafc', borderRadius: 6, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4, border: '0.5px solid #e2e8f0' }}>
+            Line Item Date: {dayjs(campaignStart).format('DD MMM YYYY')} → {dayjs(campaignEnd).format('DD MMM YYYY')}
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
-            <Select mode="multiple" value={item.adFormat} onChange={handleAdFormatChange}
-              placeholder="Select format…" style={{ width: '100%' }} maxTagCount="responsive" menuItemSelectedIcon={null}
-              optionRender={(option) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" readOnly checked={item.adFormat.includes(option.value as string)}
-                    style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }} />
-                  <span>{option.label}</span>
-                </div>
-              )}
-              options={AD_FORMAT_OPTIONS}
-            />
-          </Form.Item>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
-            <Input placeholder="e.g. 1000000" value={item.impressions}
-              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
-              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>} style={{ height: 38 }} />
+
+          <Form.Item
+            label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Ad Format <span style={{ color: '#ef4444' }}>*</span></span>}
+            style={{ marginBottom: 14 }}
+          >
+            {(() => {
+              const [expandedFormat, setExpandedFormat] = React.useState<string | null>(null);
+
+              // Build display value string
+              const displayValue = item.adFormat
+                ? item.adSubFormat.length > 0
+                  ? `${AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label} › ${(item.adSubFormat as string[])
+                    .map(s => AD_FORMAT_SUB_OPTIONS[item.adFormat]?.find(o => o.value === s)?.label)
+                    .filter(Boolean)
+                    .join(', ')
+                  }`
+                  : AD_FORMAT_OPTIONS.find(f => f.value === item.adFormat)?.label
+                : undefined;
+
+              return (
+                <Select
+                  value={displayValue}
+                  placeholder="Select format…"
+                  style={{ width: '100%', height: 38 }}
+                  dropdownRender={() => (
+                    <div style={{ padding: '4px 0' }}>
+                      {AD_FORMAT_OPTIONS.map(fmt => {
+                        const isExpanded = expandedFormat === fmt.value;
+                        const isSelected = item.adFormat === fmt.value;
+                        const subOpts = AD_FORMAT_SUB_OPTIONS[fmt.value] || [];
+                        const selectedSubs: string[] = Array.isArray(item.adSubFormat) ? item.adSubFormat : [];
+
+                        return (
+                          <div key={fmt.value}>
+                            {/* ── Parent row ── */}
+                            <div
+                              style={{
+                                display: 'flex', alignItems: 'center',
+                                padding: '7px 12px', cursor: 'pointer',
+                                background: isSelected ? '#eef2ff' : 'transparent',
+                                gap: 8, userSelect: 'none',
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected)
+                                  (e.currentTarget as HTMLDivElement).style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={e => {
+                                if (!isSelected)
+                                  (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                              }}
+                              onClick={e => {
+                                e.stopPropagation();
+                                if (subOpts.length > 0) {
+                                  setExpandedFormat(isExpanded ? null : fmt.value);
+                                } else {
+                                  handleAdFormatChange(fmt.value);
+                                }
+                              }}
+                            >
+                              {/* Expand toggle */}
+                              {subOpts.length > 0 ? (
+                                <div style={{
+                                  width: 16, height: 16,
+                                  border: '1px solid #94a3b8', borderRadius: 3,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 13, color: '#64748b',
+                                  background: '#fff', flexShrink: 0, lineHeight: 1, fontWeight: 400,
+                                }}>
+                                  {isExpanded ? '−' : '+'}
+                                </div>
+                              ) : (
+                                <div style={{ width: 16, flexShrink: 0 }} />
+                              )}
+
+                              <span style={{
+                                fontSize: 13,
+                                color: isSelected ? '#4f46e5' : '#1e293b',
+                                fontWeight: isSelected ? 600 : 400, flex: 1,
+                              }}>
+                                {fmt.label}
+                              </span>
+
+                              {/* Sub-selection summary badges */}
+                              {isSelected && selectedSubs.length > 0 && (
+                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                  {selectedSubs.map(s => {
+                                    const subLabel = AD_FORMAT_SUB_OPTIONS[fmt.value]?.find(o => o.value === s)?.label;
+                                    return (
+                                      <span key={s} style={{
+                                        fontSize: 9, fontWeight: 700,
+                                        color: '#4f46e5', background: '#eef2ff',
+                                        padding: '1px 5px', borderRadius: 3,
+                                        border: '1px solid #c7d2fe',
+                                      }}>{subLabel}</span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Checkmark if format selected with no subs */}
+                              {isSelected && subOpts.length === 0 && (
+                                <CheckOutlined style={{ fontSize: 11, color: '#4f46e5' }} />
+                              )}
+                            </div>
+
+                            {/* ── Sub-options with checkboxes ── */}
+                            {isExpanded && subOpts.length > 0 && (
+                              <div style={{ background: '#fafbff' }}>
+                                {subOpts.map(sub => {
+                                  const isSubSelected = isSelected
+                                    ? selectedSubs.includes(sub.value)
+                                    : true; // pre-check all when previewing
+                                  const handleSubToggle = (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+
+                                    // First: select the parent format if not already
+                                    if (!isSelected) {
+                                      handleAdFormatChange(fmt.value);
+
+                                      return;
+                                    }
+
+                                    // Toggle this sub-option
+                                    const newSubs = isSubSelected
+                                      ? selectedSubs.filter(s => s !== sub.value)
+                                      : [...selectedSubs, sub.value];
+
+                                    onChange(item.id, 'adSubFormat', newSubs);
+                                  };
+
+                                  return (
+                                    <div
+                                      key={sub.value}
+                                      onClick={handleSubToggle}
+                                      style={{
+                                        display: 'flex', alignItems: 'center',
+                                        padding: '7px 12px 7px 36px',
+                                        cursor: 'pointer',
+                                        background: isSubSelected ? '#eef2ff' : 'transparent',
+                                        gap: 8,
+                                      }}
+                                      onMouseEnter={e => {
+                                        if (!isSubSelected)
+                                          (e.currentTarget as HTMLDivElement).style.background = '#f1f5f9';
+                                      }}
+                                      onMouseLeave={e => {
+                                        if (!isSubSelected)
+                                          (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                                      }}
+                                    >
+                                      {/* Checkbox */}
+                                      <div style={{
+                                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                                        border: `2px solid ${isSubSelected ? '#4f46e5' : '#94a3b8'}`,
+                                        background: isSubSelected ? '#4f46e5' : '#fff',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.15s',
+                                      }}>
+                                        {isSubSelected && (
+                                          <CheckOutlined style={{ fontSize: 8, color: '#fff' }} />
+                                        )}
+                                      </div>
+
+                                      <span style={{
+                                        fontSize: 12.5,
+                                        color: isSubSelected ? '#4f46e5' : '#374151',
+                                        fontWeight: isSubSelected ? 600 : 400,
+                                      }}>
+                                        {sub.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  allowClear
+                  onClear={() => {
+                    handleAdFormatChange('');
+                    setExpandedFormat(null);
+                  }}
+                />
+              );
+            })()}
           </Form.Item>
         </div>
 
-        <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>Creatives</span>} style={{ marginBottom: 14 }}>
+        {/* Creatives Upload */}
+        <Form.Item
+          label={<span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>Creatives</span>}
+          style={{ marginBottom: 14 }}
+        >
           {item.adFormat.length === 0 && (
             <div style={{ border: '1px dashed #d1d5db', borderRadius: 8, padding: '14px 16px', background: '#f9fafb', display: 'flex', alignItems: 'center', gap: 10 }}>
               <PlusOutlined style={{ fontSize: 16, color: '#d1d5db' }} />
               <div style={{ fontSize: 13, color: '#9ca3af' }}>Select an Ad Format above to enable upload</div>
             </div>
           )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {item.adFormat.includes('banner') && (
+
+            {/* ── BANNER / IMAGE ZONE ── */}
+            {item.adFormat === 'banner' && (
               <div>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <FileImageOutlined /> Images
                 </div>
-                <button type="button" onClick={handleUploadCreatives}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', border: '1px solid #93c5fd', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
+                <button
+                  type="button"
+                  onClick={handleUploadCreatives}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    height: 38, padding: '0 16px',
+                    border: '1px solid #93c5fd', borderRadius: 6,
+                    background: '#eff6ff', color: '#1d4ed8',
+                    fontWeight: 500, fontSize: 13, cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#dbeafe';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#3b82f6';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#93c5fd';
+                  }}
+                >
                   <FileImageOutlined style={{ fontSize: 14 }} />
                   Upload Image Creatives
                   {uploadedImageCreatives.length > 0 && (
@@ -975,15 +1525,66 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
                     </span>
                   )}
                 </button>
+
+                {uploadedImageCreatives.length > 0 && (
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {uploadedImageCreatives.map((creative: CreativeData, idx: number) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '5px 10px', background: '#f0fdf4',
+                        borderRadius: 6, border: '0.5px solid #86efac',
+                        maxWidth: 260,
+                      }}>
+                        {creative.main_asset && creative.main_asset.type?.startsWith('image/') ? (
+                          <img
+                            src={URL.createObjectURL(creative.main_asset)}
+                            alt={creative.creative_name}
+                            style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid #d1fae5' }}
+                          />
+                        ) : (
+                          <FileImageOutlined style={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
+                        )}
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: '#14532d', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {creative.creative_name || `Creative ${idx + 1}`}
+                          </div>
+                          {creative.dimensions && (
+                            <div style={{ fontSize: 10.5, color: '#4ade80' }}>{creative.dimensions}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            {item.adFormat.includes('video') && (
+
+            {/* ── VIDEO ZONE ── */}
+            {item.adFormat === 'video' && (
               <div>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <VideoCameraOutlined /> Videos
                 </div>
-                <button type="button" onClick={handleUploadVideoCreatives}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', border: '1px solid #ddd6fe', borderRadius: 6, background: '#f5f3ff', color: '#7c3aed', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
+                <button
+                  type="button"
+                  onClick={handleUploadVideoCreatives}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    height: 38, padding: '0 16px',
+                    border: '1px solid #ddd6fe', borderRadius: 6,
+                    background: '#eff6ff', color: '#1d4ed8',
+                    fontWeight: 500, fontSize: 13, cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#ede9fe';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#7c3aed';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#ddd6fe';
+                  }}
+                >
                   <VideoCameraOutlined style={{ fontSize: 14 }} />
                   Upload Video Creatives
                   {uploadedVideoCreatives.length > 0 && (
@@ -992,28 +1593,202 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
                     </span>
                   )}
                 </button>
+
+                {uploadedVideoCreatives.length > 0 && (
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {uploadedVideoCreatives.map((creative: CreativeData, idx: number) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '5px 10px', background: '#f0fdf4',
+                        borderRadius: 6, border: '0.5px solid #86efac',
+                        maxWidth: 260,
+                      }}>
+                        <VideoCameraOutlined style={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: '#14532d', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {creative.creative_name || `Video ${idx + 1}`}
+                          </div>
+                          {creative.dimensions && (
+                            <div style={{ fontSize: 10.5, color: '#4ade80' }}>{creative.dimensions}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
           </div>
         </Form.Item>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Impressions</span>} style={{ marginBottom: 14 }}>
+            <Input
+              placeholder="e.g. 1000000"
+              value={item.impressions}
+              onChange={e => onChange(item.id, 'impressions', e.target.value.replace(/[^0-9]/g, ''))}
+              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>impr.</span>}
+              style={{ height: 38 }}
+            />
+          </Form.Item>
+          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Units</span>} style={{ marginBottom: 14 }}>
+            <Select
+              value={item.units || undefined}
+              onChange={handleUnitsChange}
+              placeholder="Select unit…"
+              style={{ width: '100%', height: 38 }}
+              options={UNITS_OPTIONS.map(u => ({ value: u, label: u }))}
+            />
+          </Form.Item>
+          {/* Rate input — shown only when units is selected */}
+
+          <Form.Item
+            label={
+              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Rate ({item.units})
+                <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                  Editable
+                </span>
+              </span>
+            }
+            style={{ marginBottom: 14 }}
+          >
+            <Input
+              placeholder={item.units === 'CPM' ? 'e.g. 1.25' : 'e.g. 1.00'}
+              value={item.rate}
+              onChange={e => {
+                const val = e.target.value.replace(/[^0-9.]/g, '');
+                onChange(item.id, 'rate', val);
+              }}
+              prefix={<span style={{ fontSize: 11, color: '#94a3b8' }}>{currencySymbol}</span>}
+              suffix={
+                <span style={{ fontSize: 10, color: '#94a3b8' }}>
+                  {item.units === 'CPM' ? 'per 1000 impr.' : 'per click'}
+                </span>
+              }
+              style={{ height: 38 }}
+            />
+          </Form.Item>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+          {/* Unit Cost Display */}
+          <Form.Item
+            label={
+              <span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Unit Cost (Budget)
+                {calculatedUnitCost && (
+                  <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                    Auto-calculated
+                  </span>
+                )}
+              </span>
+            }
+            style={{ marginBottom: 0 }}
+          >
+            {calculatedUnitCost ? (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1.5px solid #86efac',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d', fontFamily: 'monospace' }}>
+                    {currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <span style={{ fontSize: 10.5, color: '#4ade80', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                  = {calculatedUnitCost.formula}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                height: 38, padding: '0 12px',
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center',
+                color: '#94a3b8', fontSize: 12.5, gap: 6,
+              }}>
+                <InfoCircleOutlined style={{ fontSize: 11 }} />
+                Enter impressions, ad format &amp; unit to calculate
+              </div>
+            )}
+          </Form.Item>
+        </div>
+
         {(showCTR || showVCR) && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 14 }}>
-            {showCTR && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>CTR</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 0.5" value={item.ctr} onChange={e => onChange(item.id, 'ctr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
-            {showViewability && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 70" value={item.viewability} onChange={e => onChange(item.id, 'viewability', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
-            {showVCR && (
-              <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>VCR</span>} style={{ marginBottom: 0 }}>
-                <Input placeholder="e.g. 60" value={item.vcr} onChange={e => onChange(item.id, 'vcr', e.target.value.replace(/[^0-9.]/g, ''))} suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-              </Form.Item>
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              {showCTR && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>CTR</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 0.4"
+                    value={item.ctr}
+                    onChange={e => {
+                      onChange(item.id, 'ctr', e.target.value.replace(/[^0-9.]/g, ''));
+                      if (!item.ctrNotes) onChange(item.id, 'ctrNotes', '');
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+              {showViewability && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 70"
+                    value={item.viewability}
+                    onChange={e => {
+                      onChange(item.id, 'viewability', e.target.value.replace(/[^0-9.]/g, ''));
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+              {showVCR && (
+                <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>VCR</span>} style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="e.g. 60"
+                    value={item.vcr}
+                    onChange={e => {
+                      onChange(item.id, 'vcr', e.target.value.replace(/[^0-9.]/g, ''));
+                    }}
+                    suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>}
+                    style={{ height: 38 }}
+                  />
+                </Form.Item>
+              )}
+            </div>
+
+            {/* Notes — shown only if any value differs from default */}
+            {(
+              (showCTR && item.ctr !== '0.4') ||
+              (showViewability && item.viewability !== '70') ||
+              (showVCR && item.vcr !== '70')
+            ) && (
+                <div style={{
+                  background: '#fffbeb', border: '1px dashed #fcd34d',
+                  borderRadius: 8, padding: '12px 14px',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <InfoCircleOutlined style={{ fontSize: 12, color: '#d97706' }} />
+                    You've changed one or more default values — add a note if needed
+                  </div>
+                  <Input.TextArea
+                    placeholder="e.g. CTR adjusted based on client brief, VCR target revised for mobile inventory…"
+                    value={item.ctrNotes}
+                    onChange={e => onChange(item.id, 'ctrNotes', e.target.value)}
+                    rows={2}
+                    style={{ fontSize: 12.5 }}
+                  />
+                </div>
+              )}
           </div>
         )}
       </Form>
@@ -1021,7 +1796,7 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
   );
 }
 
-// ─── Step 4 ───────────────────────────────────────────────────────────────────
+// Step 4 — Line Item Details 
 interface Step4Props {
   campaignStartDate: string;
   campaignEndDate: string;
@@ -1030,9 +1805,17 @@ interface Step4Props {
   lineItemCreatives: LineItemCreativesMap;
   lineItemOffset: number;
   confirmedLineItemIds: Set<string>;
+  geoLocations: GeoLocation[];   // ← add
+  clientCountry: string;
+  clientCurrencySymbol: string;
 }
 
-function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLineItems, lineItemCreatives, lineItemOffset, confirmedLineItemIds }: Step4Props) {
+function Step4LineItems({
+  campaignStartDate, campaignEndDate, lineItems, setLineItems,
+  lineItemCreatives, lineItemOffset, confirmedLineItemIds, geoLocations,
+  clientCountry, clientCurrencySymbol      // ← add
+}: Step4Props) {
+
   function handleChange(id: string, field: keyof LineItem, value: any) {
     setLineItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   }
@@ -1054,27 +1837,50 @@ function Step4LineItems({ campaignStartDate, campaignEndDate, lineItems, setLine
       {(!campaignStartDate || !campaignEndDate) && (
         <div style={{ background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
           <InfoCircleOutlined style={{ color: '#d97706' }} />
-          No campaign dates set. Go back to Step 2 to set them.
+          No campaign dates set. Go back to Step 2 to set them — line item dates will be validated against those dates.
         </div>
       )}
+
       {lineItems.map((item, idx) => (
-        <LineItemCard key={item.id} item={item} index={idx}
-          campaignStart={campaignStartDate} campaignEnd={campaignEndDate}
-          onChange={handleChange} onRemove={handleRemove} canRemove={lineItems.length > 1}
-          lineItemCreatives={lineItemCreatives} allLineItemCreatives={lineItemCreatives}
+        <LineItemCard
+          key={item.id}
+          item={item}
+          index={idx}
+          campaignStart={campaignStartDate}
+          campaignEnd={campaignEndDate}
+          onChange={handleChange}
+          onRemove={handleRemove}
+          canRemove={lineItems.length > 1}
+          lineItemCreatives={lineItemCreatives}
+          allLineItemCreatives={lineItemCreatives}
           idConfirmed={confirmedLineItemIds.has(item.id)}
+          geoLocations={geoLocations}
+          clientCountry={clientCountry}   // ← add
+          clientCurrencySymbol={clientCurrencySymbol}   // ← add
         />
       ))}
-      <button onClick={handleAdd}
-        style={{ width: '100%', padding: '12px', border: '1px dashed #4f46e5', borderRadius: 8, background: 'none', cursor: 'pointer', color: '#4f46e5', fontWeight: 500, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+
+      <button
+        onClick={handleAdd}
+        style={{ width: '100%', padding: '12px', border: '1px dashed #4f46e5', borderRadius: 8, background: 'none', cursor: 'pointer', color: '#4f46e5', fontWeight: 500, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+      >
         <PlusOutlined /> Add Another Line Item
       </button>
     </div>
   );
 }
 
-// ─── Step 5 ───────────────────────────────────────────────────────────────────
-function Step5Review({ client, advertiser, websiteUrl, campaignName, clientCampaignId, purchaseOrderId, campaignType, buyingType, objective, notes, age, gender, geoLocations, platforms, freqCap, brandSafety, viewability, startDate, endDate, durationDays, lineItems, lineItemCreatives, onEdit }: any) {
+// Step 5 — Review & Confirm 
+function Step5Review({
+  client, advertiser, websiteUrl,
+  campaignName, clientCampaignId, purchaseOrderId,
+  campaignType, buyingType, objective, notes,
+  age, gender, geoLocations, platforms,
+  freqCap, brandSafety, viewability, startDate, endDate, durationDays,
+  lineItems,
+  lineItemCreatives,
+  onEdit,
+}: any) {
   const geoString = geoLocations.length > 0
     ? geoLocations.map((l: GeoLocation) => [l.country, l.state, l.city, l.zipcode, l.range].filter(Boolean).join(' › ')).join(', ')
     : '—';
@@ -1111,6 +1917,7 @@ function Step5Review({ client, advertiser, websiteUrl, campaignName, clientCampa
           <div className="cc-review-ready-sub">Review the details below before creating the campaign.</div>
         </div>
       </div>
+
       <div className="cc-review-header">
         <span className="cc-review-label">Campaign Summary</span>
         <button className="cc-review-edit-btn" onClick={onEdit}>← Edit Details</button>
@@ -1123,6 +1930,7 @@ function Step5Review({ client, advertiser, websiteUrl, campaignName, clientCampa
           </div>
         ))}
       </div>
+
       {lineItems.length > 0 && (
         <>
           <div className="cc-review-header" style={{ marginTop: 20 }}>
@@ -1137,15 +1945,45 @@ function Step5Review({ client, advertiser, websiteUrl, campaignName, clientCampa
                 <div style={{ background: '#f8fafc', padding: '8px 14px', fontSize: 12.5, fontWeight: 600, color: '#1e293b', borderBottom: '0.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#4f46e5', color: '#fff', fontSize: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                   {li.lineItemName || `Line Item ${i + 1}`}
-                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, fontFamily: 'monospace', background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>{li.id}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, fontFamily: 'monospace', background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>
+                    {li.id}
+                  </span>
                 </div>
                 <div className="cc-review-table">
                   {[
                     { label: 'Line Item ID', value: li.id },
+                    { label: 'Ethnicity', value: li.ethnicity.length > 0 ? li.ethnicity.join(', ') : '—' },
                     { label: 'Start Date', value: li.startDate || '—' },
                     { label: 'End Date', value: li.endDate || '—' },
-                    { label: 'Ad Format', value: li.adFormat.length > 0 ? li.adFormat.join(', ') : '—' },
+                    {
+                      label: 'Ad Format',
+                      value: li.adFormat
+                        ? (() => {
+                          const formatLabel = AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat;
+                          const subLabel =
+                            li.adSubFormat?.length
+                              ? AD_FORMAT_SUB_OPTIONS[li.adFormat]
+                                ?.filter(s => li.adSubFormat.includes(s.value))
+                                .map(s => s.label)
+                                .join(', ')
+                              : null;
+                          return subLabel ? `${formatLabel} › ${subLabel}` : formatLabel;
+                        })()
+                        : '—'
+                    },
                     { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
+                    {
+                      label: 'Image Creatives',
+                      value: imgCreatives.length > 0
+                        ? `${imgCreatives.length} file(s): ${imgCreatives.map((c: CreativeData) => c.creative_name).join(', ')}`
+                        : '—'
+                    },
+                    {
+                      label: 'Video Creatives',
+                      value: vidCreatives.length > 0
+                        ? `${vidCreatives.length} file(s): ${vidCreatives.map((c: CreativeData) => c.creative_name).join(', ')}`
+                        : '—'
+                    },
                     { label: 'Total Creatives', value: totalCreatives > 0 ? `${totalCreatives} file(s)` : '—' },
                   ].map((row, j) => (
                     <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? '#fff' : 'var(--slate-100)' }}>
@@ -1159,6 +1997,7 @@ function Step5Review({ client, advertiser, websiteUrl, campaignName, clientCampa
           })}
         </>
       )}
+
       <div style={{ marginTop: 18 }}>
         <InfoBox variant="amber">
           Once created, you can manage line items, add creatives and launch the campaign from the campaigns dashboard.
@@ -1235,7 +2074,7 @@ function SaveDraftModal({ visible, onConfirm, onCancel, defaultName }: {
   );
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// Main
 export default function Campaign_Create() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1247,11 +2086,13 @@ export default function Campaign_Create() {
   const isReturnFromCreative = !!(locationState?.fromCreativeUpload);
   const shouldRestoreDraft = isBackNav || isReturnFromCreative;
   const initialDraft = shouldRestoreDraft ? loadDraft() : null;
+  const clientName = localStorage.getItem('client_name') ?? '';  // ← add
+
 
   // Check if we're editing an existing draft
   const editingDraftId = locationState?.editDraftId as string | undefined;
 
-  if (!shouldRestoreDraft && !editingDraftId) {
+  if (!shouldRestoreDraft) {
     clearDraft();
   }
 
@@ -1279,8 +2120,13 @@ export default function Campaign_Create() {
   // Step 1
   const [client, setClient] = useState<string>(restoredData?.client ?? '');
   const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
-  const [advertiser, setAdvertiser] = useState<string>(restoredData?.advertiser ?? '');
+  const [advertiser, setAdvertiser] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
+
+  // After clientId state, add:
+  const [clientCountry, setClientCountry] = useState<string>('');
+  // Add alongside clientCountry state:
+  const [clientCurrencySymbol, setClientCurrencySymbol] = useState<string>('$');
 
   // Step 2
   const [campaignName, setCampaignName] = useState<string>(restoredData?.campaignName ?? '');
@@ -1310,6 +2156,7 @@ export default function Campaign_Create() {
     return [emptyLineItem(1, 1)];
   });
 
+
   const [lineItemCreatives, setLineItemCreatives] = useState<LineItemCreativesMap>(() => {
     if (isReturnFromCreative && locationState?.allLineItemCreatives) {
       return locationState.allLineItemCreatives as LineItemCreativesMap;
@@ -1317,8 +2164,13 @@ export default function Campaign_Create() {
     return {};
   });
 
-  const durationDays = startDate && endDate ? dayjs(endDate).diff(dayjs(startDate), 'day') : 0;
+  // ✅ Add it here, before the return
+  const durationDays = startDate && endDate
+    ? dayjs(endDate).diff(dayjs(startDate), 'day')
+    : 0;
 
+
+  // Fetch backend offset on fresh load 
   useEffect(() => {
     if (!shouldRestoreDraft && !editingDraftId) {
       fetchLastLineItemOffset().then(offset => {
@@ -1328,15 +2180,22 @@ export default function Campaign_Create() {
     }
   }, []);
 
+  // On return from Creative_Image_Upload or Creative_Video_Upload 
   useEffect(() => {
     if (locationState?.uploadedCreatives && locationState?.lineItemId) {
       const lid = locationState.lineItemId as string;
       const returnedAll = (locationState.allLineItemCreatives ?? {}) as LineItemCreativesMap;
-      setLineItemCreatives(() => ({ ...returnedAll, [lid]: locationState.uploadedCreatives }));
+
+      setLineItemCreatives(() => ({
+        ...returnedAll,
+        [lid]: locationState.uploadedCreatives,
+      }));
+
       window.history.replaceState({}, '');
     }
   }, [locationState]);
 
+  // Persist draft
   const isMounted = useRef(false);
   useEffect(() => {
     if (!isMounted.current) { isMounted.current = true; return; }
@@ -1378,6 +2237,7 @@ export default function Campaign_Create() {
     setShowSaveDraftModal(false);
   };
 
+  // "Next Step" handler
   const handleNextStep = () => {
     if (activeStep === 4) {
       const incomplete = lineItems.filter(li => !isLineItemComplete(li));
@@ -1393,12 +2253,14 @@ export default function Campaign_Create() {
     setActiveStep(s => s + 1);
   };
 
+  // Submit 
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitStatus('idle');
     setErrorMsg('');
 
     const fd = new FormData();
+
     fd.append('client', clientId);
     fd.append('client_name', client);
     fd.append('advertiser', advertiser);
@@ -1408,10 +2270,15 @@ export default function Campaign_Create() {
     fd.append('objective', objective);
     fd.append('age', age.join(', '));
     fd.append('gender', gender.join(', '));
-    fd.append('geo_targeting', JSON.stringify(geoLocations.map(loc => ({
-      country: loc.country || '', state: loc.state || '', city: loc.city || '',
-      zipcode: loc.zipcode || '', range: loc.range || '',
-    }))));
+    fd.append('geo_targeting', JSON.stringify(
+      geoLocations.map(loc => ({
+        country: loc.country || '',
+        state: loc.state || '',
+        city: loc.city || '',
+        zipcode: loc.zipcode || '',
+        range: loc.range || '',
+      }))
+    ));
     fd.append('platforms', platforms.join(', '));
     fd.append('brand_safety', brandSafety);
     fd.append('start_date', startDate);
@@ -1423,54 +2290,131 @@ export default function Campaign_Create() {
     if (freqCap) fd.append('frequency_cap', freqCap);
     if (viewability) fd.append('viewability_goal', viewability);
 
-    fd.append('line_items', JSON.stringify(lineItems.map((li) => {
-      const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
-      const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
-      const allCreatives = [...imageCreatives, ...videoCreatives];
-      return {
-        line_item_id: li.id, lineItemName: li.lineItemName,
-        ethnicity: li.ethnicity, startDate: li.startDate, endDate: li.endDate,
-        adFormat: li.adFormat, impressions: li.impressions, units: li.units,
-        ctr: li.ctr, viewability: li.viewability, vcr: li.vcr,
-        creatives: allCreatives.filter(c => c.type !== 'third_party').map(creative => ({
-          creative_name: creative.creative_name, dimensions: creative.dimensions,
-          aspect_ratio: creative.aspect_ratio, file_size: creative.file_size,
-          click_through_url: creative.click_through_url || '',
-          appended_html_tag: creative.appended_html_tag || '',
-          integration_code: creative.integration_code || '', notes: creative.notes || '',
-        })),
-        third_party_creatives: allCreatives.filter(c => c.type === 'third_party').map(creative => ({
-          input_file_name: creative.main_asset?.name ?? '',
-          backup_image_name: creative.backup_image?.name ?? '',
-        })),
-      };
-    })));
+    // Merge image + video creatives per line item 
+    fd.append('line_items', JSON.stringify(
+      lineItems.map((li) => {
+        const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
+        const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
+        const allCreatives = [...imageCreatives, ...videoCreatives];
 
+        // ── Calculate unit cost inline ──
+        const impressions = parseFloat(li.impressions);
+        const rawAdFormat = li.adFormat;  // raw value: 'banner', 'video' etc.
+        const unit = li.units;
+        let unitCostBudget: number | string = '';
+        if (impressions && unit && rawAdFormat) {
+          if (unit === 'CPM') {
+            const rate = CPM_RATES[rawAdFormat] ?? 1;
+            unitCostBudget = (impressions * rate) / 1000;
+          } else if (unit === 'CPC') {
+            const rate = CPC_RATES[rawAdFormat] ?? 1;
+            unitCostBudget = impressions * rate;
+          }
+        }
+
+        // Build display adFormat string separately
+        // In Step5Review and handleSubmit adFormatDisplay:
+        const adFormatDisplay = li.adFormat
+          ? Array.isArray(li.adSubFormat) && li.adSubFormat.length > 0
+            ? `${AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat} › ${li.adSubFormat
+              .map((s: string) => AD_FORMAT_SUB_OPTIONS[li.adFormat]?.find(o => o.value === s)?.label ?? s)
+              .join(', ')
+            }`
+            : AD_FORMAT_OPTIONS.find(f => f.value === li.adFormat)?.label ?? li.adFormat
+          : '';
+        return {
+          line_item_id: li.id,
+          lineItemName: li.lineItemName,
+          ethnicity: li.ethnicity,
+          startDate: li.startDate,
+          endDate: li.endDate,
+          impressions: li.impressions,
+          units: li.units,
+          ctr: li.ctr,
+          viewability: li.viewability,
+          vcr: li.vcr,
+          kpi_notes: li.ctrNotes || '',       // single combined KPI notes field
+          adFormat: adFormatDisplay,   // combined label for display/storage
+          unit_cost: unitCostBudget !== ''
+            ? `${clientCurrencySymbol}${unitCostBudget}`
+            : '',
+          unit_value: li.rate || '',   // ← add this
+
+
+          // ✅ Standard creatives only
+          creatives: allCreatives
+            .filter(c => c.type !== 'third_party')
+            .map(creative => ({
+              creative_name: creative.creative_name,
+              dimensions: creative.dimensions,
+              aspect_ratio: creative.aspect_ratio,
+              file_size: creative.file_size,
+              click_through_url: creative.click_through_url || '',
+              appended_html_tag: creative.appended_html_tag || '',
+              integration_code: creative.integration_code || '',
+              notes: creative.notes || '',
+            })),
+
+          // ✅ Third-party creatives separately
+          third_party_creatives: allCreatives
+            .filter(c => c.type === 'third_party')
+            .map(creative => ({
+              input_file_name: creative.main_asset?.name ?? '',
+              backup_image_name: creative.backup_image?.name ?? '',
+            })),
+
+
+        };
+      })
+    ));
+
+    // Append actual files (image + video assets) 
+    // ✅ Fix — use separate counters for standard and third-party
     lineItems.forEach((li, i) => {
       const imageCreatives = lineItemCreatives[li.id + '_image'] || [];
       const videoCreatives = lineItemCreatives[li.id + '_video'] || [];
       const allCreatives = [...imageCreatives, ...videoCreatives];
-      let standardIndex = 0, tpIndex = 0;
+
+      let standardIndex = 0;
+      let tpIndex = 0;
+
       allCreatives.forEach((creative: CreativeData) => {
         if (creative.type === 'third_party') {
-          if (creative.main_asset) fd.append(`line_item_${i}thirdparty_file${tpIndex}`, creative.main_asset, creative.main_asset.name);
-          if (creative.backup_image) fd.append(`line_item_${i}thirdparty_backup${tpIndex}`, creative.backup_image, creative.backup_image.name);
+          if (creative.main_asset) {
+            fd.append(
+              `line_item_${i}thirdparty_file${tpIndex}`,
+              creative.main_asset,
+              creative.main_asset.name
+            );
+          }
+          if (creative.backup_image) {
+            fd.append(
+              `line_item_${i}thirdparty_backup${tpIndex}`,
+              creative.backup_image,
+              creative.backup_image.name
+            );
+          }
           tpIndex++;
         } else {
-          if (creative.main_asset) fd.append(`line_item_${i}main_asset${standardIndex}`, creative.main_asset, creative.main_asset.name);
+          if (creative.main_asset) {
+            fd.append(
+              `line_item_${i}main_asset${standardIndex}`,
+              creative.main_asset,
+              creative.main_asset.name
+            );
+          }
           standardIndex++;
         }
       });
     });
 
     try {
-      const res = await fetch(SUBMIT_URL, { method: 'POST', body: fd, headers: { 'ngrok-skip-browser-warning': '1' } });
+      const res = await fetch(SUBMIT_URL, {
+        method: 'POST',
+        body: fd,
+        headers: { 'ngrok-skip-browser-warning': '1' },
+      });
       if (res.ok) {
-        // Remove from drafts if this was a draft being submitted
-        if (currentDraftId) {
-          const drafts = getAllDrafts().filter(d => d.draftId !== currentDraftId);
-          localStorage.setItem(ALL_DRAFTS_KEY, JSON.stringify(drafts));
-        }
         clearDraft();
         setSubmitStatus('success');
       } else {
@@ -1502,7 +2446,10 @@ export default function Campaign_Create() {
     5: { title: 'Review & Confirm', sub: 'Review all details before creating the campaign' },
   };
 
-  const handleCancel = () => { clearDraft(); navigate('/user_dashboard'); };
+  const handleCancel = () => {
+    clearDraft();
+    navigate('/user_dashboard');
+  };
 
   const defaultDraftName = campaignName.trim() || `Draft ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
 
@@ -1511,6 +2458,7 @@ export default function Campaign_Create() {
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
 
       <div className="cc-main" style={{ marginLeft: sideWidth }}>
+
         {/* Topbar */}
         <header className="cc-topbar">
           <div className="cc-topbar-breadcrumb">
@@ -1523,7 +2471,7 @@ export default function Campaign_Create() {
               <BellOutlined style={{ fontSize: 15, color: 'var(--slate-500)' }} />
               <span className="cc-topbar-bell-dot" />
             </div>
-            <div className="cc-topbar-avatar">AK</div>
+            <div className="cc-topbar-avatar">{clientName ? clientName.charAt(0).toUpperCase() : 'AK'}</div>
           </div>
         </header>
 
@@ -1551,7 +2499,6 @@ export default function Campaign_Create() {
           {submitStatus === 'error' && (
             <div className="cc-banner cc-banner-error">❌ Submission failed: {errorMsg}</div>
           )}
-
           {/* Stepper */}
           <div className="cc-stepper-wrap">
             <div className="cc-stepper">
@@ -1576,6 +2523,7 @@ export default function Campaign_Create() {
             </div>
           </div>
 
+
           {/* Step Content */}
           <div className="cc-content-wrap" key={activeStep}>
             <div className="cc-card">
@@ -1588,16 +2536,77 @@ export default function Campaign_Create() {
                 <div className="cc-card-step-count">Step {activeStep} of {STEPS.length}</div>
               </div>
               <div className="cc-card-body">
-                {activeStep === 1 && <Step1 client={client} setClient={setClient} setClientId={setClientId} advertiser={advertiser} setAdvertiser={setAdvertiser} websiteUrl={websiteUrl} setWebsiteUrl={setWebsiteUrl} />}
-                {activeStep === 2 && <Step2 campaignId="" campaignName={campaignName} setCampaignName={setCampaignName} clientCampaignId={clientCampaignId} setClientCampaignId={setClientCampaignId} purchaseOrderId={purchaseOrderId} setPurchaseOrderId={setPurchaseOrderId} campaignType={campaignType} setCampaignType={setCampaignType} buyingType={buyingType} setBuyingType={setBuyingType} objective={objective} setObjective={setObjective} notes={notes} setNotes={setNotes} startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} />}
-                {activeStep === 3 && <Step3 age={age} setAge={setAge} gender={gender} setGender={setGender} geoLocations={geoLocations} setGeoLocations={setGeoLocations} platforms={platforms} setPlatforms={setPlatforms} freqCap={freqCap} setFreqCap={setFreqCap} brandSafety={brandSafety} setBrandSafety={setBrandSafety} viewability={viewability} setViewability={setViewability} />}
-                {activeStep === 4 && <Step4LineItems campaignStartDate={startDate} campaignEndDate={endDate} lineItems={lineItems} setLineItems={setLineItems} lineItemCreatives={lineItemCreatives} lineItemOffset={lineItemOffset} confirmedLineItemIds={confirmedLineItemIds} />}
-                {activeStep === 5 && <Step5Review client={client} advertiser={advertiser} websiteUrl={websiteUrl} campaignName={campaignName} clientCampaignId={clientCampaignId} purchaseOrderId={purchaseOrderId} campaignType={campaignType} buyingType={buyingType} objective={objective} notes={notes} age={age} gender={gender} geoLocations={geoLocations} platforms={platforms} freqCap={freqCap} brandSafety={brandSafety} viewability={viewability} startDate={startDate} endDate={endDate} lineItems={lineItems} lineItemCreatives={lineItemCreatives} onEdit={() => setActiveStep(1)} durationDays={durationDays} />}
+                {activeStep === 1 && (
+                  <Step1
+                    client={client} setClient={setClient}
+                    setClientId={setClientId}
+                    setClientCountry={setClientCountry}
+                    setClientCurrencySymbol={setClientCurrencySymbol}   // ← add
+                    advertiser={advertiser} setAdvertiser={setAdvertiser}
+                    websiteUrl={websiteUrl} setWebsiteUrl={setWebsiteUrl}
+                  />
+                )}
+                {activeStep === 2 && (
+                  <Step2
+                    campaignId=""
+                    campaignName={campaignName} setCampaignName={setCampaignName}
+                    clientCampaignId={clientCampaignId} setClientCampaignId={setClientCampaignId}
+                    purchaseOrderId={purchaseOrderId} setPurchaseOrderId={setPurchaseOrderId}
+                    campaignType={campaignType} setCampaignType={setCampaignType}
+                    buyingType={buyingType} setBuyingType={setBuyingType}
+                    objective={objective} setObjective={setObjective}
+                    notes={notes} setNotes={setNotes}
+                    startDate={startDate} setStartDate={setStartDate}
+                    endDate={endDate} setEndDate={setEndDate}
+                  />
+                )}
+                {activeStep === 3 && (
+                  <Step3
+                    age={age} setAge={setAge}
+                    gender={gender} setGender={setGender}
+                    geoLocations={geoLocations} setGeoLocations={setGeoLocations}
+                    platforms={platforms} setPlatforms={setPlatforms}
+                    freqCap={freqCap} setFreqCap={setFreqCap}
+                    brandSafety={brandSafety} setBrandSafety={setBrandSafety}
+                    viewability={viewability} setViewability={setViewability}
+                  />
+                )}
+                {activeStep === 4 && (
+                  <Step4LineItems
+                    campaignStartDate={startDate}
+                    campaignEndDate={endDate}
+                    lineItems={lineItems}
+                    setLineItems={setLineItems}
+                    lineItemCreatives={lineItemCreatives}
+                    lineItemOffset={lineItemOffset}
+                    confirmedLineItemIds={confirmedLineItemIds}
+                    geoLocations={geoLocations}
+                    clientCountry={clientCountry}   // ← add
+                    clientCurrencySymbol={clientCurrencySymbol}   // ← add
+                  />
+                )}
+                {activeStep === 5 && (
+                  <Step5Review
+                    client={client} advertiser={advertiser} websiteUrl={websiteUrl}
+                    campaignName={campaignName}
+                    clientCampaignId={clientCampaignId} purchaseOrderId={purchaseOrderId}
+                    campaignType={campaignType} buyingType={buyingType}
+                    objective={objective} notes={notes}
+                    age={age} gender={gender}
+                    geoLocations={geoLocations} platforms={platforms}
+                    freqCap={freqCap} brandSafety={brandSafety} viewability={viewability}
+                    startDate={startDate} endDate={endDate}
+                    lineItems={lineItems}
+                    lineItemCreatives={lineItemCreatives}
+                    onEdit={() => setActiveStep(1)}
+                    durationDays={durationDays}
+                  />
+                )}
               </div>
             </div>
           </div>
 
-          {/* ─── Bottom Bar ────────────────────────────────────────────────── */}
+          {/* Bottom Bar */}
           <div className="cc-bottom-bar">
             <Button className="cc-btn-cancel" onClick={handleCancel}>Cancel</Button>
 
@@ -1639,9 +2648,9 @@ export default function Campaign_Create() {
               )}
             </div>
           </div>
+
         </main>
       </div>
-
       {/* Save Draft Modal */}
       <SaveDraftModal
         visible={showSaveDraftModal}

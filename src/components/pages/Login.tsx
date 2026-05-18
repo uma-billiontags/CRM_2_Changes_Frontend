@@ -33,38 +33,84 @@ export default function Login() {
   },
 ];
 
-const handleSignIn = async () => {
+// const handleSignIn = async () => {
+//   setError('');
+
+//   if (!email.trim()) {
+//     setError('Please enter your email address.');
+//     return;
+//   }
+//   if (!password.trim()) {
+//     setError('Please enter your password.');
+//     return;
+//   }
+
+//   const matched = USERS.find(
+//     u => u.email === email.trim().toLowerCase() && u.password === password
+//   );
+
+//   if (matched) {
+//     if (remember) {
+//       localStorage.setItem('remembered_email', email.trim());
+//     } else {
+//       localStorage.removeItem('remembered_email');
+//     }
+//     // Store role for use across the app
+//     localStorage.setItem('user_role', matched.role);
+//     localStorage.setItem('user_email', matched.email);
+//     navigate(matched.redirect);
+//   } else {
+//     setError('Invalid email or password. Please try again.');
+//   }
+// };
+ 
+  // Submit on Enter key
+  const handleSignIn = async () => {
   setError('');
+  if (!email.trim()) { setError('Please enter your email address.'); return; }
+  if (!password.trim()) { setError('Please enter your password.'); return; }
 
-  if (!email.trim()) {
-    setError('Please enter your email address.');
-    return;
-  }
-  if (!password.trim()) {
-    setError('Please enter your password.');
-    return;
-  }
+  setLoading(true);
+  try {
+    const res = await fetch('https://grinch-revocable-cornflake.ngrok-free.dev/login_view/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
 
-  const matched = USERS.find(
-    u => u.email === email.trim().toLowerCase() && u.password === password
-  );
+    const data = await res.json();
 
-  if (matched) {
+    if (!res.ok) {
+      setError(data.error || 'Invalid email or password.');
+      return;
+    }
+
+    // Store user info
+    localStorage.setItem('user_role', data.user.role);
+    localStorage.setItem('user_email', data.user.email);
+    localStorage.setItem('user_id', String(data.user.id));
+    localStorage.setItem('client_id', data.user.client_id || '');
+
     if (remember) {
       localStorage.setItem('remembered_email', email.trim());
     } else {
       localStorage.removeItem('remembered_email');
     }
-    // Store role for use across the app
-    localStorage.setItem('user_role', matched.role);
-    localStorage.setItem('user_email', matched.email);
-    navigate(matched.redirect);
-  } else {
-    setError('Invalid email or password. Please try again.');
+
+    // Redirect based on role
+    if (data.user.role === 'creative') {
+      navigate('/creative_dashboard');
+    } else {
+      navigate('/user_dashboard');
+    }
+
+  } catch {
+    setError('Network error. Please try again.');
+  } finally {
+    setLoading(false);
   }
 };
- 
-  // Submit on Enter key
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSignIn();
   };

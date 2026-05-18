@@ -61,7 +61,7 @@ const STATUS_STYLE: Record<string, { color: string; bg: string; border: string; 
 };
 
 // ── Topbar ────────────────────────────────────────────────────────────────────
-function Topbar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
+function Topbar({ title, subtitle, actions, avatarInitials }: { title: string; subtitle?: string; actions?: React.ReactNode, avatarInitials?: string; }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -117,7 +117,7 @@ function Topbar({ title, subtitle, actions }: { title: string; subtitle?: string
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: WHITE, fontSize: 12, fontWeight: 800,
           cursor: 'pointer',
-        }}>AS</div>
+        }}>{avatarInitials ?? 'U'} </div>
       </div>
     </header>
   );
@@ -195,9 +195,12 @@ export default function User_Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
 
+  const clientName = localStorage.getItem('client_name') ?? '';
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';
 
   useEffect(() => {
-    fetch('https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/', {
+    const clientId = localStorage.getItem('client_id');
+    fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/${clientId}/`, {
       headers: { 'ngrok-skip-browser-warning': '1' }
     })
       .then(r => {
@@ -259,7 +262,8 @@ export default function User_Dashboard() {
       }}>
         <Topbar
           title="Dashboard"
-          subtitle="WELCOME BACK, AARAV ✦"
+          subtitle={`WELCOME BACK, ${clientName.toUpperCase()} ✦`}
+          avatarInitials={avatarInitials}   // ← add this
           actions={
             <button
               onClick={() => navigate('/campaign_create')}

@@ -8,7 +8,6 @@ import Sidebar from '../shared/Sidebar';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/CLT-2026-00003/';
 
 interface LineItem {
   line_item_id: string;
@@ -74,8 +73,10 @@ export default function User_Campaigns() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const fetchCampaigns = () => {
+     const clientId = localStorage.getItem('client_id');
+  
     setLoading(true);
-    fetch(GET_CAMPAIGNS_URL, {
+    fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/${clientId}/`, {
       headers: { 'ngrok-skip-browser-warning': '1' },
     })
       .then(r => {

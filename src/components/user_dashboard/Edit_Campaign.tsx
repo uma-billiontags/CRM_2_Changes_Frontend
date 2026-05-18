@@ -83,11 +83,11 @@ function apiLineItemToForm(li: any): LineItem {
     vcr: li.vcr ? String(li.vcr) : '',
     // ── missing fields ──
     ctrNotes: '',
-    viewabilityNotes: '',
-    vcrNotes: '',
     unitCost: '',
     adSubFormatOpen: false,
     adSubFormat: li.ad_sub_format ?? '',
+    rate: li.rate ? String(li.rate) : '',
+    
 
   };
 }

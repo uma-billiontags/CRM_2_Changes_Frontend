@@ -355,7 +355,7 @@ function FileBadge({ file, color = 'blue', onClick }: { file: File; color?: stri
 }
 
 // Main Component
-export default function Creative_Upload() {
+export default function Creative_Image_Upload() {
   const navigate = useNavigate();
   const location = useLocation();
 

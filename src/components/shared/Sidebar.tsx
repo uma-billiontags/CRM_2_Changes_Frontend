@@ -12,25 +12,25 @@ const CAMPAIGN_NAV = [
   {
     g: 'WORKSPACE',
     items: [
-      { label: 'Dashboard',        icon: LayoutDashboard, to: '/user_dashboard' },
-      { label: 'My Campaigns',     icon: Megaphone,       to: '/user_campaigns' },
-      { label: 'Create Campaign',  icon: Plus,            to: '/campaign_create' },
-      { label: 'My Drafts',        icon: Layers,          to: '/user_drafts' },
-      { label: 'Insertion Orders', icon: FileText,        to: '/user_io' },
+      { label: 'Dashboard', icon: LayoutDashboard, to: '/user_dashboard' },
+      { label: 'My Campaigns', icon: Megaphone, to: '/user_campaigns' },
+      { label: 'Create Campaign', icon: Plus, to: '/campaign_create' },
+      { label: 'My Drafts', icon: Layers, to: '/user_drafts' },
+      { label: 'Insertion Orders', icon: FileText, to: '/user_io' },
     ],
   },
   {
     g: 'MONITOR',
     items: [
-      { label: 'Live Status', icon: Radio,    to: '/user_live' },
-      { label: 'Approvals',   icon: FileText, to: '/user_approvals' },
+      { label: 'Live Status', icon: Radio, to: '/user_live' },
+      { label: 'Approvals', icon: FileText, to: '/user_approvals' },
     ],
   },
   {
     g: 'INSIGHTS',
     items: [
       { label: 'Reports', icon: FileText, to: '/user_reports' },
-      { label: 'Billing', icon: Wallet,   to: '/user_billing' },
+      { label: 'Billing', icon: Wallet, to: '/user_billing' },
     ],
   },
 ];
@@ -39,10 +39,10 @@ const CREATIVE_NAV = [
   {
     g: 'WORKSPACE',
     items: [
-      { label: 'Dashboard',         icon: LayoutDashboard, to: '/creative_dashboard' },
-      { label: 'Image Creatives',   icon: Image,           to: '/image_creatives' },
-      { label: 'Video Creatives',   icon: Video,           to: '/video_creatives' },
-      { label: 'Third-Party Creatives', icon: FileText,    to: '/third_party_creatives' },
+      { label: 'Dashboard', icon: LayoutDashboard, to: '/creative_dashboard' },
+      { label: 'Image Creatives', icon: Image, to: '/image_creatives' },
+      { label: 'Video Creatives', icon: Video, to: '/video_creatives' },
+      { label: 'Third-Party Creatives', icon: FileText, to: '/third_party_creatives' },
     ],
   },
   {
@@ -61,15 +61,15 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const role = localStorage.getItem('user_role') ?? 'campaign';
-  const userEmail = localStorage.getItem('user_email') ?? '';
+  const clientName = localStorage.getItem('client_name') ?? '';  // ← add
 
   const NAV = role === 'creative' ? CREATIVE_NAV : CAMPAIGN_NAV;
 
-  // Display info per role
-  const avatarInitials = role === 'creative' ? 'CT' : 'AK';
-  const displayName    = role === 'creative' ? 'Creative Team' : 'Aarav Shah';
-  const displayRole    = role === 'creative' ? 'CREATIVE TEAM' : 'CAMPAIGN MANAGER';
-  const accentColor    = role === 'creative' ? '#7c3aed' : BLUE;
+  // ← Replace these 4 lines
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : (role === 'creative' ? 'C' : 'A');
+  const displayName = clientName || (role === 'creative' ? 'Creative Team' : 'Campaign Manager');
+  const displayRole = role === 'creative' ? 'CREATIVE TEAM' : 'CAMPAIGN MANAGER';
+  const accentColor = role === 'creative' ? '#7c3aed' : BLUE;
 
   return (
     <aside style={{

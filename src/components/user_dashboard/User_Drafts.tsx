@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Sidebar from '../shared/Sidebar';
-import { getAllDrafts, type SavedDraft } from '../forms/Campaign_Create';
+import { getAllDrafts, type SavedDraft } from '../user_dashboard/Campaign_Create';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
