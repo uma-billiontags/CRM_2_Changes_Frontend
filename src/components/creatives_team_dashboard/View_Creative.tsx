@@ -6,7 +6,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
+const BASE_URL = 'http://127.0.0.1:8000';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';

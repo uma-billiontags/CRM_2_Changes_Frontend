@@ -16,7 +16,7 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 // API
-const SUBMIT_URL = "https://grinch-revocable-cornflake.ngrok-free.dev/create_client/";
+const SUBMIT_URL = "http://127.0.0.1:8000/create_client/";
 
 // Dropdown choices — all data lives here on the frontend
 const DEFAULT_CHOICES = {
@@ -52,7 +52,7 @@ function getDialCode(idd: { root?: string; suffixes?: string[] }) {
   return suffixes.length === 1 ? idd.root + suffixes[0] : idd.root;
 }
 
-// ─── PhoneInput component ─────────────────────────────────────────────────────
+// PhoneInput component
 
 const PhoneInput = React.memo(function PhoneInput({
   phone, phone_code, phone_cca2, countries, onPhoneChange, onCountryChange,
@@ -184,7 +184,7 @@ const PhoneInput = React.memo(function PhoneInput({
   );
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 const toOpts = (arr: string[]) => arr.map((s) => ({ value: s, label: s }));
 
@@ -215,8 +215,7 @@ const TABS = [
   { id: "review", label: "Review & Summary", emoji: "✅" },
 ];
 
-// ─── AddNewSelect ─────────────────────────────────────────────────────────────
-
+// AddNewSelect component
 const AddNewSelect = React.memo(function AddNewSelect({
   value, onChange, options, setOptions, placeholder, loading = false, showSearch = false,
 }: AddNewSelectProps & { loading?: boolean; showSearch?: boolean }) {
@@ -288,8 +287,7 @@ const AddNewSelect = React.memo(function AddNewSelect({
   );
 });
 
-// ─── useLocationData ──────────────────────────────────────────────────────────
-
+// useLocationData hook to fetch and manage country/state/city data with caching and error handling
 function useLocationData() {
   const [countryOpts, setCountryOpts] = useState<string[]>([]);
   const [stateOpts, setStateOpts] = useState<string[]>([]);
@@ -439,8 +437,7 @@ function useLocationData() {
   };
 }
 
-// ─── BillingForm props type ───────────────────────────────────────────────────
-
+// BillingForm props type 
 interface BillingFormProps {
   company: CompanyForm;
   sf: (k: keyof CompanyForm, v: string | boolean) => void;
@@ -449,12 +446,12 @@ interface BillingFormProps {
   setTaxTypes: React.Dispatch<React.SetStateAction<string[]>>;
   billingContacts: string[];
   setBillingContacts: React.Dispatch<React.SetStateAction<string[]>>;
+  availableCurrencies: string[];   // ← Add this
 }
 
-// ─── BillingForm — OUTSIDE Onboarding ────────────────────────────────────────
-
+// BillingForm — OUTSIDE Onboarding 
 const BillingForm = React.memo(function BillingForm({
-  company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
+  company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts, availableCurrencies
 }: BillingFormProps) {
   const isPostpaid = company.payment_type === "Postpaid";
 
@@ -530,11 +527,23 @@ const BillingForm = React.memo(function BillingForm({
         </Form.Item>
 
         <Form.Item label="Currency">
-          <Select style={{ width: "100%" }} value={company.billing_currency}
+          <Select
+            style={{ width: "100%" }}
+            value={company.billing_currency}
             onChange={(v) => sf("billing_currency", v)}
-            options={DEFAULT_CHOICES.billing_currencies.map((c) => ({
-              value: c, label: c === "INR" ? "INR (₹)" : c,
-            }))} />
+            options={availableCurrencies.map((c: any) => ({
+              value: c,
+              label: c === "INR" ? "INR (₹)" :
+                c === "USD" ? "USD ($)" :
+                  c === "EUR" ? "EUR (€)" :
+                    c === "GBP" ? "GBP (£)" : c,
+            }))}
+          />
+          {company.country && (
+            <p className="text-xs text-emerald-600 mt-1">
+              ✓ Auto-detected currency for {company.country}
+            </p>
+          )}
         </Form.Item>
 
         <Form.Item label="Advance / Security Deposit" name="advance_amount"
@@ -566,21 +575,19 @@ const BillingForm = React.memo(function BillingForm({
   );
 });
 
-// ─── ContactsSection props type ───────────────────────────────────────────────
-
+// ContactsSection props type 
 interface ContactsSectionProps {
   contacts: ContactRow[];
   addContact: () => void;
   removeContact: (id: number) => void;
   updateContact: (id: number, k: keyof ContactRow, v: string | File | null) => void;
-  countries: Country[];           // ✅ keep — needed for PhoneInput dropdown
+  countries: Country[];
   loadingCountries: boolean;
   countryOpts: string[];
   setCountryOpts: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-// ─── ContactsSection — OUTSIDE Onboarding ────────────────────────────────────
-
+// ContactsSection — OUTSIDE Onboarding 
 const ContactsSection = React.memo(function ContactsSection({
   contacts, addContact, removeContact, updateContact,
   countries, loadingCountries, countryOpts, setCountryOpts,
@@ -676,8 +683,7 @@ const ContactsSection = React.memo(function ContactsSection({
   );
 });
 
-// ─── AddressesSection props type ──────────────────────────────────────────────
-
+// AddressesSection props type 
 interface AddressesSectionProps {
   addresses: AddressRow[];
   addAddress: () => void;
@@ -688,8 +694,7 @@ interface AddressesSectionProps {
   setCountryOpts: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-// ─── AddressesSection — OUTSIDE Onboarding ───────────────────────────────────
-
+// AddressesSection — OUTSIDE Onboarding
 const AddressesSection = React.memo(function AddressesSection({
   addresses, addAddress, removeAddress, updateAddress,
   loadingCountries, countryOpts, setCountryOpts,
@@ -750,8 +755,7 @@ const AddressesSection = React.memo(function AddressesSection({
   );
 });
 
-// ─── FormCard ─────────────────────────────────────────────────────────────────
-
+// FormCard — reusable card component for each section, memoized for performance
 const FormCard = React.memo(function FormCard({
   icon, title, subtitle, action, badge, children,
 }: {
@@ -782,8 +786,7 @@ const FormCard = React.memo(function FormCard({
   );
 });
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-
+// MAIN COMPONENT
 export default function Onboarding() {
   const [form] = Form.useForm();
 
@@ -835,9 +838,10 @@ export default function Onboarding() {
   const [salesOwners, setSalesOwners] = useState<string[]>(DEFAULT_CHOICES.sales_owners);
   const [campaignManagers, setCampaignManagers] = useState<string[]>(DEFAULT_CHOICES.campaign_managers);
   const [financeOwners, setFinanceOwners] = useState<string[]>(DEFAULT_CHOICES.finance_owners);
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>(["INR"]);
 
   const [company, setCompany] = useState<CompanyForm>({
-    reporting_id: "", company_name: "", company_type: "", agency_type: "",
+    company_name: "", company_type: "", agency_type: "",
     brand: "", website: "", phone_code: "+91", phone_cca2: "IN", phone: "", email: "",
     billing_currency: "INR", address_line1: "", address_line2: "",
     country: "", state: "", city: "", zipcode: "", cin_number: "", vast_number: "",
@@ -864,15 +868,6 @@ export default function Onboarding() {
   );
 
   // ✅ useCallback for country/state change handlers
-  const onCompanyCountryChange = useCallback((v: string) => {
-    sf("country", v ?? "");
-    _handleCountryChange(
-      v ?? "",
-      () => { sf("state", ""); form.setFieldsValue({ state: undefined }); },
-      () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
-    );
-  }, [sf, _handleCountryChange, form]);
-
   const onCompanyStateChange = useCallback((v: string) => {
     sf("state", v ?? "");
     _handleStateChange(
@@ -881,6 +876,43 @@ export default function Onboarding() {
       () => { sf("city", ""); form.setFieldsValue({ city: undefined }); },
     );
   }, [sf, _handleStateChange, company.country, form]);
+
+  // ✅ Country Change + Auto Currency Fetch
+  const onCompanyCountryChangeWithCurrency = useCallback(async (countryName: string) => {
+    sf("country", countryName ?? "");
+
+    // Clear state & city
+    _handleCountryChange(
+      countryName ?? "",
+      () => { sf("state", ""); form.setFieldsValue({ state: undefined }); },
+      () => { sf("city", ""); form.setFieldsValue({ city: undefined }); }
+    );
+
+    if (countryName) {
+      try {
+        const res = await fetch(
+          `https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}?fields=currencies`
+        );
+        const data = await res.json();
+
+        if (data && data.length > 0 && data[0].currencies) {
+          const currencies = Object.keys(data[0].currencies);
+          setAvailableCurrencies(currencies);
+          sf("billing_currency", currencies[0]); // Auto select first currency
+        } else {
+          setAvailableCurrencies(["INR"]);
+          sf("billing_currency", "INR");
+        }
+      } catch (err) {
+        console.warn("Failed to fetch currency for", countryName);
+        setAvailableCurrencies(["INR"]);
+        sf("billing_currency", "INR");
+      }
+    } else {
+      setAvailableCurrencies(["INR"]);
+      sf("billing_currency", "INR");
+    }
+  }, [sf, _handleCountryChange, form]);
 
   // ✅ useCallback for contacts handlers
   const addContact = useCallback(
@@ -914,7 +946,6 @@ export default function Onboarding() {
 
   const buildPayload = useCallback(() => {
     const clientFields = {
-      reporting_id: company.reporting_id,
       name: company.company_name,
       company_type: company.company_type,
       agency_type: company.agency_type,
@@ -1008,6 +1039,41 @@ export default function Onboarding() {
     };
   }, [company, contacts, addresses]);
 
+  // Add this with other handlers
+  const handleCancel = useCallback(() => {
+    // Reset AntD Form
+    form.resetFields();
+
+    // Reset main company state
+    setCompany({
+      company_name: "", company_type: "", agency_type: "",
+      brand: "", website: "", phone_code: "+91", phone_cca2: "IN", phone: "", email: "",
+      billing_currency: "INR", address_line1: "", address_line2: "",
+      country: "", state: "", city: "", zipcode: "", cin_number: "", vast_number: "",
+      place_of_supply: "", is_active: true,
+      credit_period_days: "",
+      payment_terms: "15 Days", payment_type: "Prepaid", tax_type: "", tds_applicable: "",
+      tds_section: "", advance_amount: "", credit_limit: "", outstanding_limit: "",
+      billing_contact: "",
+      default_market: "", default_platform: "", inventory_type: "",
+      campaign_objective: "", language: "", audience_focus: "", ad_formats: "", timezone: "",
+      account_manager: "", sales_owner: "", campaign_manager: "", finance_owner: "",
+      client_type: "", priority: "", risk_level: "", payment_behavior: "",
+      avg_response_time: "", notes: "", additional_internal_notes: "", additional_tags: "",
+    });
+
+    // Reset contacts and addresses to initial state
+    setContacts([makeContact()]);
+    setAddresses([makeAddress()]);
+
+    // Reset active tab to first one
+    setActiveTab("basic");
+
+    // Optional: Show feedback
+    // message.success("Form has been reset");
+
+  }, [form]);
+
   const handleSubmit = useCallback(async () => {
     try { await form.validateFields(); } catch { return; }
     setSubmitting(true);
@@ -1040,7 +1106,7 @@ export default function Onboarding() {
 
   // ✅ Memoize prop bundles — stable object identity prevents child re-renders
   const billingFormProps = useMemo<BillingFormProps>(() => ({
-    company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts,
+    company, sf, form, taxTypes, setTaxTypes, billingContacts, setBillingContacts, availableCurrencies
   }), [company, sf, form, taxTypes, billingContacts]);
 
   const contactsSectionProps = useMemo<ContactsSectionProps>(() => ({
@@ -1053,18 +1119,25 @@ export default function Onboarding() {
     loadingCountries, countryOpts, setCountryOpts,
   }), [addresses, loadingCountries, countryOpts, addAddress, removeAddress, updateAddress]);
 
-  // ─── JSX ──────────────────────────────────────────────────────────────────
+  // JSX
   return (
     <div className="min-h-screen bg-gray-100">
 
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 sticky top-0 z-40 shadow-sm">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">N</div>
-          <span className="font-semibold tracking-tight text-gray-800">
-            Billion <span className="text-indigo-600">Tags</span>
-          </span>
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-3 sticky top-0 z-40 shadow-sm">
+        <Link to="/">
+          <Button
+            icon={<ArrowLeftOutlined />}
+            style={{ border: `1px solid #CBD5E1`, color: '#64748B', fontWeight: 600 }}
+          >
+            Back
+          </Button>
         </Link>
-        <span className="text-xs text-gray-400 ml-2">/ New Client Onboarding</span>
+
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold text-sm">B</div>
+          <span className="font-semibold tracking-tight">Billion <span className="text-primary">Media</span></span>
+        </div>
+        <span className="text-xs text-gray-400 pt-1">New Client Onboarding</span>
       </header>
 
       <div className="max-w-7xl mx-auto px-6 pt-6 pb-14">
@@ -1097,15 +1170,7 @@ export default function Onboarding() {
                 <p className="text-xs text-gray-400 mt-0.5">Create a new client profile with all required details</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link to="/login">
-                <Button className="ob-btn-default">Cancel</Button>
-              </Link>
-              <Button type="primary" icon={<SaveOutlined />} loading={submitting}
-                onClick={handleSubmit} className="ob-btn-primary">
-                {submitting ? "Saving…" : "Save Client"}
-              </Button>
-            </div>
+
           </div>
 
           <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} className="onboarding-tabs" />
@@ -1122,11 +1187,6 @@ export default function Onboarding() {
 
                       <Form.Item label="Client ID (Auto)">
                         <Input disabled value="Auto-generated" />
-                      </Form.Item>
-
-                      <Form.Item label="Reporting ID (Internal)" name="reporting_id">
-                        <Input placeholder="Enter Reporting ID" value={company.reporting_id}
-                          onChange={(e) => sf("reporting_id", e.target.value)} />
                       </Form.Item>
 
                       <Form.Item label="Company Name" name="company_name"
@@ -1184,24 +1244,17 @@ export default function Onboarding() {
                           onChange={(e) => sf("email", e.target.value)} />
                       </Form.Item>
 
-                      <Form.Item label="Billing Currency">
-                        <Select style={{ width: "100%" }} value={company.billing_currency}
-                          onChange={(v) => sf("billing_currency", v)}
-                          options={DEFAULT_CHOICES.billing_currencies.map((c) => ({
-                            value: c, label: c === "INR" ? "INR (₹)" : c,
-                          }))} />
-                      </Form.Item>
-
-                      <Form.Item label="Address Line 1" name="address_line1" className="md:col-span-2"
+                      <Form.Item label="Address Line 1" name="address_line1"
                         rules={[{ required: true, message: "Address line 1 is required" }]}>
                         <Input placeholder="Enter address line 1" value={company.address_line1}
                           onChange={(e) => sf("address_line1", e.target.value)} />
                       </Form.Item>
 
-                      <Form.Item label="Address Line 2" className="md:col-span-2">
+                      <Form.Item label="Address Line 2">
                         <Input placeholder="Enter address line 2" value={company.address_line2}
                           onChange={(e) => sf("address_line2", e.target.value)} />
                       </Form.Item>
+
 
                       <Form.Item label="Country" name="country"
                         rules={[{ required: true, message: "Country is required" }]}>
@@ -1210,7 +1263,7 @@ export default function Onboarding() {
                           loading={loadingCountries}
                           showSearch
                           value={company.country}
-                          onChange={onCompanyCountryChange}
+                          onChange={onCompanyCountryChangeWithCurrency}
                           options={countryOpts}
                           setOptions={setCountryOpts}
                         />
@@ -1267,7 +1320,7 @@ export default function Onboarding() {
                       </Form.Item>
 
                       <Form.Item label="Is Active">
-                        <div className="flex items-center gap-2 h-[38px]">
+                        <div className="flex items-center gap-2 h-9.5">
                           <Switch checked={company.is_active} onChange={(checked) => sf("is_active", checked)} />
                           <Text className="text-xs text-gray-500">
                             {company.is_active ? "Active" : "Inactive"}
@@ -1404,6 +1457,26 @@ export default function Onboarding() {
                     </div>
                   </Form>
                 </FormCard>
+                {/* Bottom Action Buttons */}
+                <div className="sticky bottom-0 bg-white border-t border-gray-200 -mx-6 -mb-6 px-6 py-5 flex justify-end gap-3 mt-8">
+                  <Button
+                    className="ob-btn-default"
+                    size="large"
+                    onClick={handleCancel}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={submitting}
+                    onClick={handleSubmit}
+                    className="ob-btn-primary"
+                    size="large"
+                  >
+                    {submitting ? "Submitting…" : "Submit"}
+                  </Button>
+                </div>
 
               </div>
             )}
@@ -1434,7 +1507,6 @@ export default function Onboarding() {
                       <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Company Details</p>
                       {[
                         ["Company Name", company.company_name],
-                        ["Reporting ID", company.reporting_id],
                         ["Company Type", company.company_type],
                         ["Email", company.email],
                         ["Phone", `${company.phone_code} ${company.phone}`],

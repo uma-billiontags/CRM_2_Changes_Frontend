@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import SuperAdminSidebar from "./SuperAdminSidebar";
-import { Toast } from "./SharedComponents";
+import SuperAdminSidebar from "./AdminSidebar";
+import { Toast } from "../super_admin/SharedComponents";
 import {  C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
 
@@ -17,7 +17,7 @@ export interface SuperAdminOutletContext {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-export default function SuperAdminLayout() {
+export default function AdminLayout() {
   const navigate = useNavigate();
   // With this:
   const [clients, setClients] = useState<Client[]>([]);

@@ -22,6 +22,9 @@ import { AdminUsersPage, AuditLogsPage, SystemSettingsPage } from "./components/
 import { Navigate } from "react-router-dom";
 import TeamAccess from "./components/super_admin/TeamAccess";
 import All_Campaigns from "./components/super_admin/All_Campaigns";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminOverview from "./components/admin/AdminOverview";
+import Admin_Campaigns from "./components/admin/Admin_Campaigns";
 function App() {
 
   return (
@@ -58,6 +61,19 @@ function App() {
           <Route path="team" element={<TeamAccess />} />
           <Route path="campaigns" element={<All_Campaigns />} />
         </Route>
+        
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<AdminOverview />} />
+          <Route path="clients" element={<AllClientsPage />} />
+          <Route path="pending" element={<PendingPage />} />
+          <Route path="approved" element={<ApprovedPage />} />
+          <Route path="rejected" element={<RejectedPage />} />
+          <Route path="system-settings" element={<SystemSettingsPage />} />
+          <Route path="audit-logs" element={<AuditLogsPage />} />
+          <Route path="campaigns" element={<Admin_Campaigns />} />
+        </Route>
+
       </Routes>
     </BrowserRouter>
   )

@@ -19,7 +19,7 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
+const BASE_URL = 'http://127.0.0.1:8000';
 
 // ─── Constants (same as Campaign_Create) ──────────────────────────────────────
 

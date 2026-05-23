@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { C, fmt } from "../types/types";
 import { StatusBadge, ClientDetailModal } from "./SharedComponents";
 import type { Client, ClientStatus } from "../types/types";
+import { Button } from 'antd';
+import { CheckOutlined } from "@ant-design/icons";
 
 interface ColDef {
   label: string;
@@ -36,6 +38,25 @@ export default function ClientTablePage({
   const [sentClients, setSentClients] = useState<Set<string>>(new Set());
 
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (credClient) {
+          setCredClient(null);
+          setCredPassword("");
+          setCredMsg("");
+          setSearch("");
+        }
+        if (selectedClient) {
+          setSelectedClient(null);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [credClient, selectedClient]);
+
   const handleSendCredentials = async () => {
     if (!credPassword.trim()) {
       setCredMsg("Password is required");
@@ -46,7 +67,7 @@ export default function ClientTablePage({
     setCredMsg("");
 
     try {
-      const res = await fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/approve_client/`, {
+      const res = await fetch(`http://127.0.0.1:8000/approve_client/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -217,59 +238,48 @@ export default function ClientTablePage({
 
               {/* Actions */}
               <div style={{ width: 220, flexShrink: 0, padding: "14px 14px", display: "flex", gap: 6 }}>
-                <button
+                <Button
                   onClick={() => setSelectedClient(c)}
                   style={{
                     padding: "4px 10px", borderRadius: 6,
                     background: C.blueLight, border: `1px solid ${C.blueMid}`,
                     color: C.blue, fontSize: 11, fontWeight: 600, cursor: "pointer",
                   }}
-                >View</button>
+                >View</Button>
                 {c.status === "pending" && (
                   <>
-                    <button
+                    <Button
                       onClick={() => onApprove(c.id)}
                       style={{
                         padding: "4px 10px", borderRadius: 6,
                         background: C.greenLight, border: `1px solid #BBF7D0`,
                         color: C.green, fontSize: 11, fontWeight: 600, cursor: "pointer",
                       }}
-                    >Approve</button>
-                    <button
+                    >Approve</Button>
+                    <Button
                       onClick={() => onReject(c.id)}
                       style={{
                         padding: "4px 10px", borderRadius: 6,
                         background: C.redLight, border: `1px solid #FECACA`,
                         color: C.red, fontSize: 11, fontWeight: 600, cursor: "pointer",
                       }}
-                    >Reject</button>
+                    >Reject</Button>
                   </>
                 )}
                 {c.status === "approved" && (
-                  sentClients.has(c.id) ? (
-                    // Already sent — show "Sent ✓" button (disabled)
-                    <button
-                      disabled
-                      style={{
-                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        cursor: "not-allowed",
-                        background: C.greenLight,
-                        border: `1px solid #BBF7D0`,
-                        color: C.green,
-                        opacity: 0.85,
-                      }}
-                    >✓ Access Shared</button>
-                  ) : (
-                    // Not yet sent — show Send Credentials button
-                    <button
-                      onClick={() => { setCredClient(c); setCredPassword(""); setCredMsg(""); }}
-                      style={{
-                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        cursor: "pointer", background: C.purpleLight,
-                        border: `1px solid #C4B5FD`, color: C.purple,
-                      }}
-                    >Send Credentials</button>
-                  )
+                  <Button
+                    onClick={() => { setCredClient(c); setCredPassword(""); setCredMsg(""); }}
+                    icon={sentClients.has(c.id) ? <CheckOutlined /> : null}
+                    style={{
+                      padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                      cursor: "pointer",
+                      background: sentClients.has(c.id) ? C.greenLight : C.purpleLight,
+                      border: sentClients.has(c.id) ? "1px solid #BBF7D0" : "1px solid #C4B5FD",
+                      color: sentClients.has(c.id) ? C.green : C.purple,
+                    }}
+                  >
+                    {sentClients.has(c.id) ? "Sent" : "Send Credentials"}
+                  </Button>
                 )}
               </div>
             </div>
@@ -290,7 +300,7 @@ export default function ClientTablePage({
         <div style={{
           position: "fixed", inset: 0, zIndex: 300,
           background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 300,
         }}>
           <div style={{
             background: C.white, borderRadius: 16, border: `1px solid ${C.border}`,
@@ -303,10 +313,10 @@ export default function ClientTablePage({
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: C.slate, margin: 0 }}>Send Credentials</h3>
                 <p style={{ fontSize: 12, color: C.slate500, margin: "4px 0 0" }}>Credentials will be emailed to the client</p>
               </div>
-              <button
+              <Button
                 onClick={() => { setCredClient(null); setSearch(""); }}
                 style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.border}`, background: C.slate100, cursor: "pointer", fontSize: 16 }}
-              >✕</button>
+              >✕</Button>
             </div>
 
             {/* Client email (read-only) */}
@@ -349,15 +359,19 @@ export default function ClientTablePage({
 
             {/* Buttons */}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button
+              <Button
                 onClick={() => { setCredClient(null); setSearch(""); }}
                 style={{ padding: "9px 18px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.slate500, fontSize: 13, cursor: "pointer" }}
-              >Cancel</button>
-              <button
+              >
+                Cancel
+              </Button>
+              <Button
                 onClick={handleSendCredentials}
                 disabled={credSending}
                 style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: C.purple, color: C.white, fontSize: 13, fontWeight: 700, cursor: credSending ? "not-allowed" : "pointer", opacity: credSending ? 0.7 : 1 }}
-              >{credSending ? "Sending…" : "Send Credentials"}</button>
+              >
+                {credSending ? "Sending…" : "Send Credentials"}
+              </Button>
             </div>
           </div>
         </div>

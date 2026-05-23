@@ -14,9 +14,9 @@ import Sidebar from '../shared/Sidebar';
 const { Text } = Typography;
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
-const BASE = 'https://grinch-revocable-cornflake.ngrok-free.dev';
-const MEDIA_BASE_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev';
+const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const BASE = 'http://127.0.0.1:8000';
+const MEDIA_BASE_URL = 'http://127.0.0.1:8000';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';

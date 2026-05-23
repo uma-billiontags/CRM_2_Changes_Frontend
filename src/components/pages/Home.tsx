@@ -20,8 +20,8 @@ export default function Home() {
       <header className="sticky top-0 z-40 backdrop-blur-md bg-background/80 border-b border-border">
         <div className="max-w-7xl mx-auto h-16 px-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold text-sm">N</div>
-            <span className="font-semibold tracking-tight">Billion <span className="text-primary">Tags</span></span>
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold text-sm">B</div>
+            <span className="font-semibold tracking-tight">Billion <span className="text-primary">Media</span></span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-ink-soft">
             <a href="#features" className="hover:text-ink">Features</a>

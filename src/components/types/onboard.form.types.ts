@@ -22,7 +22,6 @@ export interface AddressRow {
 }
 
 export interface CompanyForm {
-  reporting_id: string;
   company_name: string;
   company_type: string;
   agency_type: string;

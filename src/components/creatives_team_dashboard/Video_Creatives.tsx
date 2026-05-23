@@ -10,7 +10,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
+const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -302,7 +302,7 @@ export default function Video_Creatives() {
       message.warning('No asset available to download');
       return;
     }
-    const downloadUrl = `https://grinch-revocable-cornflake.ngrok-free.dev/download_creative/${record.creativeId}/`;
+    const downloadUrl = `http://127.0.0.1:8000/download_creative/${record.creativeId}/`;
     const a = document.createElement('a');
     a.href = downloadUrl;
     a.target = '_blank';

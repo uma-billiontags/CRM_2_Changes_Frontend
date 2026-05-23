@@ -97,7 +97,7 @@ export function ClientDetailModal({ client, onApprove, onReject, onClose }: Clie
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
       background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 250,
     }}>
       <div style={{
         background: C.white, borderRadius: 16, border: `1px solid ${C.border}`,

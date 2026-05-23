@@ -2,8 +2,7 @@ import { useOutletContext } from "react-router-dom";
 import ClientTablePage from "./ClientTablePage";
 import type { SuperAdminOutletContext } from "./SuperAdminLayout";
 
-// ── All Clients ───────────────────────────────────────────────────────────────
-
+// All Clients
 export function AllClientsPage() {
   const { clients, handleApprove, handleReject } = useOutletContext<SuperAdminOutletContext>();
   return (
@@ -18,8 +17,7 @@ export function AllClientsPage() {
   );
 }
 
-// ── Pending Approval ──────────────────────────────────────────────────────────
-
+// Pending Approval
 export function PendingPage() {
   const { clients, handleApprove, handleReject } = useOutletContext<SuperAdminOutletContext>();
   return (

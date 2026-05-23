@@ -1,50 +1,41 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Megaphone, Plus, Layers,
-  FileText, Settings, LogOut, Wallet, Radio,
+  LayoutDashboard, FileText, Settings, LogOut,
+  Image, Video,
 } from 'lucide-react';
 
-const BLUE  = '#2563EB';
-const WHITE = '#FFFFFF';
+const PURPLE = '#7c3aed';
+const WHITE  = '#FFFFFF';
 
-const CAMPAIGN_NAV = [
+const CREATIVE_NAV = [
   {
     g: 'WORKSPACE',
     items: [
-      { label: 'Dashboard',        icon: LayoutDashboard, to: '/user_dashboard'   },
-      { label: 'My Campaigns',     icon: Megaphone,       to: '/user_campaigns'   },
-      { label: 'Create Campaign',  icon: Plus,            to: '/campaign_create'  },
-      { label: 'My Drafts',        icon: Layers,          to: '/user_drafts'      },
-      { label: 'Insertion Orders', icon: FileText,        to: '/user_io'          },
+      { label: 'Dashboard',              icon: LayoutDashboard, to: '/creative_dashboard'      },
+      { label: 'Image Creatives',        icon: Image,           to: '/image_creatives'         },
+      { label: 'Video Creatives',        icon: Video,           to: '/video_creatives'         },
+      { label: 'Third-Party Creatives',  icon: FileText,        to: '/third_party_creatives'   },
     ],
   },
   {
-    g: 'MONITOR',
+    g: 'ACCOUNT',
     items: [
-      { label: 'Live Status', icon: Radio,    to: '/user_live'      },
-      { label: 'Approvals',   icon: FileText, to: '/user_approvals' },
-    ],
-  },
-  {
-    g: 'INSIGHTS',
-    items: [
-      { label: 'Reports', icon: FileText, to: '/user_reports'  },
-      { label: 'Billing', icon: Wallet,   to: '/user_billing'  },
+      { label: 'Reports', icon: FileText, to: '/creative_reports' },
     ],
   },
 ];
 
-interface SidebarProps {
+interface CreativeSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
 }
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
-  const location   = useLocation();
+export default function CreativeSidebar({ collapsed, onToggle }: CreativeSidebarProps) {
+  const location  = useLocation();
   const clientName = localStorage.getItem('client_name') ?? '';
 
-  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'A';
-  const displayName    = clientName || 'Campaign Manager';
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'C';
+  const displayName    = clientName || 'Creative Team';
 
   return (
     <aside style={{
@@ -67,16 +58,16 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 9, background: BLUE,
+              width: 34, height: 34, borderRadius: 9, background: PURPLE,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, fontWeight: 900, color: WHITE,
             }}>N</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: WHITE, letterSpacing: '-0.3px' }}>
-                Billion <span style={{ color: '#60A5FA' }}>Tags</span>
+                Billion <span style={{ color: '#C4B5FD' }}>Tags</span>
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
-                CAMPAIGN PLATFORM
+                CREATIVE PLATFORM
               </div>
             </div>
           </Link>
@@ -84,7 +75,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         {collapsed && (
           <div style={{
-            width: 34, height: 34, borderRadius: 9, background: BLUE,
+            width: 34, height: 34, borderRadius: 9, background: PURPLE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 900, color: WHITE,
           }}>N</div>
@@ -108,7 +99,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* ── Nav ── */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
-        {CAMPAIGN_NAV.map(({ g, items }) => (
+        {CREATIVE_NAV.map(({ g, items }) => (
           <div key={g} style={{ marginBottom: 2 }}>
             {!collapsed && (
               <div style={{
@@ -132,7 +123,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     fontSize: 13, fontWeight: active ? 600 : 400,
                     marginBottom: 1,
                     color: active ? WHITE : 'rgba(255,255,255,0.45)',
-                    background: active ? 'rgba(37,99,235,0.85)' : 'transparent',
+                    background: active ? 'rgba(124,58,237,0.85)' : 'transparent',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.15s',
                   }}>
@@ -159,13 +150,13 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             background: 'rgba(255,255,255,0.05)', marginBottom: 6,
           }}>
             <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: BLUE,
+              width: 32, height: 32, borderRadius: '50%', background: PURPLE,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: WHITE, fontSize: 12, fontWeight: 800, flexShrink: 0,
             }}>{avatarInitials}</div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: WHITE }}>{displayName}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CAMPAIGN MANAGER</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CREATIVE TEAM</div>
             </div>
           </div>
         )}

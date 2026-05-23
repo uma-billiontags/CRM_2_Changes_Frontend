@@ -200,7 +200,7 @@ export default function User_Dashboard() {
 
   useEffect(() => {
     const clientId = localStorage.getItem('client_id');
-    fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns_by_client/${clientId}/`, {
+    fetch(`http://127.0.0.1:8000/get_campaigns_by_client/${clientId}/`, {
       headers: { 'ngrok-skip-browser-warning': '1' }
     })
       .then(r => {

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
-
 export default function Login() {
   const navigate = useNavigate();
 
@@ -11,105 +10,67 @@ export default function Login() {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
-  
-  const USERS = [
-  {
-    email: 'creative@gmail.com',
-    password: '123',
-    role: 'creative',
-    redirect: '/creative_dashboard',
-  },
-  {
-    email: 'campaign@gmail.com',
-    password: '123',
-    role: 'campaign',
-    redirect: '/campaign_dashboard',
-  },
-  {
-    email: 'client@gmail.com',
-    password: '123',
-    role: 'client',
-    redirect: '/user_dashboard',
-  },
-];
 
-// const handleSignIn = async () => {
-//   setError('');
-
-//   if (!email.trim()) {
-//     setError('Please enter your email address.');
-//     return;
-//   }
-//   if (!password.trim()) {
-//     setError('Please enter your password.');
-//     return;
-//   }
-
-//   const matched = USERS.find(
-//     u => u.email === email.trim().toLowerCase() && u.password === password
-//   );
-
-//   if (matched) {
-//     if (remember) {
-//       localStorage.setItem('remembered_email', email.trim());
-//     } else {
-//       localStorage.removeItem('remembered_email');
-//     }
-//     // Store role for use across the app
-//     localStorage.setItem('user_role', matched.role);
-//     localStorage.setItem('user_email', matched.email);
-//     navigate(matched.redirect);
-//   } else {
-//     setError('Invalid email or password. Please try again.');
-//   }
-// };
- 
-  // Submit on Enter key
   const handleSignIn = async () => {
-  setError('');
-  if (!email.trim()) { setError('Please enter your email address.'); return; }
-  if (!password.trim()) { setError('Please enter your password.'); return; }
+    setError("");
+    if (!email.trim()) { setError("Please enter your email address."); return; }
+    if (!password.trim()) { setError("Please enter your password."); return; }
 
-  setLoading(true);
-  try {
-    const res = await fetch('https://grinch-revocable-cornflake.ngrok-free.dev/login_view/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
-      body: JSON.stringify({ email: email.trim(), password }),
-    });
+    setLoading(true);
+    try {
+      const res = await fetch(
+        "http://127.0.0.1:8000/login_view/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "1",
+          },
+          body: JSON.stringify({ email: email.trim(), password }),
+        }
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Invalid email or password.');
-      return;
+      if (!res.ok) {
+        // Show the exact error message from backend
+        // (inactive account, not approved, invalid password, etc.)
+        setError(data.error || "Invalid email or password.");
+        return;
+      }
+
+      // ── Store user info in localStorage ──────────────────────────────────
+      localStorage.setItem("user_role",   data.user.role);
+      localStorage.setItem("user_email",  data.user.email);
+      localStorage.setItem("user_id",     String(data.user.id));
+      localStorage.setItem("user_name",   data.user.username  || "");
+      localStorage.setItem("client_id",   data.user.client_id || "");
+      localStorage.setItem("user_source", data.user.source    || "");
+
+      if (remember) {
+        localStorage.setItem("remembered_email", email.trim());
+      } else {
+        localStorage.removeItem("remembered_email");
+      }
+
+      // ── Redirect based on role (frontend decides) ─────────────────────────
+      const role = data.user.role.toLowerCase();
+      const redirectMap: Record<string, string> = {
+        superadmin:    "/superadmin_dashboard",
+        admin:         "/admin_dashboard",
+        creative_team: "/creative_dashboard",
+        campaign_team: "/campaign_dashboard",
+        client:        "/user_dashboard",
+        viewer:        "/viewer_dashboard",
+      };
+      navigate(redirectMap[role] ?? "/dashboard");
+
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    // Store user info
-    localStorage.setItem('user_role', data.user.role);
-    localStorage.setItem('user_email', data.user.email);
-    localStorage.setItem('user_id', String(data.user.id));
-    localStorage.setItem('client_id', data.user.client_id || '');
-
-    if (remember) {
-      localStorage.setItem('remembered_email', email.trim());
-    } else {
-      localStorage.removeItem('remembered_email');
-    }
-
-    // Redirect based on role
-    if (data.user.role === 'creative') {
-      navigate('/creative_dashboard');
-    } else {
-      navigate('/user_dashboard');
-    }
-
-  } catch {
-    setError('Network error. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSignIn();
@@ -118,7 +79,7 @@ export default function Login() {
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
 
-      {/* ── Visual / branding side ── */}
+      {/* ── Branding side ── */}
       <div className="hidden md:flex relative overflow-hidden bg-sidebar text-sidebar-foreground p-12 flex-col justify-between">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-12 h-12 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold">
@@ -169,7 +130,7 @@ export default function Login() {
             Sign in with your registered credentials
           </p>
 
-          {/* ✅ Error banner — shown when credentials don't match DB */}
+          {/* Error banner */}
           {error && (
             <div className="mt-4 px-4 py-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
               <span className="mt-0.5 flex-shrink-0">⚠️</span>
@@ -179,7 +140,6 @@ export default function Login() {
 
           <div className="mt-7 space-y-4" onKeyDown={handleKeyDown}>
 
-            {/* Email field */}
             <Field
               icon={<Mail className="w-4 h-4" />}
               type="email"
@@ -189,7 +149,6 @@ export default function Login() {
               onChange={setEmail}
             />
 
-            {/* Password field */}
             <Field
               icon={<Lock className="w-4 h-4" />}
               type="password"
@@ -214,7 +173,6 @@ export default function Login() {
               </a>
             </div>
 
-            {/* ✅ Sign in button — disabled while loading */}
             <button
               onClick={handleSignIn}
               disabled={loading}
@@ -246,7 +204,6 @@ export default function Login() {
 }
 
 // ── Field sub-component ───────────────────────────────────────────────────────
-
 function Field({
   icon, label, value, onChange, ...props
 }: {

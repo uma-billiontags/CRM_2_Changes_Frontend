@@ -20,9 +20,9 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const SUBMIT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/create_campaign/';
-// const CLIENT_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_client/CLT-2026-00007/';
-const GET_CAMPAIGNS_URL = 'https://grinch-revocable-cornflake.ngrok-free.dev/get_campaigns/';
+const SUBMIT_URL = 'http://127.0.0.1:8000/create_campaign/';
+// const CLIENT_URL = 'http://127.0.0.1:8000/get_client/CLT-2026-00007/';
+const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
@@ -652,7 +652,7 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
       return;
     }
 
-    fetch(`https://grinch-revocable-cornflake.ngrok-free.dev/get_client/${clientId}/`, {
+    fetch(`http://127.0.0.1:8000/get_client/${clientId}/`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => res.json())
