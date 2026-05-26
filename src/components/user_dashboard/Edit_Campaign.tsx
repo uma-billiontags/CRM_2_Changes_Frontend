@@ -19,7 +19,7 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
 
 // ─── Constants (same as Campaign_Create) ──────────────────────────────────────
 
@@ -643,13 +643,7 @@ export default function Edit_Campaign() {
                         <Input value={client} disabled style={{ fontWeight: 600 }} />
                       </Form.Item>
                       <Form.Item label="Advertiser (Brand)" required>
-                        <Select
-                          value={advertiser || undefined}
-                          onChange={setAdvertiser}
-                          placeholder="Select an advertiser…"
-                          options={toOpts(['Unilever India', 'Tata Digital', 'HDFC Bank', 'Myntra', 'Reliance Retail', 'Mahindra Group', 'Airtel India'])}
-                          style={{ width: '100%', height: 38 }}
-                        />
+                        <Input placeholder="Enter advertiser name…" value={advertiser} onChange={e => setAdvertiser(e.target.value)} style={{ width: '100%', height: 38 }} />
                       </Form.Item>
                       <InfoBox variant="blue">
                         Changing the advertiser will affect all reports mapped to this campaign.

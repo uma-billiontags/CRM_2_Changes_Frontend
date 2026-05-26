@@ -1,11 +1,11 @@
 // ── Shared Types ──────────────────────────────────────────────────────────────
 
-export type ClientStatus  = "pending" | "approved" | "rejected";
-export type RiskLevel     = "Low" | "Medium" | "High" | "Critical";
+export type ClientStatus = "pending" | "approved" | "rejected";
+export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
 export type PriorityLevel = "High" | "Medium" | "Low";
-export type ClientType    = "Platinum" | "Gold" | "Silver" | "Standard";
-export type ViewId        = "overview" | "clients" | "pending" | "approved" | "rejected";
-export type ToastType     = "success" | "error";
+export type ClientType = "Platinum" | "Gold" | "Silver" | "Standard";
+export type ViewId = "overview" | "clients" | "pending" | "approved" | "rejected";
+export type ToastType = "success" | "error";
 
 export interface ClientBilling {
   payment_type: string;
@@ -75,34 +75,36 @@ export interface Counts {
   pending: number;
   approved: number;
   rejected: number;
+  campaignTotal: number; // ← add this
+
 }
 
 // ── Shared Color Palette ──────────────────────────────────────────────────────
 
 export const C = {
-  bg:           "#F8FAFC",
-  surface:      "#FFFFFF",
-  card:         "#FFFFFF",
-  border:       "#CBD5E1",
-  borderLight:  "#E2E8F0",
-  blue:         "#2563EB",
-  blueLight:    "#EFF6FF",
-  blueMid:      "#BFDBFE",
-  blueDeep:     "#1D4ED8",
-  green:        "#16A34A",
-  greenLight:   "#DCFCE7",
-  amber:        "#D97706",
-  amberLight:   "#FEF3C7",
-  red:          "#DC2626",
-  redLight:     "#FEE2E2",
-  purple:       "#7C3AED",
-  purpleLight:  "#EDE9FE",
-  slate:        "#0F172A",
-  slate700:     "#334155",
-  slate500:     "#64748B",
-  slate300:     "#CBD5E1",
-  slate100:     "#F1F5F9",
-  white:        "#FFFFFF",
+  bg: "#F8FAFC",
+  surface: "#FFFFFF",
+  card: "#FFFFFF",
+  border: "#CBD5E1",
+  borderLight: "#E2E8F0",
+  blue: "#2563EB",
+  blueLight: "#EFF6FF",
+  blueMid: "#BFDBFE",
+  blueDeep: "#1D4ED8",
+  green: "#16A34A",
+  greenLight: "#DCFCE7",
+  amber: "#D97706",
+  amberLight: "#FEF3C7",
+  red: "#DC2626",
+  redLight: "#FEE2E2",
+  purple: "#7C3AED",
+  purpleLight: "#EDE9FE",
+  slate: "#0F172A",
+  slate700: "#334155",
+  slate500: "#64748B",
+  slate300: "#CBD5E1",
+  slate100: "#F1F5F9",
+  white: "#FFFFFF",
 };
 
 // ── Shared Status/Risk/Type Maps ──────────────────────────────────────────────
@@ -116,22 +118,22 @@ export interface StatusStyle {
 }
 
 export const STATUS_MAP: Record<ClientStatus, StatusStyle> = {
-  pending:  { label: "Pending",  color: C.amber, bg: C.amberLight, border: "#FDE68A", dot: C.amber },
+  pending: { label: "Pending", color: C.amber, bg: C.amberLight, border: "#FDE68A", dot: C.amber },
   approved: { label: "Approved", color: C.green, bg: C.greenLight, border: "#BBF7D0", dot: C.green },
-  rejected: { label: "Rejected", color: C.red,   bg: C.redLight,   border: "#FECACA", dot: C.red   },
+  rejected: { label: "Rejected", color: C.red, bg: C.redLight, border: "#FECACA", dot: C.red },
 };
 
 export const RISK_COLOR: Record<RiskLevel, string> = {
-  Low:      C.green,
-  Medium:   C.amber,
-  High:     C.red,
+  Low: C.green,
+  Medium: C.amber,
+  High: C.red,
   Critical: "#DB2777",
 };
 
 export const CLIENT_TYPE_COLOR: Record<ClientType, string> = {
   Platinum: C.slate700,
-  Gold:     C.amber,
-  Silver:   C.slate500,
+  Gold: C.amber,
+  Silver: C.slate500,
   Standard: C.blue,
 };
 

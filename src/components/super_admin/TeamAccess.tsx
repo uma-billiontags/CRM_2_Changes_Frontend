@@ -27,13 +27,13 @@ const C = {
 };
 
 const API = {
-  create:       "http://127.0.0.1:8000/create_team_member/",
-  getAll:       "http://127.0.0.1:8000/get_team_members/",
-  delete:       "http://127.0.0.1:8000/delete_team_member/",
-  edit:         "http://127.0.0.1:8000/edit_team_member/",
-  getClients:   "http://127.0.0.1:8000/get_client_users/",
-  editClient:   "http://127.0.0.1:8000/edit_client_user/",
-  deleteClient: "http://127.0.0.1:8000/delete_client_user/",
+  create:       "https://city-animate-anagram.ngrok-free.dev/create_team_member/",
+  getAll:       "https://city-animate-anagram.ngrok-free.dev/get_team_members/",
+  delete:       "https://city-animate-anagram.ngrok-free.dev/delete_team_member/",
+  edit:         "https://city-animate-anagram.ngrok-free.dev/edit_team_member/",
+  getClients:   "https://city-animate-anagram.ngrok-free.dev/get_client_users/",
+  editClient:   "https://city-animate-anagram.ngrok-free.dev/edit_client_user/",
+  deleteClient: "https://city-animate-anagram.ngrok-free.dev/delete_client_user/",
 };
 
 const NGROK_HEADERS = {

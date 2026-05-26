@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   ArrowRightOutlined, CheckOutlined,
-  PlusOutlined, BellOutlined, RightOutlined,
+  PlusOutlined, RightOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
   SaveOutlined
@@ -20,9 +20,9 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const SUBMIT_URL = 'http://127.0.0.1:8000/create_campaign/';
-// const CLIENT_URL = 'http://127.0.0.1:8000/get_client/CLT-2026-00007/';
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const SUBMIT_URL = 'https://city-animate-anagram.ngrok-free.dev/create_campaign/';
+// const CLIENT_URL = 'https://city-animate-anagram.ngrok-free.dev/get_client/CLT-2026-00007/';
+const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
@@ -652,7 +652,7 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
       return;
     }
 
-    fetch(`http://127.0.0.1:8000/get_client/${clientId}/`, {
+    fetch(`https://city-animate-anagram.ngrok-free.dev/get_client/${clientId}/`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => res.json())
@@ -1036,8 +1036,7 @@ function LineItemCard({
   const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
 
   // ── Unit Cost Calculation ──
-  const currencySymbol = clientCurrencySymbol;  // ← comes directly from API now
-
+const currencySymbol = clientCurrencySymbol || '...';
 
   const calculatedUnitCost = useMemo(() => {
     const impressions = parseFloat(item.impressions);
@@ -1764,7 +1763,7 @@ function LineItemCard({
                   />
                 </Form.Item>
               )}
-            </div>
+            </div> 
 
             {/* Notes — shown only if any value differs from default */}
             {(
@@ -2120,13 +2119,13 @@ export default function Campaign_Create() {
   // Step 1
   const [client, setClient] = useState<string>(restoredData?.client ?? '');
   const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
-  const [advertiser, setAdvertiser] = useState('');
+  const [advertiser, setAdvertiser] = useState<string>(restoredData?.advertiser ?? '');
   const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
 
   // After clientId state, add:
   const [clientCountry, setClientCountry] = useState<string>('');
   // Add alongside clientCountry state:
-  const [clientCurrencySymbol, setClientCurrencySymbol] = useState<string>('$');
+  const [clientCurrencySymbol, setClientCurrencySymbol] = useState<string>('');
 
   // Step 2
   const [campaignName, setCampaignName] = useState<string>(restoredData?.campaignName ?? '');
@@ -2467,10 +2466,7 @@ export default function Campaign_Create() {
             <span style={{ color: 'var(--slate)', fontWeight: 600 }}>Create Campaign</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="cc-topbar-bell">
-              <BellOutlined style={{ fontSize: 15, color: 'var(--slate-500)' }} />
-              <span className="cc-topbar-bell-dot" />
-            </div>
+            
             <div className="cc-topbar-avatar">{clientName ? clientName.charAt(0).toUpperCase() : 'AK'}</div>
           </div>
         </header>

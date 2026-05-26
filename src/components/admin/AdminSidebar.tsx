@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import type { Counts } from "../types/types";
-import { LogOut, Settings, Users } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 
 
 // ── Sidebar Color Palette ─────────────────────────────────────────────────────
@@ -43,20 +43,20 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: "CLIENTS",
     items: [
-      { label: "All Clients",      icon: "🏢", to: "/admin/clients",  countKey: "total" },
+      { label: "All Clients", icon: "🏢", to: "/admin/clients", countKey: "total" },
     ],
   },
   {
     group: "CAMPAIGNS",
     items: [
-      { label: "All Campaigns", icon: "📊", to: "/admin/campaigns", countKey: "total" },
+      { label: "All Campaigns", icon: "📊", to: "/admin/campaigns", countKey: "campaignTotal" },
     ],
   },
   {
     group: "SETTINGS",
     items: [
       { label: "System Settings", icon: "⚙️", to: "/admin/system-settings" },
-      { label: "Audit Logs",      icon: "📋", to: "/admin/audit-logs" },
+      { label: "Audit Logs", icon: "📋", to: "/admin/audit-logs" },
     ],
   },
 ];

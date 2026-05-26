@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import type { Counts } from "../types/types";
-import { LogOut, Settings, Users } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 
 
 // ── Sidebar Color Palette ─────────────────────────────────────────────────────
@@ -43,16 +43,16 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: "CLIENTS",
     items: [
-      { label: "All Clients",      icon: "🏢", to: "/superadmin/clients",  countKey: "total" },
-      { label: "Pending Approval", icon: "⏳", to: "/superadmin/pending",  countKey: "pending",  accent: "#D97706" },
-      { label: "Approved",         icon: "✅", to: "/superadmin/approved", countKey: "approved", accent: "#16A34A" },
-      { label: "Rejected",         icon: "❌", to: "/superadmin/rejected", countKey: "rejected", accent: "#DC2626" },
+      { label: "All Clients", icon: "🏢", to: "/superadmin/clients", countKey: "total" },
+      { label: "Pending Approval", icon: "⏳", to: "/superadmin/pending", countKey: "pending", accent: "#D97706" },
+      { label: "Approved", icon: "✅", to: "/superadmin/approved", countKey: "approved", accent: "#16A34A" },
+      { label: "Rejected", icon: "❌", to: "/superadmin/rejected", countKey: "rejected", accent: "#DC2626" },
     ],
   },
   {
     group: "CAMPAIGNS",
     items: [
-      { label: "All Campaigns", icon: "📊", to: "/superadmin/campaigns", countKey: "total" },
+      { label: "All Campaigns", icon: "📊", to: "/superadmin/campaigns", countKey: "campaignTotal" },
     ],
   },
   {
@@ -65,8 +65,8 @@ const NAV_GROUPS: NavGroup[] = [
     group: "SETTINGS",
     items: [
       { label: "System Settings", icon: "⚙️", to: "/superadmin/system-settings" },
-      { label: "Admin Users",     icon: "🔑", to: "/superadmin/admin-users" },
-      { label: "Audit Logs",      icon: "📋", to: "/superadmin/audit-logs" },
+      { label: "Admin Users", icon: "🔑", to: "/superadmin/admin-users" },
+      { label: "Audit Logs", icon: "📋", to: "/superadmin/audit-logs" },
     ],
   },
 ];

@@ -8,13 +8,13 @@ import {
     SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
     PlusOutlined, DeleteOutlined, FileImageOutlined,
     CloudUploadOutlined, SaveOutlined, InfoCircleOutlined,
-    CodeOutlined
+    CodeOutlined, CheckCircleOutlined, CloseOutlined
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 
 const { Option } = Select;
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "https://city-animate-anagram.ngrok-free.dev";
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 const C = {
@@ -54,7 +54,6 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
     cancelled: { bg: C.redLight, border: "#FECACA", color: C.red, dot: C.red },
 };
 
-// ── Constants matching Campaign_Create ───────────────────────────────────────
 const AD_FORMAT_OPTIONS = [
     { value: "banner", label: "Banner" },
     { value: "video", label: "Video" },
@@ -73,7 +72,7 @@ const CPC_RATES: Record<string, number> = { banner: 1, Interstitial: 1, video: 1
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface EditableCreative {
     key: string;
-    id?: number;          // ← ADD THIS (the DB id from API)
+    id?: number;
     type: "standard" | "third_party";
     creative_name: string;
     dimensions: string;
@@ -85,7 +84,6 @@ interface EditableCreative {
     notes: string;
     main_asset: File | null;
     backup_image: File | null;
-    // existing (already saved, no new file)
     isExisting?: boolean;
 }
 
@@ -150,7 +148,9 @@ interface LineItem {
 }
 
 interface Campaign {
-    campaign_id: string;
+    id: number;
+    campaign_id: string | null;
+    approval_status?: 'pending' | 'approved';
     client_campaign_ID?: string;
     purchase_order_ID?: string;
     campaign_name: string;
@@ -175,6 +175,8 @@ interface Campaign {
     viewability_goal?: string;
     geo_targeting?: GeoLocation[] | string;
     line_items?: LineItem[];
+    new_cpm?: string | number;
+    new_price?: string | number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -254,7 +256,6 @@ function apiLineItemToEditable(li: LineItem): EditableLineItem {
             ? li.ad_format.split(" › ")[0].toLowerCase()
             : "";
 
-    // Map display label back to value key
     const formatMap: Record<string, string> = {
         "banner": "banner", "video": "video", "youtube": "youtube", "interstitial": "Interstitial",
     };
@@ -346,7 +347,6 @@ function StatCard({ label, value, color, bg, icon, active, onClick }: {
     );
 }
 
-// ── Section Label ─────────────────────────────────────────────────────────────
 function SectionLabel({ icon, label }: { icon: string; label: string }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
@@ -356,7 +356,6 @@ function SectionLabel({ icon, label }: { icon: string; label: string }) {
     );
 }
 
-// ── Field Label helper ────────────────────────────────────────────────────────
 function FL({ children }: { children: React.ReactNode }) {
     return <span style={{ fontSize: 11, fontWeight: 700, color: C.slate500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{children}</span>;
 }
@@ -364,7 +363,7 @@ function FL({ children }: { children: React.ReactNode }) {
 // ── Creative Preview Modal ────────────────────────────────────────────────────
 interface PreviewTarget {
     type: "image" | "video" | "file";
-    objectUrl: string | null;       // from File (new upload)
+    objectUrl: string | null;
     fileName: string;
     creativeName: string;
     dimensions?: string;
@@ -374,7 +373,6 @@ interface PreviewTarget {
 }
 
 function CreativePreviewModal({ preview, onClose }: { preview: PreviewTarget | null; onClose: () => void }) {
-    // Revoke object URL when modal closes to avoid memory leaks
     useEffect(() => {
         return () => {
             if (preview?.objectUrl) URL.revokeObjectURL(preview.objectUrl);
@@ -384,105 +382,151 @@ function CreativePreviewModal({ preview, onClose }: { preview: PreviewTarget | n
     if (!preview) return null;
 
     const hasMedia = !!preview.objectUrl;
+    const metaParts = [preview.dimensions, preview.aspectRatio, preview.fileSize].filter(Boolean);
 
     return (
-        <Modal
-            open={!!preview}
-            onCancel={onClose}
-            footer={null}
-            width={preview.type === "video" ? 820 : 680}
-            centered
-            styles={{
-                body: { padding: 0 },
-                mask: { backdropFilter: "blur(6px)", background: "rgba(0,0,0,0.7)" },
-            }}
-            closeIcon={
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13 }}>✕</div>
-            }
-        >
-            {/* Header */}
-            <div style={{ background: "linear-gradient(135deg,#0F172A,#1E293B)", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: preview.type === "video" ? "rgba(79,70,229,0.3)" : preview.type === "image" ? "rgba(37,99,235,0.3)" : "rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                    {preview.type === "video" ? "🎬" : preview.type === "image" ? "🖼️" : "📄"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview.creativeName || preview.fileName}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-                        {[preview.dimensions, preview.aspectRatio, preview.fileSize].filter(Boolean).join("  ·  ")}
+        <>
+            <div
+                onClick={onClose}
+                style={{
+                    position: "fixed", inset: 0, zIndex: 1050,
+                    background: "rgba(0,0,0,0.55)",
+                    backdropFilter: "blur(4px)",
+                }}
+            />
+            <div style={{
+                position: "fixed",
+                top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 1051,
+                width: preview.type === "video" ? 780 : 640,
+                maxWidth: "92vw",
+                borderRadius: 16,
+                overflow: "hidden",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)",
+                background: C.white,
+            }}>
+                <div style={{
+                    background: "linear-gradient(135deg,#0F172A 0%,#1E293B 100%)",
+                    padding: "14px 18px",
+                    display: "flex", alignItems: "center", gap: 12,
+                }}>
+                    <div style={{
+                        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                        background: preview.type === "video"
+                            ? "rgba(79,70,229,0.3)"
+                            : preview.type === "image"
+                                ? "rgba(37,99,235,0.3)"
+                                : "rgba(124,58,237,0.3)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                    }}>
+                        {preview.type === "video" ? "🎬" : preview.type === "image" ? "🖼️" : "📄"}
                     </div>
-                </div>
-                {preview.isExisting && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenLight, padding: "2px 8px", borderRadius: 10, border: `1px solid #86efac`, flexShrink: 0 }}>Saved</span>
-                )}
-            </div>
-
-            {/* Body */}
-            <div style={{ background: "#0F172A", minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", padding: 24 }}>
-                {hasMedia ? (
-                    preview.type === "image" ? (
-                        <img
-                            src={preview.objectUrl!}
-                            alt={preview.creativeName}
-                            style={{ maxWidth: "100%", maxHeight: 500, objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }}
-                        />
-                    ) : preview.type === "video" ? (
-                        <video
-                            src={preview.objectUrl!}
-                            controls
-                            autoPlay
-                            style={{ maxWidth: "100%", maxHeight: 480, borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", background: "#000" }}
-                        />
-                    ) : (
-                        /* File type (third-party tag files) */
-                        <div style={{ textAlign: "center" }}>
-                            <div style={{ fontSize: 56, marginBottom: 16 }}>📄</div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 6 }}>{preview.fileName}</div>
-                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 20 }}>{preview.fileSize}</div>
-                            <a href={preview.objectUrl!} download={preview.fileName}>
-                                <Button type="primary" style={{ background: C.indigo, borderColor: C.indigo, fontWeight: 600 }}>
-                                    Download File
-                                </Button>
-                            </a>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {preview.creativeName || preview.fileName}
                         </div>
-                    )
-                ) : (
-                    /* Existing saved creative — no local file available */
-                    <div style={{ textAlign: "center", padding: "20px 0" }}>
-                        <div style={{ fontSize: 52, marginBottom: 14, opacity: 0.5 }}>
-                            {preview.type === "video" ? "🎬" : "🖼️"}
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)", marginBottom: 8 }}>
-                            Preview not available
-                        </div>
-                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", maxWidth: 300, lineHeight: 1.6 }}>
-                            This creative is already saved on the server. To preview it, replace the file using the <strong style={{ color: "rgba(255,255,255,0.6)" }}>Replace File</strong> button.
-                        </div>
-                        {/* Metadata pills */}
-                        {(preview.dimensions || preview.aspectRatio || preview.fileSize) && (
-                            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
-                                {preview.dimensions && (
-                                    <span style={{ fontSize: 11, fontWeight: 600, color: C.blue, background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.3)", padding: "3px 10px", borderRadius: 20 }}>📐 {preview.dimensions}</span>
-                                )}
-                                {preview.aspectRatio && (
-                                    <span style={{ fontSize: 11, fontWeight: 600, color: C.indigo, background: "rgba(79,70,229,0.15)", border: "1px solid rgba(79,70,229,0.3)", padding: "3px 10px", borderRadius: 20 }}>⬜ {preview.aspectRatio}</span>
-                                )}
-                                {preview.fileSize && (
-                                    <span style={{ fontSize: 11, fontWeight: 600, color: C.slate400, background: "rgba(148,163,184,0.15)", border: "1px solid rgba(148,163,184,0.3)", padding: "3px 10px", borderRadius: 20 }}>💾 {preview.fileSize}</span>
-                                )}
+                        {metaParts.length > 0 && (
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                                {metaParts.join("  ·  ")}
                             </div>
                         )}
                     </div>
-                )}
+                    {preview.isExisting && (
+                        <span style={{
+                            fontSize: 10, fontWeight: 700, color: C.green,
+                            background: "rgba(22,163,74,0.15)",
+                            padding: "3px 10px", borderRadius: 20,
+                            border: "1px solid rgba(22,163,74,0.35)",
+                            flexShrink: 0,
+                        }}>Saved</span>
+                    )}
+                    <button
+                        onClick={onClose}
+                        style={{
+                            width: 30, height: 30, borderRadius: "50%",
+                            background: "rgba(255,255,255,0.12)",
+                            border: "1.5px solid rgba(255,255,255,0.25)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            cursor: "pointer", color: "#fff", fontSize: 13,
+                            flexShrink: 0, transition: "background 0.15s", padding: 0,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.22)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                    >
+                        <CloseOutlined style={{ fontSize: 12 }} />
+                    </button>
+                </div>
+                <div style={{
+                    background: "#0F172A", minHeight: 260,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "28px 24px",
+                }}>
+                    {hasMedia ? (
+                        preview.type === "image" ? (
+                            <img src={preview.objectUrl!} alt={preview.creativeName}
+                                style={{ maxWidth: "100%", maxHeight: 460, objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
+                        ) : preview.type === "video" ? (
+                            <video src={preview.objectUrl!} controls autoPlay
+                                style={{ maxWidth: "100%", maxHeight: 440, borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)", background: "#000" }} />
+                        ) : (
+                            <div style={{ textAlign: "center" }}>
+                                <div style={{ fontSize: 52, marginBottom: 14 }}>📄</div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 6 }}>{preview.fileName}</div>
+                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 20 }}>{preview.fileSize}</div>
+                                <a href={preview.objectUrl!} download={preview.fileName}>
+                                    <Button type="primary" style={{ background: C.indigo, borderColor: C.indigo, fontWeight: 600 }}>Download File</Button>
+                                </a>
+                            </div>
+                        )
+                    ) : (
+                        <div style={{ textAlign: "center", padding: "10px 0" }}>
+                            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>
+                                {preview.type === "video" ? "🎬" : "🖼️"}
+                            </div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.65)", marginBottom: 8 }}>
+                                Preview not available
+                            </div>
+                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.38)", maxWidth: 280, lineHeight: 1.6 }}>
+                                This creative is saved on the server. Use the <strong style={{ color: "rgba(255,255,255,0.55)" }}>Replace File</strong> button to upload a new version.
+                            </div>
+                            {metaParts.length > 0 && (
+                                <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 18, flexWrap: "wrap" }}>
+                                    {preview.dimensions && (
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: C.blue, background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.3)", padding: "3px 10px", borderRadius: 20 }}>📐 {preview.dimensions}</span>
+                                    )}
+                                    {preview.aspectRatio && (
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: C.indigo, background: "rgba(79,70,229,0.15)", border: "1px solid rgba(79,70,229,0.3)", padding: "3px 10px", borderRadius: 20 }}>⬜ {preview.aspectRatio}</span>
+                                    )}
+                                    {preview.fileSize && (
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: C.slate400, background: "rgba(148,163,184,0.15)", border: "1px solid rgba(148,163,184,0.3)", padding: "3px 10px", borderRadius: 20 }}>💾 {preview.fileSize}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <div style={{
+                    background: "#1E293B", padding: "11px 18px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }}>
+                        {preview.fileName || "—"}
+                    </span>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            height: 32, padding: "0 16px", borderRadius: 8,
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            background: "transparent", color: "rgba(255,255,255,0.6)",
+                            fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#fff"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                    >Close</button>
+                </div>
             </div>
-
-            {/* Footer */}
-            <div style={{ background: "#1E293B", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>{preview.fileName || "—"}</span>
-                <Button onClick={onClose} style={{ height: 32, borderRadius: 7, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 600 }}>
-                    Close
-                </Button>
-            </div>
-        </Modal>
+        </>
     );
 }
 
@@ -500,11 +544,8 @@ function CreativeRowEditor({
     const backupRef = useRef<HTMLInputElement>(null);
     const isVideo = ["video", "youtube"].includes(adFormat);
     const isThirdParty = creative.type === "third_party";
-
-    // Preview state — stores the active preview target
     const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
-    // Build a PreviewTarget from a File object
     const buildPreviewFromFile = (file: File, creativeName: string, dimensions?: string, aspectRatio?: string, fileSize?: string): PreviewTarget => {
         const isImg = file.type.startsWith("image/");
         const isVid = file.type.startsWith("video/");
@@ -520,37 +561,30 @@ function CreativeRowEditor({
         };
     };
 
-    // Build a PreviewTarget for an existing (server-saved) creative — no File available
-   // In CreativeRowEditor, replace getServerPreviewUrl usage:
+    const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) => {
+        if (!creative.id) return;
+        const url = creative.type === "third_party"
+            ? `${BASE_URL}/download_thirdparty/${creative.id}/`
+            : `${BASE_URL}/download_creative/${creative.id}/`;
+        try {
+            const res = await fetch(url, { headers: { "ngrok-skip-browser-warning": "1" } });
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            setPreview({
+                type: isVideo ? "video" : "image",
+                objectUrl: blobUrl,
+                fileName: creative.creative_name,
+                creativeName: creative.creative_name,
+                dimensions: creative.dimensions,
+                aspectRatio: creative.aspect_ratio,
+                fileSize: creative.file_size,
+                isExisting: true,
+            });
+        } catch (e) {
+            console.error("Failed to load preview", e);
+        }
+    };
 
-const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) => {
-    if (!creative.id) return;
-    
-    const url = creative.type === "third_party"
-        ? `${BASE_URL}/download_thirdparty/${creative.id}/`
-        : `${BASE_URL}/download_creative/${creative.id}/`;
-    
-    try {
-        const res = await fetch(url, {
-            headers: { "ngrok-skip-browser-warning": "1" }  // ← key fix for ngrok
-        });
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        
-        setPreview({
-            type: isVideo ? "video" : "image",
-            objectUrl: blobUrl,
-            fileName: creative.creative_name,
-            creativeName: creative.creative_name,
-            dimensions: creative.dimensions,
-            aspectRatio: creative.aspect_ratio,
-            fileSize: creative.file_size,
-            isExisting: true,
-        });
-    } catch (e) {
-        console.error("Failed to load preview", e);
-    }
-};
     const handleMainFile = async (file: File) => {
         let meta = { dimensions: "", aspect_ratio: "", file_size: "" };
         if (isVideo || file.type.startsWith("video/")) {
@@ -564,7 +598,6 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
         onUpdate({ main_asset: file, creative_name: file.name.replace(/\.[^.]+$/, ""), ...meta, isExisting: false });
     };
 
-    // Thumbnail for image-type new uploads
     const thumbnailUrl = creative.main_asset && creative.main_asset.type.startsWith("image/")
         ? URL.createObjectURL(creative.main_asset)
         : null;
@@ -572,52 +605,44 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
     return (
         <>
             <CreativePreviewModal preview={preview} onClose={() => setPreview(null)} />
-
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", background: "#FAFBFC", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: isThirdParty ? C.purpleLight : C.blueLight, border: `1px solid ${isThirdParty ? C.purpleMid : C.blueMid}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: isThirdParty ? C.purple : C.blue }}>{index + 1}</div>
+                        <div style={{
+                            width: 22, height: 22, borderRadius: "50%",
+                            background: isThirdParty ? C.purpleLight : C.blueLight,
+                            border: `1px solid ${isThirdParty ? C.purpleMid : C.blueMid}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, fontWeight: 700, color: isThirdParty ? C.purple : C.blue,
+                        }}>{index + 1}</div>
                         <Tag color={isThirdParty ? "purple" : "blue"} style={{ fontSize: 10, margin: 0 }}>{isThirdParty ? "3rd Party" : "Standard"}</Tag>
                         {creative.isExisting && <Tag color="green" style={{ fontSize: 10, margin: 0 }}>Saved</Tag>}
                         {creative.creative_name && <span style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>{creative.creative_name}</span>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {/* Preview button — shown when there's a file or existing saved creative (non-third-party) */}
                         {!isThirdParty && (creative.main_asset || creative.isExisting) && (
                             <Button
                                 size="small"
                                 icon={<EyeOutlined style={{ fontSize: 11 }} />}
                                 onClick={() => {
                                     if (creative.main_asset) {
-                                        // New file — use blob URL as before
-                                        setPreview(buildPreviewFromFile(
-                                            creative.main_asset,
-                                            creative.creative_name,
-                                            creative.dimensions,
-                                            creative.aspect_ratio,
-                                            creative.file_size
-                                        ));
-                                    }  else if (creative.isExisting && creative.id) {
-    loadServerPreview(creative, isVideo);  // ← use fetch with ngrok header
-}
+                                        setPreview(buildPreviewFromFile(creative.main_asset, creative.creative_name, creative.dimensions, creative.aspect_ratio, creative.file_size));
+                                    } else if (creative.isExisting && creative.id) {
+                                        loadServerPreview(creative, isVideo);
+                                    }
                                 }}
                                 style={{ fontSize: 11, fontWeight: 600, height: 26, color: C.blue, borderColor: C.blueMid, background: C.blueLight, borderRadius: 6, display: "flex", alignItems: "center", gap: 4 }}
-                            >
-                                Preview
-                            </Button>
+                            >Preview</Button>
                         )}
                         <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={onRemove} style={{ fontSize: 12 }} />
                     </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    {/* Creative Name */}
                     <div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Creative Name</div>
                         <Input value={creative.creative_name} onChange={e => onUpdate({ creative_name: e.target.value })} placeholder="e.g. Banner_300x250" style={{ height: 34, borderRadius: 7 }} />
                     </div>
-
-                    {/* Main Asset */}
                     <div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                             {isThirdParty ? "Input File (txt/doc/xls)" : isVideo ? "Video Asset" : "Image Asset"}
@@ -628,15 +653,10 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
                             onChange={async e => { const f = e.target.files?.[0]; if (f) await handleMainFile(f); if (mainAssetRef.current) mainAssetRef.current.value = ""; }}
                         />
                         {creative.main_asset ? (
-                            /* File selected — show thumbnail (image) or play icon (video) + filename, click to preview */
                             <div
                                 onClick={() => setPreview(buildPreviewFromFile(creative.main_asset!, creative.creative_name, creative.dimensions, creative.aspect_ratio, creative.file_size))}
-                                style={{ display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 10px", background: isVideo ? C.purpleLight : C.blueLight, border: `1px solid ${isVideo ? C.purpleMid : C.blueMid}`, borderRadius: 7, cursor: "pointer", transition: "all 0.15s" }}
-                                onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
-                                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-                                title="Click to preview"
+                                style={{ display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 10px", background: isVideo ? C.purpleLight : C.blueLight, border: `1px solid ${isVideo ? C.purpleMid : C.blueMid}`, borderRadius: 7, cursor: "pointer" }}
                             >
-                                {/* Thumbnail or icon */}
                                 {thumbnailUrl ? (
                                     <img src={thumbnailUrl} alt="thumb" style={{ width: 22, height: 22, objectFit: "cover", borderRadius: 3, border: `1px solid ${C.blueMid}`, flexShrink: 0 }} />
                                 ) : (
@@ -648,12 +668,10 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
                                 <EyeOutlined style={{ fontSize: 11, color: isVideo ? C.purple : C.blue, flexShrink: 0 }} />
                             </div>
                         ) : creative.isExisting && !isThirdParty ? (
-                            /* Saved on server — show a clickable "preview saved" row */
                             <div style={{ display: "flex", gap: 6 }}>
                                 <div
                                     onClick={() => loadServerPreview(creative, isVideo)}
                                     style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 10px", background: C.greenLight, border: `1px solid #86efac`, borderRadius: 7, cursor: "pointer" }}
-                                    title="Click to preview saved creative"
                                 >
                                     <span style={{ fontSize: 14 }}>{isVideo ? "🎬" : "🖼️"}</span>
                                     <span style={{ fontSize: 11, fontWeight: 600, color: C.green, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -674,7 +692,6 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
                         )}
                     </div>
 
-                    {/* Dimensions (auto) */}
                     {!isThirdParty && (
                         <>
                             <div>
@@ -708,7 +725,6 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
                         </>
                     )}
 
-                    {/* Third party backup image */}
                     {isThirdParty && (
                         <div>
                             <div style={{ fontSize: 10, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Backup Image <span style={{ fontWeight: 400, color: C.slate400 }}>(optional)</span></div>
@@ -728,7 +744,6 @@ const loadServerPreview = async (creative: EditableCreative, isVideo: boolean) =
                                             isExisting: false,
                                         })}
                                         style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer" }}
-                                        title="Click to preview"
                                     />
                                     <Tag color="green" style={{ cursor: "pointer", fontSize: 11 }} onClick={() => backupRef.current?.click()}>{creative.backup_image.name}</Tag>
                                 </div>
@@ -791,7 +806,6 @@ function LineItemEditor({
 
     return (
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.white, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-            {/* Header */}
             <div style={{ background: C.indigoLight, borderBottom: `1px solid ${C.purpleMid}`, padding: "12px 18px", display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 26, height: 26, borderRadius: "50%", background: C.indigo, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{index + 1}</div>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.slate, flex: 1 }}>
@@ -811,7 +825,6 @@ function LineItemEditor({
             </div>
 
             <div style={{ padding: "18px" }}>
-                {/* Row 1: Name + Ethnicity */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Line Item Name <span style={{ color: C.red }}>*</span></div>
@@ -819,52 +832,25 @@ function LineItemEditor({
                     </div>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Ethnicity</div>
-                        <Select
-                            mode="multiple" value={li.ethnicity}
-                            onChange={vals => onUpdate({ ethnicity: vals })}
-                            placeholder="Select ethnicity…" style={{ width: "100%" }} maxTagCount="responsive"
-                            options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))}
-                        />
+                        <Select mode="multiple" value={li.ethnicity} onChange={vals => onUpdate({ ethnicity: vals })} placeholder="Select ethnicity…" style={{ width: "100%" }} maxTagCount="responsive" options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))} />
                     </div>
                 </div>
 
-                {/* Row 2: Dates */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Start Date <span style={{ color: C.red }}>*</span></div>
-                        <DatePicker
-                            style={{ width: "100%", height: 36 }}
-                            value={li.start_date ? dayjs(li.start_date) : null}
-                            onChange={(_, ds) => onUpdate({ start_date: typeof ds === "string" ? ds : "" })}
-                            disabledDate={disabledDate}
-                            placeholder={campaignStart ? `From ${fmtDate(campaignStart)}` : "Select date"}
-                        />
+                        <DatePicker style={{ width: "100%", height: 36 }} value={li.start_date ? dayjs(li.start_date) : null} onChange={(_, ds) => onUpdate({ start_date: typeof ds === "string" ? ds : "" })} disabledDate={disabledDate} placeholder={campaignStart ? `From ${fmtDate(campaignStart)}` : "Select date"} />
                     </div>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>End Date <span style={{ color: C.red }}>*</span></div>
-                        <DatePicker
-                            style={{ width: "100%", height: 36 }}
-                            value={li.end_date ? dayjs(li.end_date) : null}
-                            onChange={(_, ds) => onUpdate({ end_date: typeof ds === "string" ? ds : "" })}
-                            disabledDate={disabledDate}
-                            placeholder={campaignEnd ? `Until ${fmtDate(campaignEnd)}` : "Select date"}
-                        />
+                        <DatePicker style={{ width: "100%", height: 36 }} value={li.end_date ? dayjs(li.end_date) : null} onChange={(_, ds) => onUpdate({ end_date: typeof ds === "string" ? ds : "" })} disabledDate={disabledDate} placeholder={campaignEnd ? `Until ${fmtDate(campaignEnd)}` : "Select date"} />
                     </div>
                 </div>
 
-                {/* Row 3: Ad Format + Impressions + Units + Rate */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Ad Format <span style={{ color: C.red }}>*</span></div>
-                        <Select
-                            value={li.ad_format || undefined}
-                            onChange={val => {
-                                const defaultRate = li.units === "CPM" ? (CPM_RATES[val] ?? 1) : (CPC_RATES[val] ?? 1);
-                                onUpdate({ ad_format: val, unit_value: String(defaultRate) });
-                            }}
-                            placeholder="Select format…" style={{ width: "100%", height: 36 }}
-                            options={AD_FORMAT_OPTIONS}
-                        />
+                        <Select value={li.ad_format || undefined} onChange={val => { const defaultRate = li.units === "CPM" ? (CPM_RATES[val] ?? 1) : (CPC_RATES[val] ?? 1); onUpdate({ ad_format: val, unit_value: String(defaultRate) }); }} placeholder="Select format…" style={{ width: "100%", height: 36 }} options={AD_FORMAT_OPTIONS} />
                     </div>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Impressions</div>
@@ -872,30 +858,14 @@ function LineItemEditor({
                     </div>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Units</div>
-                        <Select
-                            value={li.units || undefined}
-                            onChange={val => {
-                                const defaultRate = val === "CPM" ? (CPM_RATES[li.ad_format] ?? 1) : (CPC_RATES[li.ad_format] ?? 1);
-                                onUpdate({ units: val, unit_value: li.ad_format ? String(defaultRate) : "" });
-                            }}
-                            placeholder="CPM / CPC" style={{ width: "100%", height: 36 }}
-                            options={[{ value: "CPM", label: "CPM" }, { value: "CPC", label: "CPC" }]}
-                        />
+                        <Select value={li.units || undefined} onChange={val => { const defaultRate = val === "CPM" ? (CPM_RATES[li.ad_format] ?? 1) : (CPC_RATES[li.ad_format] ?? 1); onUpdate({ units: val, unit_value: li.ad_format ? String(defaultRate) : "" }); }} placeholder="CPM / CPC" style={{ width: "100%", height: 36 }} options={[{ value: "CPM", label: "CPM" }, { value: "CPC", label: "CPC" }]} />
                     </div>
                     <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Rate ({li.units || "—"}) <span style={{ fontSize: 9, fontWeight: 500, color: C.indigo, background: C.indigoLight, padding: "1px 5px", borderRadius: 4 }}>Editable</span></div>
-                        <Input
-                            value={li.unit_value}
-                            onChange={e => onUpdate({ unit_value: e.target.value.replace(/[^0-9.]/g, "") })}
-                            prefix={<span style={{ fontSize: 11, color: C.slate400 }}>$</span>}
-                            placeholder="e.g. 1.25"
-                            suffix={<span style={{ fontSize: 10, color: C.slate400 }}>{li.units === "CPM" ? "per 1k" : "per click"}</span>}
-                            style={{ height: 36, borderRadius: 8 }}
-                        />
+                        <Input value={li.unit_value} onChange={e => onUpdate({ unit_value: e.target.value.replace(/[^0-9.]/g, "") })} prefix={<span style={{ fontSize: 11, color: C.slate400 }}>$</span>} placeholder="e.g. 1.25" suffix={<span style={{ fontSize: 10, color: C.slate400 }}>{li.units === "CPM" ? "per 1k" : "per click"}</span>} style={{ height: 36, borderRadius: 8 }} />
                     </div>
                 </div>
 
-                {/* Calculated Budget */}
                 <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                         Unit Cost (Budget) <span style={{ fontSize: 9, fontWeight: 500, color: C.green, background: C.greenLight, padding: "1px 5px", borderRadius: 4 }}>Auto-calculated</span>
@@ -916,7 +886,6 @@ function LineItemEditor({
                     )}
                 </div>
 
-                {/* KPI: CTR, Viewability, VCR */}
                 {(showCTR || showVCR) && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                         {showCTR && (
@@ -940,34 +909,24 @@ function LineItemEditor({
                     </div>
                 )}
 
-                {/* KPI Notes */}
                 <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>KPI Notes <span style={{ fontWeight: 400, color: C.slate400 }}>(optional)</span></div>
                     <Input.TextArea value={li.kpi_notes} onChange={e => onUpdate({ kpi_notes: e.target.value })} placeholder="e.g. CTR adjusted based on client brief…" rows={2} style={{ borderRadius: 8 }} />
                 </div>
 
-                {/* Creatives Section */}
                 <Divider style={{ margin: "12px 0" }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: C.slate, display: "flex", alignItems: "center", gap: 6 }}>
                         <FileImageOutlined style={{ color: C.blue }} /> Creatives
-                        {li.creatives.length > 0 && (
-                            <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>{li.creatives.length} added</Tag>
-                        )}
+                        {li.creatives.length > 0 && <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>{li.creatives.length} added</Tag>}
                     </span>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <Button
-                            size="small" icon={<PlusOutlined />}
-                            onClick={() => addCreative("standard")}
-                            style={{ fontSize: 11, fontWeight: 600, height: 28, color: C.blue, borderColor: C.blueMid, background: C.blueLight, borderRadius: 6 }}
-                        >
+                        <Button size="small" icon={<PlusOutlined />} onClick={() => addCreative("standard")}
+                            style={{ fontSize: 11, fontWeight: 600, height: 28, color: C.blue, borderColor: C.blueMid, background: C.blueLight, borderRadius: 6 }}>
                             {isVideo ? "Add Video" : "Add Image"}
                         </Button>
-                        <Button
-                            size="small" icon={<CodeOutlined />}
-                            onClick={() => addCreative("third_party")}
-                            style={{ fontSize: 11, fontWeight: 600, height: 28, color: C.purple, borderColor: C.purpleMid, background: C.purpleLight, borderRadius: 6 }}
-                        >
+                        <Button size="small" icon={<CodeOutlined />} onClick={() => addCreative("third_party")}
+                            style={{ fontSize: 11, fontWeight: 600, height: 28, color: C.purple, borderColor: C.purpleMid, background: C.purpleLight, borderRadius: 6 }}>
                             3rd Party
                         </Button>
                     </div>
@@ -979,14 +938,7 @@ function LineItemEditor({
                     </div>
                 ) : (
                     li.creatives.map((cr, ci) => (
-                        <CreativeRowEditor
-                            key={cr.key}
-                            creative={cr}
-                            index={ci}
-                            adFormat={li.ad_format}
-                            onUpdate={patch => updateCreative(cr.key, patch)}
-                            onRemove={() => removeCreative(cr.key)}
-                        />
+                        <CreativeRowEditor key={cr.key} creative={cr} index={ci} adFormat={li.ad_format} onUpdate={patch => updateCreative(cr.key, patch)} onRemove={() => removeCreative(cr.key)} />
                     ))
                 )}
             </div>
@@ -1030,6 +982,8 @@ function EditCampaignModal({
                 frequency_cap: campaign.frequency_cap,
                 brand_safety: campaign.brand_safety,
                 viewability_goal: campaign.viewability_goal,
+                new_cpm: campaign.new_cpm,
+                new_price: campaign.new_price,
             });
             setLineItems((campaign.line_items || []).map(apiLineItemToEditable));
         }
@@ -1042,54 +996,68 @@ function EditCampaignModal({
         setLineItems(prev => prev.map(li => li.key === key ? { ...li, ...patch } : li));
     };
 
-    const addLineItem = () => {
-        setLineItems(prev => [...prev, emptyLineItem()]);
-    };
+    const addLineItem = () => setLineItems(prev => [...prev, emptyLineItem()]);
+    const removeLineItem = (key: string) => setLineItems(prev => prev.filter(li => li.key !== key));
 
-    const removeLineItem = (key: string) => {
-        setLineItems(prev => prev.filter(li => li.key !== key));
-    };
-
+    // ── FIXED handleSave: reads from form + local lineItems state ─────────────
     const handleSave = async () => {
         if (!campaign) return;
-        try {
-            const values = await form.validateFields();
-            setSaving(true);
 
-            // Build the JSON payload
-            const payload = {
-                campaign_name: values.campaign_name,
-                client_campaign_ID: values.client_campaign_ID,
-                purchase_order_ID: values.purchase_order_ID,
-                advertiser: values.advertiser,
-                website_url: values.website_url,
-                campaign_type: values.campaign_type,
-                objective: values.objective,
-                notes: values.notes,
-                buying_type: Array.isArray(values.buying_type) ? values.buying_type.join(", ") : values.buying_type,
-                start_date: values.start_date ? values.start_date.format("YYYY-MM-DD") : null,
-                end_date: values.end_date ? values.end_date.format("YYYY-MM-DD") : null,
-                age: Array.isArray(values.age) ? values.age.join(", ") : values.age,
-                gender: Array.isArray(values.gender) ? values.gender.join(", ") : values.gender,
-                platforms: Array.isArray(values.platforms) ? values.platforms.join(", ") : values.platforms,
-                frequency_cap: values.frequency_cap,
-                brand_safety: values.brand_safety,
-                viewability_goal: values.viewability_goal,
-                line_items: lineItems.map(li => ({
-                    line_item_id: li.line_item_id,
-                    line_item_name: li.line_item_name,
-                    ethnicity: li.ethnicity,
-                    start_date: li.start_date,
-                    end_date: li.end_date,
-                    ad_format: li.ad_format,
-                    impressions: li.impressions,
-                    units: li.units,
-                    ctr: li.ctr,
-                    viewability: li.viewability,
-                    vcr: li.vcr,
-                    kpi_notes: li.kpi_notes,
-                    unit_value: li.unit_value,
-                    creatives: li.creatives.filter(c => c.type !== "third_party").map(c => ({
+        try {
+            await form.validateFields();
+        } catch {
+            return;
+        }
+
+        const values = form.getFieldsValue();
+        setSaving(true);
+
+        const fd = new FormData();
+
+        // Campaign-level fields — read from form values or campaign prop
+        fd.append("client", String(campaign.client ?? ""));
+        fd.append("client_name", campaign.client_name ?? "");
+        fd.append("advertiser", values.advertiser ?? "");
+        fd.append("campaign_name", values.campaign_name ?? "");
+        fd.append("campaign_type", values.campaign_type ?? "");
+        fd.append("buying_type", (values.buying_type ?? []).join(", "));
+        fd.append("objective", values.objective ?? "");
+        fd.append("age", (values.age ?? []).join(", "));
+        fd.append("gender", (values.gender ?? []).join(", "));
+        fd.append("platforms", (values.platforms ?? []).join(", "));
+        fd.append("brand_safety", values.brand_safety ?? "");
+        fd.append("start_date", values.start_date?.format("YYYY-MM-DD") ?? "");
+        fd.append("end_date", values.end_date?.format("YYYY-MM-DD") ?? "");
+        if (values.website_url) fd.append("website_url", values.website_url);
+        if (values.client_campaign_ID) fd.append("client_campaign_ID", values.client_campaign_ID);
+        if (values.purchase_order_ID) fd.append("purchase_order_ID", values.purchase_order_ID);
+        if (values.notes) fd.append("notes", values.notes);
+        if (values.frequency_cap) fd.append("frequency_cap", values.frequency_cap);
+        if (values.viewability_goal) fd.append("viewability_goal", values.viewability_goal);
+        if (values.new_cpm) fd.append("new_cpm", values.new_cpm);
+        if (values.new_price) fd.append("new_price", values.new_price);
+
+        // Line items JSON
+        fd.append("line_items", JSON.stringify(
+            lineItems.map(li => ({
+                line_item_id: li.line_item_id,
+                lineItemName: li.line_item_name,
+                ethnicity: li.ethnicity,
+                startDate: li.start_date,
+                endDate: li.end_date,
+                adFormat: li.ad_format,
+                impressions: li.impressions,
+                units: li.units,
+                ctr: li.ctr,
+                viewability: li.viewability,
+                vcr: li.vcr,
+                kpi_notes: li.kpi_notes,
+                unit_cost: li.unit_cost,
+                unit_value: li.unit_value,
+                // Standard creatives metadata
+                creatives: li.creatives
+                    .filter(c => c.type !== "third_party")
+                    .map(c => ({
                         creative_name: c.creative_name,
                         dimensions: c.dimensions,
                         aspect_ratio: c.aspect_ratio,
@@ -1099,64 +1067,59 @@ function EditCampaignModal({
                         integration_code: c.integration_code,
                         notes: c.notes,
                     })),
-                    third_party_creatives: li.creatives.filter(c => c.type === "third_party").map(c => ({
+                // Third-party creatives metadata
+                third_party_creatives: li.creatives
+                    .filter(c => c.type === "third_party")
+                    .map(c => ({
                         creative_name: c.creative_name,
                         input_file_name: c.main_asset?.name ?? "",
                         backup_image_name: c.backup_image?.name ?? "",
                     })),
-                })),
-            };
+            }))
+        ));
 
-            // Use FormData if there are new file uploads
-            const hasNewFiles = lineItems.some(li => li.creatives.some(c => c.main_asset || c.backup_image));
+        // Append creative files per line item
+        lineItems.forEach((li, i) => {
+            let standardIndex = 0;
+            let tpIndex = 0;
+            li.creatives.forEach(cr => {
+                if (cr.type === "third_party") {
+                    if (cr.main_asset) fd.append(`line_item_${i}thirdparty_file${tpIndex}`, cr.main_asset, cr.main_asset.name);
+                    if (cr.backup_image) fd.append(`line_item_${i}thirdparty_backup${tpIndex}`, cr.backup_image, cr.backup_image.name);
+                    tpIndex++;
+                } else {
+                    if (cr.main_asset) fd.append(`line_item_${i}main_asset${standardIndex}`, cr.main_asset, cr.main_asset.name);
+                    standardIndex++;
+                }
+            });
+        });
 
-            if (hasNewFiles) {
-                const fd = new FormData();
-                fd.append("data", JSON.stringify(payload));
-                lineItems.forEach((li, liIdx) => {
-                    let stdIdx = 0, tpIdx = 0;
-                    li.creatives.forEach(c => {
-                        if (c.type === "third_party") {
-                            if (c.main_asset) fd.append(`line_item_${liIdx}thirdparty_file${tpIdx}`, c.main_asset, c.main_asset.name);
-                            if (c.backup_image) fd.append(`line_item_${liIdx}thirdparty_backup${tpIdx}`, c.backup_image, c.backup_image.name);
-                            tpIdx++;
-                        } else {
-                            if (c.main_asset) fd.append(`line_item_${liIdx}main_asset${stdIdx}`, c.main_asset, c.main_asset.name);
-                            stdIdx++;
-                        }
-                    });
-                });
-                const res = await fetch(`${BASE_URL}/update_campaign/${campaign.campaign_id}/`, {
-                    method: "PUT",
-                    headers: { "ngrok-skip-browser-warning": "1" },
-                    body: fd,
-                });
-                if (res.ok) { message.success("Campaign updated successfully!"); onClose(); onSaved(); }
-                else { message.error("Failed to update campaign"); }
+        try {
+            const res = await fetch(`${BASE_URL}/update_campaign/${campaign.campaign_id}/`, {
+                method: "PUT",
+                body: fd,
+                headers: { "ngrok-skip-browser-warning": "1" },
+            });
+            if (res.ok) {
+                message.success("Campaign updated successfully!");
+                onSaved();
+                onClose();
             } else {
-                const res = await fetch(`${BASE_URL}/update_campaign/${campaign.campaign_id}/`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "1" },
-                    body: JSON.stringify(payload),
-                });
-                if (res.ok) { message.success("Campaign updated successfully!"); onClose(); onSaved(); }
-                else { message.error("Failed to update campaign"); }
+                const text = await res.text();
+                message.error(text || `Server error: ${res.status}`);
             }
-        } catch (e) {
-            message.error("Please check all required fields");
+        } catch (err) {
+            message.error(err instanceof Error ? err.message : "Network error");
         } finally {
             setSaving(false);
         }
     };
 
+    // Guard — render nothing if no campaign
     if (!campaign) return null;
 
     const campaignState = isActiveCampaign(campaign) ? "active" : isClosedCampaign(campaign) ? "closed" : "upcoming";
-    const stateStyle = campaignState === "active"
-        ? { color: C.green }
-        : campaignState === "closed"
-            ? { color: C.red }
-            : { color: C.amber };
+    const stateColor = campaignState === "active" ? C.green : campaignState === "closed" ? C.red : C.amber;
 
     const tabItems = [
         {
@@ -1164,7 +1127,6 @@ function EditCampaignModal({
             label: <span style={{ fontSize: 12, fontWeight: 700 }}>📋 Campaign Details</span>,
             children: (
                 <Form form={form} layout="vertical" style={{ fontFamily: "inherit" }}>
-                    {/* Client & Advertiser */}
                     <SectionLabel icon="🏢" label="Client & Advertiser" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
                         <Form.Item label={<FL>Advertiser</FL>} name="advertiser">
@@ -1175,12 +1137,11 @@ function EditCampaignModal({
                         </Form.Item>
                     </div>
 
-                    {/* Campaign Info */}
                     <SectionLabel icon="📋" label="Campaign Information" />
-                    <Form.Item label={<FL>Campaign Name <span style={{ color: C.red }}>*</span></FL>} name="campaign_name" rules={[{ required: true, message: "Required" }]}>
-                        <Input style={{ height: 38, borderRadius: 8 }} />
-                    </Form.Item>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <Form.Item label={<FL>Campaign Name <span style={{ color: C.red }}>*</span></FL>} name="campaign_name" rules={[{ required: true, message: "Required" }]}>
+                            <Input style={{ height: 38, borderRadius: 8 }} />
+                        </Form.Item>
                         <Form.Item label={<FL>Client Campaign ID</FL>} name="client_campaign_ID">
                             <Input style={{ height: 38, borderRadius: 8 }} />
                         </Form.Item>
@@ -1197,17 +1158,17 @@ function EditCampaignModal({
                                 {["Increase Brand Awareness", "Drive Website Traffic", "Generate Leads", "Boost Sales", "App Installs"].map(o => <Option key={o} value={o}>{o}</Option>)}
                             </Select>
                         </Form.Item>
+                        <Form.Item label={<FL>Buying Type</FL>} name="buying_type">
+                            <Select mode="multiple" style={{ width: "100%" }} placeholder="Select buying types" maxTagCount="responsive">
+                                {["Programmatic (DV360)", "Direct", "Programmatic Guaranteed", "Preferred Deal", "Open Auction"].map(b => <Option key={b} value={b}>{b}</Option>)}
+                            </Select>
+                        </Form.Item>
                     </div>
-                    <Form.Item label={<FL>Buying Type</FL>} name="buying_type">
-                        <Select mode="multiple" style={{ width: "100%" }} placeholder="Select buying types" maxTagCount="responsive">
-                            {["Programmatic (DV360)", "Direct", "Programmatic Guaranteed", "Preferred Deal", "Open Auction"].map(b => <Option key={b} value={b}>{b}</Option>)}
-                        </Select>
-                    </Form.Item>
+
                     <Form.Item label={<FL>Notes</FL>} name="notes">
                         <Input.TextArea rows={3} style={{ borderRadius: 8 }} placeholder="Add any campaign notes…" />
                     </Form.Item>
 
-                    {/* Schedule */}
                     <SectionLabel icon="📅" label="Schedule" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
                         <Form.Item label={<FL>Start Date <span style={{ color: C.red }}>*</span></FL>} name="start_date" rules={[{ required: true, message: "Required" }]}>
@@ -1218,7 +1179,6 @@ function EditCampaignModal({
                         </Form.Item>
                     </div>
 
-                    {/* Audience & Targeting */}
                     <SectionLabel icon="🎯" label="Audience & Targeting" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
                         <Form.Item label={<FL>Age</FL>} name="age">
@@ -1251,6 +1211,16 @@ function EditCampaignModal({
                             <Input style={{ height: 38, borderRadius: 8 }} placeholder="e.g. 70" suffix="%" />
                         </Form.Item>
                     </div>
+
+                    <SectionLabel icon="💰" label="Enter Final CPM and Price Value" />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+                        <Form.Item label={<FL>CPM</FL>} name="new_cpm">
+                            <Input type="number" style={{ height: 38, borderRadius: 8 }} />
+                        </Form.Item>
+                        <Form.Item label={<FL>Price</FL>} name="new_price">
+                            <Input type="number" style={{ height: 38, borderRadius: 8 }} />
+                        </Form.Item>
+                    </div>
                 </Form>
             ),
         },
@@ -1259,9 +1229,7 @@ function EditCampaignModal({
             label: (
                 <span style={{ fontSize: 12, fontWeight: 700 }}>
                     📦 Line Items
-                    {lineItems.length > 0 && (
-                        <Tag color="purple" style={{ fontSize: 10, marginLeft: 6 }}>{lineItems.length}</Tag>
-                    )}
+                    {lineItems.length > 0 && <Tag color="purple" style={{ fontSize: 10, marginLeft: 6 }}>{lineItems.length}</Tag>}
                 </span>
             ),
             children: (
@@ -1275,11 +1243,8 @@ function EditCampaignModal({
                     ) : (
                         lineItems.map((li, idx) => (
                             <LineItemEditor
-                                key={li.key}
-                                li={li}
-                                index={idx}
-                                campaignStart={startDateVal}
-                                campaignEnd={endDateVal}
+                                key={li.key} li={li} index={idx}
+                                campaignStart={startDateVal} campaignEnd={endDateVal}
                                 onUpdate={patch => updateLineItem(li.key, patch)}
                                 onRemove={() => removeLineItem(li.key)}
                                 canRemove={lineItems.length > 1}
@@ -1302,41 +1267,74 @@ function EditCampaignModal({
             open={open}
             onCancel={onClose}
             footer={null}
-            width={900}
+            width={920}
             centered
-            styles={{
-                body: { padding: 0, overflow: "hidden" },
-                mask: { backdropFilter: "blur(4px)", background: "rgba(15,23,42,0.45)" },
-            }}
+            destroyOnClose
+            className="edit-campaign-modal"
             closeIcon={
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.slate100, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.slate500 }}>✕</div>
+                <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: "rgba(255,255,255,0.12)",
+                    border: "1.5px solid rgba(255,255,255,0.28)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontSize: 14, cursor: "pointer",
+                    transition: "background 0.15s",
+                }}>
+                    <CloseOutlined style={{ fontSize: 13 }} />
+                </div>
             }
+            style={{ padding: 10, borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}
         >
-            {/* ── Modal Header ── */}
-            <div style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", padding: "24px 28px 20px", position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", top: -20, right: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(79,70,229,0.15)" }} />
-                <div style={{ position: "absolute", top: 20, right: 60, width: 60, height: 60, borderRadius: "50%", background: "rgba(37,99,235,0.2)" }} />
+            {/* Header */}
+            <div style={{
+                background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+                padding: "22px 28px 18px",
+                position: "relative", overflow: "hidden",
+                display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            }}>
+                <div style={{ position: "absolute", top: -24, right: -24, width: 130, height: 130, borderRadius: "50%", background: "rgba(79,70,229,0.14)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", top: 18, right: 70, width: 64, height: 64, borderRadius: "50%", background: "rgba(37,99,235,0.18)", pointerEvents: "none" }} />
 
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(79,70,229,0.25)", border: "1.5px solid rgba(79,70,229,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>✏️</div>
-                        <div>
-                            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Edit Campaign</div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: "#93C5FD", fontFamily: "monospace" }}>{campaign.campaign_name}</span>
-                                <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>•</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#93C5FD", fontFamily: "monospace", letterSpacing: "0.05em" }}>{campaign.campaign_id}</span>
-                                <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>•</span>
-                                <span style={{ fontSize: 10, fontWeight: 700, color: stateStyle.color, background: `${stateStyle.color}20`, border: `1px solid ${stateStyle.color}40`, padding: "2px 8px", borderRadius: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>{campaignState}</span>
-                            </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, zIndex: 1 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(79,70,229,0.25)", border: "1.5px solid rgba(79,70,229,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✏️</div>
+                    <div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Edit Campaign</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#93C5FD" }}>{campaign.campaign_name}</span>
+                            <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10 }}>•</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#93C5FD", fontFamily: "monospace", letterSpacing: "0.05em" }}>{campaign.campaign_id}</span>
+                            <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10 }}>•</span>
+                            <span style={{
+                                fontSize: 10, fontWeight: 700, color: stateColor,
+                                background: `${stateColor}22`, border: `1px solid ${stateColor}44`,
+                                padding: "2px 9px", borderRadius: 12, textTransform: "uppercase", letterSpacing: "0.06em",
+                            }}>{campaignState}</span>
                         </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>Created {fmtDate(campaign.created_at)}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Created {fmtDate(campaign.created_at)}</span>
+                    <Button
+                        onClick={onClose}
+                        style={{
+                            width: 32, height: 32, borderRadius: 8,
+                            background: "rgba(255,255,255,0.1)",
+                            border: "1.5px solid rgba(255,255,255,0.22)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#fff", fontSize: 14, cursor: "pointer",
+                            flexShrink: 0, padding: 0, transition: "background 0.15s",
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.2)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+                    >
+                        <CloseOutlined style={{ fontSize: 13 }} />
+                    </Button>
                 </div>
             </div>
 
-            {/* ── Modal Body ── */}
-            <div style={{ maxHeight: "70vh", overflowY: "auto", background: C.bg }}>
+            {/* Body */}
+            <div style={{ maxHeight: "66vh", overflowY: "auto", background: C.bg }}>
                 <Tabs
                     activeKey={activeTabKey}
                     onChange={setActiveTabKey}
@@ -1346,12 +1344,14 @@ function EditCampaignModal({
                 />
             </div>
 
-            {/* ── Modal Footer ── */}
-            <div style={{ padding: "16px 28px", background: C.white, borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 12, color: C.slate500 }}>
-                    {lineItems.length} line item{lineItems.length !== 1 ? "s" : ""} •{" "}
-                    {campaign.start_date ? fmtDate(campaign.start_date) : "—"} → {campaign.end_date ? fmtDate(campaign.end_date) : "—"}
-                </div>
+            {/* Footer */}
+            <div style={{
+                padding: "14px 28px",
+                background: C.white,
+                borderTop: `1px solid ${C.border}`,
+                display: "flex",
+                justifyContent: "flex-end",
+            }}>
                 <div style={{ display: "flex", gap: 10 }}>
                     <Button onClick={onClose} style={{ height: 38, borderRadius: 8, border: `1px solid ${C.border}`, color: C.slate500, fontSize: 13, fontWeight: 600 }}>
                         Cancel
@@ -1361,7 +1361,7 @@ function EditCampaignModal({
                         loading={saving}
                         onClick={handleSave}
                         icon={<SaveOutlined />}
-                        style={{ height: 38, borderRadius: 8, background: C.green, borderColor: C.green, fontSize: 13, fontWeight: 700 }}
+                        style={{ height: 38, borderRadius: 8, background: C.green, borderColor: C.green, fontSize: 13, fontWeight: 700, boxShadow: `0 2px 10px ${C.green}44` }}
                     >
                         {saving ? "Saving…" : "Save Changes"}
                     </Button>
@@ -1376,7 +1376,7 @@ function Toast({ message: msg, type, onClose }: { message: string; type: "succes
     useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
     const color = type === "success" ? C.green : C.red;
     return (
-        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, background: C.white, border: `1px solid ${color}55`, borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1999, background: C.white, border: `1px solid ${color}55`, borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
             <span style={{ fontSize: 18 }}>{type === "success" ? "✅" : "❌"}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>{msg}</span>
         </div>
@@ -1425,10 +1425,38 @@ export default function Admin_Campaigns() {
         return true;
     });
 
+    const handleApproveCampaign = async (record: Campaign) => {
+        Modal.confirm({
+            title: "Approve Campaign?",
+            content: `This will generate a Campaign ID for "${record.campaign_name}". This cannot be undone.`,
+            okText: "Yes, Approve",
+            okButtonProps: { style: { background: C.green, borderColor: C.green } },
+            cancelText: "Cancel",
+            onOk: async () => {
+                try {
+                    const res = await fetch(`${BASE_URL}/approve_campaign/${record.id}/`, { method: "POST", headers: { "ngrok-skip-browser-warning": "1" } });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setToast({ message: `Campaign approved! ID: ${data.campaign_id}`, type: "success" });
+                        fetchCampaigns();
+                    } else {
+                        setToast({ message: "Failed to approve campaign", type: "error" });
+                    }
+                } catch {
+                    setToast({ message: "Network error", type: "error" });
+                }
+            },
+        });
+    };
+
     const columns: ColumnsType<Campaign> = [
         {
-            title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 160, fixed: "left",
-            render: (id: string) => <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace", whiteSpace: "nowrap" }}>{id}</span>,
+            title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 180, fixed: "left",
+            render: (id: string | null) => id ? (
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>{id}</span>
+            ) : (
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.amber, background: C.amberLight, padding: "3px 8px", borderRadius: 6, border: `1px dashed #FDE68A` }}>Pending Approval</span>
+            ),
         },
         { title: "Client Campaign ID", dataIndex: "client_campaign_ID", key: "client_campaign_ID", width: 160, render: (v: string) => <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span> },
         { title: "Purchase Order ID", dataIndex: "purchase_order_ID", key: "purchase_order_ID", width: 160, render: (v: string) => <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span> },
@@ -1462,24 +1490,35 @@ export default function Admin_Campaigns() {
         {
             title: "Line Items", key: "line_items", width: 100,
             render: (_: any, record: Campaign) => (
-                <Tag color="purple" style={{ fontSize: 11 }}>
-                    {record.line_items?.length ?? 0} item{(record.line_items?.length ?? 0) !== 1 ? "s" : ""}
-                </Tag>
+                <Tag color="purple" style={{ fontSize: 11 }}>{record.line_items?.length ?? 0} item{(record.line_items?.length ?? 0) !== 1 ? "s" : ""}</Tag>
             ),
         },
         { title: "Created", dataIndex: "created_at", key: "created_at", width: 130, render: (v: string) => v ? <span style={{ fontSize: 12, color: C.slate500 }}>{fmtDate(v)}</span> : <span style={{ color: C.slate500 }}>—</span> },
         {
-            title: "Actions", key: "actions", width: 165, fixed: "right",
+            title: "Actions", key: "actions", width: 220, fixed: "right",
             render: (_: any, record: Campaign) => (
                 <div style={{ display: "flex", gap: 6 }}>
-                    <Button size="small" icon={<EyeOutlined />} onClick={() => navigate(`/campaign/${record.campaign_id}`)}
+                    <Button size="small" icon={<EyeOutlined />}
+                        onClick={() => navigate(`/campaign/${record.campaign_id}`)}
+                        disabled={!record.campaign_id}
                         style={{ fontSize: 11, fontWeight: 600, color: C.blue, background: C.blueLight, border: `1px solid ${C.blueMid}`, borderRadius: 6 }}>
                         View
                     </Button>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => setEditCampaign(record)}
+                    <Button size="small" icon={<EditOutlined />}
+                        onClick={() => setEditCampaign(record)}
                         style={{ fontSize: 11, fontWeight: 600, color: C.slate, background: C.white, border: `1px solid ${C.slate300}`, borderRadius: 6 }}>
                         Edit
                     </Button>
+                    {record.approval_status !== "approved" ? (
+                        <Button size="small" onClick={() => handleApproveCampaign(record)}
+                            style={{ fontSize: 11, fontWeight: 600, height: 26, color: C.green, background: C.greenLight, border: `1px solid #86efac`, borderRadius: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                            ✓ Approve
+                        </Button>
+                    ) : (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: C.green, background: C.greenLight, border: `1px solid #86efac`, borderRadius: 6, padding: "3px 8px", height: 26 }}>
+                            <CheckCircleOutlined /> Approved
+                        </span>
+                    )}
                 </div>
             ),
         },
@@ -1571,8 +1610,25 @@ export default function Admin_Campaigns() {
             <style>{`
                 .all-campaigns-row:hover td { background: #F8FAFC !important; }
                 .all-campaigns-row-closed td { opacity: 0.75; }
-                .ant-table-thead > tr > th { background: #F1F5F9 !important; font-size: 11px !important; font-weight: 700 !important; color: #64748B !important; text-transform: uppercase; letter-spacing: 0.04em; }
+                .ant-table-thead > tr > th {
+                    background: #F1F5F9 !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #64748B !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
                 .ant-table-row-expand-icon-cell { background: #F1F5F9; }
+                .edit-campaign-modal .ant-modal-content {
+                    padding: 0 !important;
+                    border-radius: 16px !important;
+                    overflow: hidden !important;
+                    border: none !important;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+                }
+                .edit-campaign-modal .ant-modal-header { display: none !important; }
+                .edit-campaign-modal .ant-modal-close { display: none !important; }
+                .edit-campaign-modal .ant-modal-body { padding: 0 !important; }
             `}</style>
         </div>
     );

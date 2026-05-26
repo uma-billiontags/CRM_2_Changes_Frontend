@@ -2,13 +2,9 @@ import { useEffect, useState } from "react";
 import { C, fmt } from "../types/types";
 import { StatusBadge, ClientDetailModal } from "./SharedComponents";
 import type { Client, ClientStatus } from "../types/types";
-import { Button } from 'antd';
-import { CheckOutlined } from "@ant-design/icons";
-
-interface ColDef {
-  label: string;
-  w: number;
-}
+import { Button, Input, Modal, Table } from "antd";
+import { CheckCircleOutlined, SearchOutlined } from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
 
 interface ClientTablePageProps {
   clients: Client[];
@@ -35,9 +31,16 @@ export default function ClientTablePage({
   const [credSending, setCredSending] = useState(false);
   const [credMsg, setCredMsg] = useState("");
 
-  const [sentClients, setSentClients] = useState<Set<string>>(new Set());
+  const [sentClients, setSentClients] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("sent_credentials_clients");
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
-
+  // Close modals on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -47,12 +50,9 @@ export default function ClientTablePage({
           setCredMsg("");
           setSearch("");
         }
-        if (selectedClient) {
-          setSelectedClient(null);
-        }
+        if (selectedClient) setSelectedClient(null);
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [credClient, selectedClient]);
@@ -62,29 +62,31 @@ export default function ClientTablePage({
       setCredMsg("Password is required");
       return;
     }
-
     setCredSending(true);
     setCredMsg("");
-
     try {
-      const res = await fetch(`http://127.0.0.1:8000/approve_client/`, {
+      const res = await fetch(`https://city-animate-anagram.ngrok-free.dev/approve_client/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "1"
+          "ngrok-skip-browser-warning": "1",
         },
         body: JSON.stringify({
-          client_id: credClient!.id,   // e.g. CLT-2026-00006
-          password: credPassword        // password superadmin typed
+          client_id: credClient!.id,
+          password: credPassword,
         }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         setCredMsg("✅ Credentials sent to " + credClient!.email);
-        setSentClients(prev => new Set(prev).add(credClient!.id)); // ← ADD THIS
-
+        setSentClients((prev) => {
+          const updated = new Set(prev).add(credClient!.id);
+          localStorage.setItem(
+            "sent_credentials_clients",
+            JSON.stringify([...updated])
+          );
+          return updated;
+        });
         setTimeout(() => {
           setCredClient(null);
           setCredPassword("");
@@ -103,8 +105,6 @@ export default function ClientTablePage({
 
   const filtered = clients.filter((c) => {
     const matchStatus = !filterStatus || c.status === filterStatus;
-
-    // ← Don't filter when credentials modal is open
     if (credClient) return matchStatus;
     const q = search.toLowerCase();
     const matchSearch =
@@ -116,266 +116,436 @@ export default function ClientTablePage({
     return matchStatus && matchSearch;
   });
 
-  const cols: ColDef[] = [
-    { label: "Client ID", w: 150 },
-    { label: "Company Name", w: 200 },
-    { label: "Company Type", w: 130 },
-    { label: "Agency Type", w: 120 },
-    { label: "City", w: 100 },
-    { label: "Submitted", w: 110 },
-    { label: "Status", w: 120 },
-    { label: "Actions", w: 220 },
+  // ── Table Columns ─────────────────────────────────────────────────────────
+  const columns: ColumnsType<Client> = [
+    {
+      title: "Client ID",
+      dataIndex: "id",
+      key: "id",
+      width: 155,
+      render: (id: string) => (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: C.blue,
+            background: C.blueLight,
+            padding: "3px 8px",
+            borderRadius: 5,
+            fontFamily: "monospace",
+          }}
+        >
+          {id}
+        </span>
+      ),
+    },
+    {
+      title: "Company Name",
+      key: "company_name",
+      width: 200,
+      render: (_: any, c: Client) => (
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: C.slate,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {c.company_name}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: C.slate500,
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {c.email}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Company Type",
+      dataIndex: "company_type",
+      key: "company_type",
+      width: 130,
+      render: (v: string) => (
+        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+      ),
+    },
+    {
+      title: "Agency Type",
+      dataIndex: "agency_type",
+      key: "agency_type",
+      width: 120,
+      render: (v: string) => (
+        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+      ),
+    },
+    {
+      title: "City",
+      dataIndex: "city",
+      key: "city",
+      width: 100,
+      render: (v: string) => (
+        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+      ),
+    },
+    {
+      title: "Submitted",
+      dataIndex: "submitted_at",
+      key: "submitted_at",
+      width: 120,
+      render: (v: string) => (
+        <span style={{ fontSize: 12, color: C.slate700 }}>{fmt(v)}</span>
+      ),
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      width: 120,
+      render: (v: string) => <StatusBadge status={v as ClientStatus} />,
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      width: 230,
+      fixed: "right",
+      render: (_: any, c: Client) => (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {/* View */}
+          <Button
+            size="small"
+            onClick={() => setSelectedClient(c)}
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: C.blue,
+              background: C.blueLight,
+              border: `1px solid ${C.blueMid}`,
+              borderRadius: 6,
+            }}
+          >
+            View
+          </Button>
+
+          {/* Pending actions */}
+          {c.status === "pending" && (
+            <>
+              <Button
+                size="small"
+                onClick={() => onApprove(c.id)}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.green,
+                  background: C.greenLight,
+                  border: "1px solid #BBF7D0",
+                  borderRadius: 6,
+                }}
+              >
+                Approve
+              </Button>
+              <Button
+                size="small"
+                onClick={() => onReject(c.id)}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.red,
+                  background: C.redLight,
+                  border: "1px solid #FECACA",
+                  borderRadius: 6,
+                }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+
+          {/* Send Credentials */}
+          {c.status === "approved" && (
+            <Button
+              size="small"
+              icon={sentClients.has(c.id) ? <CheckCircleOutlined /> : null}
+              onClick={() => {
+                setCredClient(c);
+                setCredPassword("");
+                setCredMsg("");
+              }}
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                background: sentClients.has(c.id) ? C.greenLight : C.purpleLight,
+                border: sentClients.has(c.id)
+                  ? "1px solid #BBF7D0"
+                  : "1px solid #C4B5FD",
+                color: sentClients.has(c.id) ? C.green : C.purple,
+              }}
+            >
+              {sentClients.has(c.id) ? "Sent Credential" : "Send Credential"}
+            </Button>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
-    <div>
-      {/* Page heading */}
+    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      {/* ── Page Header ── */}
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: C.slate, margin: 0, letterSpacing: "-0.4px" }}>
+        <h1
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: C.slate,
+            margin: 0,
+            letterSpacing: "-0.4px",
+          }}
+        >
           {title}
         </h1>
-        <p style={{ fontSize: 11, color: C.slate500, margin: "4px 0 0", fontWeight: 500 }}>
+        <p
+          style={{
+            fontSize: 11,
+            color: C.slate500,
+            margin: "4px 0 0",
+            fontWeight: 500,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
           {subtitle}
         </p>
       </div>
 
-      {/* Search bar */}
+      {/* ── Search + Count ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <input
+
+        <Input
           placeholder="Search by company, ID, email or city…"
+          prefix={<SearchOutlined style={{ color: C.slate500 }} />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          allowClear
           style={{
             flex: 1, maxWidth: 360, height: 38, padding: "0 14px",
             background: C.white, border: `1px solid ${C.border}`,
             borderRadius: 9, color: C.slate, fontSize: 13, outline: "none",
-          }}
-        />
-        <span style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}>
+          }} />
+        <span
+          style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}
+        >
           {filtered.length} client{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      {/* Table */}
-      <div style={{
-        background: C.white, borderRadius: 14, border: `1px solid ${C.border}`,
-        overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-      }}>
-        {/* Head */}
-        <div style={{
-          display: "flex", background: C.slate100, borderBottom: `1px solid ${C.border}`,
-          overflowX: "auto",
-        }}>
-          {cols.map((col) => (
-            <div key={col.label} style={{
-              width: col.w, flexShrink: 0, padding: "10px 14px",
-              fontSize: 10, fontWeight: 700, color: C.slate500,
-              letterSpacing: "0.08em", textTransform: "uppercase",
-            }}>
-              {col.label}
-            </div>
-          ))}
-        </div>
-
-        {/* Rows */}
-        {filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center", color: C.slate500, fontSize: 13 }}>
-            No clients found.
-          </div>
-        ) : (
-          filtered.map((c, i) => (
-            <div
-              key={c.id}
-              style={{
-                display: "flex", alignItems: "center",
-                borderBottom: i < filtered.length - 1 ? `1px solid ${C.borderLight}` : "none",
-                transition: "background 0.12s", cursor: "default",
-                overflowX: "auto",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = C.slate100; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
-            >
-              {/* Client ID */}
-              <div style={{ width: 155, flexShrink: 0, padding: "14px 14px" }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, color: C.blue,
-                  background: C.blueLight, padding: "3px 8px",
-                  borderRadius: 5, fontFamily: "monospace",
-                }}>{c.id}</span>
-              </div>
-
-              {/* Company */}
-              <div style={{ width: 200, flexShrink: 0, padding: "14px 14px" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.slate, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.company_name}
-                </div>
-                <div style={{ fontSize: 11, color: C.slate500, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.email}
-                </div>
-              </div>
-              <div style={{ width: 130, flexShrink: 0, padding: "14px 14px", fontSize: 12, color: C.slate500 }}>
-                {c.company_type}
-              </div>
-              {/* Agency Type */}
-              <div style={{ width: 120, flexShrink: 0, padding: "14px 14px", fontSize: 12, color: C.slate500 }}>
-                {c.agency_type}
-              </div>
-
-              {/* City */}
-              <div style={{ width: 100, flexShrink: 0, padding: "14px 14px", fontSize: 12, color: C.slate500 }}>
-                {c.city}
-              </div>
-
-              {/* Submitted */}
-              <div style={{ width: 110, flexShrink: 0, padding: "14px 14px", fontSize: 12, color: C.slate700 }}>
-                {fmt(c.submitted_at)}
-              </div>
-
-              {/* Status */}
-              <div style={{ width: 120, flexShrink: 0, padding: "14px 14px" }}>
-                <StatusBadge status={c.status} />
-              </div>
-
-              {/* Actions */}
-              <div style={{ width: 220, flexShrink: 0, padding: "14px 14px", display: "flex", gap: 6 }}>
-                <Button
-                  onClick={() => setSelectedClient(c)}
-                  style={{
-                    padding: "4px 10px", borderRadius: 6,
-                    background: C.blueLight, border: `1px solid ${C.blueMid}`,
-                    color: C.blue, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                  }}
-                >View</Button>
-                {c.status === "pending" && (
-                  <>
-                    <Button
-                      onClick={() => onApprove(c.id)}
-                      style={{
-                        padding: "4px 10px", borderRadius: 6,
-                        background: C.greenLight, border: `1px solid #BBF7D0`,
-                        color: C.green, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                      }}
-                    >Approve</Button>
-                    <Button
-                      onClick={() => onReject(c.id)}
-                      style={{
-                        padding: "4px 10px", borderRadius: 6,
-                        background: C.redLight, border: `1px solid #FECACA`,
-                        color: C.red, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                      }}
-                    >Reject</Button>
-                  </>
-                )}
-                {c.status === "approved" && (
-                  <Button
-                    onClick={() => { setCredClient(c); setCredPassword(""); setCredMsg(""); }}
-                    icon={sentClients.has(c.id) ? <CheckOutlined /> : null}
-                    style={{
-                      padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                      cursor: "pointer",
-                      background: sentClients.has(c.id) ? C.greenLight : C.purpleLight,
-                      border: sentClients.has(c.id) ? "1px solid #BBF7D0" : "1px solid #C4B5FD",
-                      color: sentClients.has(c.id) ? C.green : C.purple,
-                    }}
-                  >
-                    {sentClients.has(c.id) ? "Sent" : "Send Credentials"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
+      {/* ── Ant Design Table ── */}
+      <div
+        style={{
+          background: C.white,
+          borderRadius: 14,
+          border: `1px solid ${C.border}`,
+          overflow: "hidden",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        }}
+      >
+        <Table
+          columns={columns}
+          dataSource={filtered}
+          rowKey="id"
+          scroll={{ x: 1200 }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50"],
+            showTotal: (total, range) =>
+              `${range[0]}–${range[1]} of ${total} clients`,
+            style: { padding: "12px 16px" },
+          }}
+          rowClassName={() => "client-table-row"}
+          style={{ fontSize: 13 }}
+        />
       </div>
 
-      {/* Detail Modal */}
+      {/* ── Client Detail Modal (existing component) ── */}
       {selectedClient && (
         <ClientDetailModal
           client={selectedClient}
-          onApprove={(id) => { onApprove(id); setSelectedClient(null); }}
-          onReject={(id) => { onReject(id); setSelectedClient(null); }}
+          onApprove={(id) => {
+            onApprove(id);
+            setSelectedClient(null);
+          }}
+          onReject={(id) => {
+            onReject(id);
+            setSelectedClient(null);
+          }}
           onClose={() => setSelectedClient(null)}
         />
       )}
-      {credClient && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 300,
-          background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 300,
-        }}>
-          <div style={{
-            background: C.white, borderRadius: 16, border: `1px solid ${C.border}`,
-            width: "100%", maxWidth: 460, padding: 28,
-            boxShadow: "0 24px 80px rgba(0,0,0,0.18)",
-          }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: C.slate, margin: 0 }}>Send Credentials</h3>
-                <p style={{ fontSize: 12, color: C.slate500, margin: "4px 0 0" }}>Credentials will be emailed to the client</p>
-              </div>
-              <Button
-                onClick={() => { setCredClient(null); setSearch(""); }}
-                style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.border}`, background: C.slate100, cursor: "pointer", fontSize: 16 }}
-              >✕</Button>
-            </div>
 
-            {/* Client email (read-only) */}
+      {/* ── Send Credentials — Ant Design Modal ── */}
+      <Modal
+        open={!!credClient}
+        onCancel={() => {
+          setCredClient(null);
+          setCredPassword("");
+          setCredMsg("");
+          setSearch("");
+        }}
+        footer={null}
+        width={450}
+        centered
+        destroyOnClose
+        title={
+          <div>
+            <div
+              style={{ fontSize: 16, fontWeight: 700, color: C.slate }}
+            >
+              Send Credentials
+            </div>
+            <div style={{ fontSize: 12, color: C.slate500, fontWeight: 400, marginTop: 2 }}>
+              Credentials will be emailed to the client
+            </div>
+          </div>
+        }
+        style={{ borderRadius: 16 }}
+      >
+        {credClient && (
+          <div>
+            {/* Client Email (read-only) */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.slate500, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.slate500,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
                 Client Email
               </label>
-              <div style={{
-                marginTop: 6, padding: "10px 14px", borderRadius: 8,
-                background: C.slate100, border: `1px solid ${C.border}`,
-                fontSize: 13, color: C.slate, fontWeight: 500,
-              }}>{credClient.email}</div>
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: C.slate100,
+                  border: `1px solid ${C.border}`,
+                  fontSize: 13,
+                  color: C.slate,
+                  fontWeight: 500,
+                }}
+              >
+                {credClient.email}
+              </div>
             </div>
 
-            {/* Password input */}
+            {/* Password Input */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.slate500, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.slate500,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
                 Set Password
               </label>
-              <input
-                type="password"
+              <Input.Password
                 placeholder="Enter password to send"
                 value={credPassword}
                 onChange={(e) => setCredPassword(e.target.value)}
-                style={{
-                  marginTop: 6, width: "100%", height: 40, padding: "0 14px",
-                  border: `1px solid ${C.border}`, borderRadius: 8,
-                  fontSize: 13, color: C.slate, outline: "none",
-                  boxSizing: "border-box",
-                }}
+                style={{ height: 40, fontSize: 13 }}
               />
             </div>
 
-            {/* Message */}
+            {/* Status Message */}
             {credMsg && (
-              <div style={{ marginBottom: 14, fontSize: 12, color: credMsg.startsWith("✅") ? C.green : C.red, fontWeight: 500 }}>
+              <div
+                style={{
+                  marginBottom: 14,
+                  fontSize: 12,
+                  color: credMsg.startsWith("✅") ? C.green : C.red,
+                  fontWeight: 500,
+                }}
+              >
                 {credMsg}
               </div>
             )}
 
-            {/* Buttons */}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            {/* Footer Buttons */}
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+              }}
+            >
               <Button
-                onClick={() => { setCredClient(null); setSearch(""); }}
-                style={{ padding: "9px 18px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.slate500, fontSize: 13, cursor: "pointer" }}
+                onClick={() => {
+                  setCredClient(null);
+                  setCredPassword("");
+                  setCredMsg("");
+                  setSearch("");
+                }}
+                style={{
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  color: C.slate500,
+                  fontSize: 13,
+                }}
               >
                 Cancel
               </Button>
               <Button
+                type="primary"
                 onClick={handleSendCredentials}
-                disabled={credSending}
-                style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: C.purple, color: C.white, fontSize: 13, fontWeight: 700, cursor: credSending ? "not-allowed" : "pointer", opacity: credSending ? 0.7 : 1 }}
+                loading={credSending}
+                style={{
+                  borderRadius: 8,
+                  background: C.blue,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  boxShadow: "0 2px 8px rgba(124,58,237,0.25)",
+                }}
               >
                 {credSending ? "Sending…" : "Send Credentials"}
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
+
+      <style>{`
+        .client-table-row:hover td { background: #F8FAFC !important; }
+        .ant-table-thead > tr > th {
+          background: #F1F5F9 !important;
+          font-size: 11px !important;
+          font-weight: 700 !important;
+          color: #64748B !important;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+      `}</style>
     </div>
   );
 }

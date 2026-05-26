@@ -7,18 +7,18 @@ import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // �
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
 
-const PURPLE      = '#7c3aed';
+const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
-const PURPLE_MID  = '#ddd6fe';
-const BLUE        = '#2563EB';
-const BLUE_LIGHT  = '#EFF6FF';
-const SLATE       = '#0F172A';
-const SLATE_300   = '#CBD5E1';
-const SLATE_500   = '#64748B';
-const WHITE       = '#FFFFFF';
-const BG          = '#F8FAFC';
+const PURPLE_MID = '#ddd6fe';
+const BLUE = '#2563EB';
+const BLUE_LIGHT = '#EFF6FF';
+const SLATE = '#0F172A';
+const SLATE_300 = '#CBD5E1';
+const SLATE_500 = '#64748B';
+const WHITE = '#FFFFFF';
+const BG = '#F8FAFC';
 
 interface CreativeDetail {
   type?: 'standard' | 'third_party';
@@ -55,6 +55,7 @@ interface Campaign {
   end_date?: string;
   status?: string;
   line_items?: LineItem[];
+  approval_status?: string;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -66,7 +67,7 @@ function CreativesCell({ li }: { li: LineItem }) {
   const imageNames = li.image_creatives ?? [];
   const videoNames = li.video_creatives ?? [];
 
-  const standardCreatives   = (li.creatives ?? []).filter(c => !c.type || c.type === 'standard');
+  const standardCreatives = (li.creatives ?? []).filter(c => !c.type || c.type === 'standard');
   const thirdPartyFromCreatives = (li.creatives ?? []).filter(c => c.type === 'third_party');
   const thirdPartyFromArray = li.third_party_creatives ?? [];
   const allThirdParty = thirdPartyFromCreatives.length > 0 ? thirdPartyFromCreatives : thirdPartyFromArray;
@@ -149,9 +150,9 @@ export default function Creative_Dashboard() {
   const sideWidth = collapsed ? 64 : 240;
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [filtered,  setFiltered]  = useState<Campaign[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState('');
+  const [filtered, setFiltered] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const fetchCampaigns = () => {
     setLoading(true);
@@ -159,8 +160,10 @@ export default function Creative_Dashboard() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const list: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
-        setCampaigns(list);
-        setFiltered(list);
+        // ✅ Only show approved campaigns
+        const approved = list.filter(c => c.approval_status === 'approved');
+        setCampaigns(approved);
+        setFiltered(approved);
       })
       .catch(() => { setCampaigns([]); setFiltered([]); })
       .finally(() => setLoading(false));
@@ -178,9 +181,9 @@ export default function Creative_Dashboard() {
     ));
   }, [search, campaigns]);
 
-  const totalCampaigns  = campaigns.length;
-  const totalLineItems  = campaigns.reduce((acc, c) => acc + (c.line_items?.length ?? 0), 0);
-  const totalCreatives  = campaigns.reduce((acc, c) =>
+  const totalCampaigns = campaigns.length;
+  const totalLineItems = campaigns.reduce((acc, c) => acc + (c.line_items?.length ?? 0), 0);
+  const totalCreatives = campaigns.reduce((acc, c) =>
     acc + (c.line_items?.reduce((a, li) =>
       a + (li.image_creatives?.length ?? 0) +
       (li.video_creatives?.length ?? 0) +
@@ -280,7 +283,7 @@ export default function Creative_Dashboard() {
         const sub = r.ad_sub_format;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {fmt && <Tag color="blue"   style={{ fontSize: 10, width: 'fit-content' }}>{fmt}</Tag>}
+            {fmt && <Tag color="blue" style={{ fontSize: 10, width: 'fit-content' }}>{fmt}</Tag>}
             {sub && <Tag color="purple" style={{ fontSize: 10, width: 'fit-content' }}>{sub}</Tag>}
             {!fmt && <Text style={{ color: SLATE_500 }}>—</Text>}
           </div>
@@ -293,8 +296,8 @@ export default function Creative_Dashboard() {
         const arr = Array.isArray(v) ? v : (v ? [v] : []);
         return arr.length > 0
           ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-              {arr.map((e: string) => <Tag key={e} style={{ fontSize: 10 }}>{e}</Tag>)}
-            </div>
+            {arr.map((e: string) => <Tag key={e} style={{ fontSize: 10 }}>{e}</Tag>)}
+          </div>
           : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
       },
     },
@@ -346,9 +349,9 @@ export default function Creative_Dashboard() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
             {[
-              { label: 'Total Campaigns',  value: totalCampaigns,  color: PURPLE,    bg: PURPLE_LIGHT, border: PURPLE_MID   },
-              { label: 'Total Line Items', value: totalLineItems,  color: BLUE,      bg: BLUE_LIGHT,   border: '#bfdbfe'    },
-              { label: 'Total Creatives',  value: totalCreatives,  color: '#059669', bg: '#f0fdf4',    border: '#86efac'    },
+              { label: 'Total Campaigns', value: totalCampaigns, color: PURPLE, bg: PURPLE_LIGHT, border: PURPLE_MID },
+              { label: 'Total Line Items', value: totalLineItems, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
+              { label: 'Total Creatives', value: totalCreatives, color: '#059669', bg: '#f0fdf4', border: '#86efac' },
             ].map(s => (
               <div key={s.label} style={{
                 background: WHITE, border: `1px solid ${SLATE_300}`,

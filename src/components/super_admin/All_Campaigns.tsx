@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Tag, Badge, Button, Input, Select } from "antd";
-import { SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 const { Option } = Select;
@@ -17,7 +17,7 @@ const C = {
     slate300: "#CBD5E1",
     slate100: "#F1F5F9",
     border: "#E2E8F0",
-    borderLight: "#F1F5F9",
+    borderLight: "#F1F5cF9",
     blue: "#2563EB",
     blueLight: "#EFF6FF",
     blueMid: "#BFDBFE",
@@ -291,7 +291,7 @@ export default function All_Campaigns() {
 
     const fetchCampaigns = useCallback(() => {
         setLoading(true);
-        fetch("http://127.0.0.1:8000/get_campaigns/", {
+        fetch("https://city-animate-anagram.ngrok-free.dev/get_campaigns/", {
             headers: { "ngrok-skip-browser-warning": "1" },
         })
             .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
@@ -320,8 +320,9 @@ export default function All_Campaigns() {
         if (!deleteCampaign) return;
         setDeleting(true);
         try {
+            
             const res = await fetch(
-                `http://127.0.0.1:8000/delete_campaign/${deleteCampaign.campaign_id}/`,
+                `https://city-animate-anagram.ngrok-free.dev/delete_campaign/${deleteCampaign.campaign_id}/`,
                 {
                     method: "DELETE",
                     headers: { "ngrok-skip-browser-warning": "1" },
@@ -366,19 +367,14 @@ export default function All_Campaigns() {
     // ── Table Columns ─────────────────────────────────────────────────────────
     const columns: ColumnsType<Campaign> = [
         {
-            title: "Campaign ID",
-            dataIndex: "campaign_id",
-            key: "campaign_id",
-            width: 160,
-            fixed: "left",
-            render: (id: string) => (
-                <span style={{
-                    fontSize: 12, fontWeight: 700, color: C.blue,
-                    background: C.blueLight, padding: "3px 8px",
-                    borderRadius: 6, fontFamily: "monospace",
-                    letterSpacing: "0.02em", whiteSpace: "nowrap",
-                }}>
+            title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 180, fixed: "left",
+            render: (id: string | null) => id ? (
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>
                     {id}
+                </span>
+            ) : (
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.amber, background: C.amberLight, padding: "3px 8px", borderRadius: 6, border: `1px dashed #FDE68A` }}>
+                    Pending Approval
                 </span>
             ),
         },
@@ -563,18 +559,6 @@ export default function All_Campaigns() {
                         }}
                     >
                         View
-                    </Button>
-                    <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => navigate(`/update_campaign/${record.campaign_id}`)}
-                        style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: C.slate, background: C.white,
-                            border: `1px solid ${C.slate300}`, borderRadius: 6,
-                        }}
-                    >
-                        Edit
                     </Button>
                     <Button
                         size="small"

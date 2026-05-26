@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined,
-  FileTextOutlined, RightOutlined, BellOutlined, ExclamationCircleOutlined,
+  FileTextOutlined, RightOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Sidebar from '../shared/Sidebar';
@@ -316,49 +316,10 @@ export default function User_Drafts() {
             >
               + NEW CAMPAIGN
             </Button>
-
-            {/* Bell */}
-            <div style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <BellOutlined style={{ fontSize: 15, color: SLATE_500 }} />
-              <span style={{ position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff' }} />
-            </div>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: BLUE, color: WHITE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>AK</div>
           </div>
         </header>
 
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
-
-          {/* ─── Summary strip ───────────────────────────────────────────── */}
-          <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-            {[
-              { label: 'Total Drafts', value: drafts.length, color: '#7c3aed', bg: '#ede9fe' },
-              {
-                label: 'In Progress',
-                value: drafts.filter(d => d.activeStep < 5).length,
-                color: '#d97706', bg: '#fffbeb',
-              },
-              {
-                label: 'Ready to Submit',
-                value: drafts.filter(d => d.activeStep === 5).length,
-                color: '#059669', bg: '#ecfdf5',
-              },
-            ].map(stat => (
-              <div key={stat.label} style={{
-                background: WHITE, border: `1px solid ${SLATE_300}`, borderRadius: 12,
-                padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
-                minWidth: 180,
-              }}>
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileTextOutlined style={{ fontSize: 18, color: stat.color }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: SLATE, lineHeight: 1.2 }}>{stat.value}</div>
-                  <div style={{ fontSize: 12, color: SLATE_500, fontWeight: 500 }}>{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
           {/* ─── Filters ────────────────────────────────────────────────── */}
           <div style={{
             background: WHITE, borderRadius: 12, padding: '16px 20px',
@@ -370,13 +331,16 @@ export default function User_Drafts() {
               prefix={<SearchOutlined style={{ color: SLATE_500 }} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: 320, height: 36 }}
+              style={{ flex: 1, minWidth: 240, height: 36 }}
               allowClear
             />
             <Button
               icon={<ReloadOutlined />}
               onClick={loadDrafts}
-              style={{ height: 36, color: SLATE_500, border: `1px solid ${SLATE_300}` }}
+              style={{
+                        height: 36, borderRadius: 8, border: `1px solid E2E8F0`,
+                        background: '#FFFFFF', color: '#64748B', fontSize: 12, fontWeight: 600,
+                    }}
             >
               Refresh
             </Button>

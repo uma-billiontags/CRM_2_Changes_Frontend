@@ -9,14 +9,14 @@ import {
     CodeOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import Sidebar from '../shared/Sidebar';
+import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
 
 const { Text } = Typography;
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
-const BASE = 'http://127.0.0.1:8000';
-const MEDIA_BASE_URL = 'http://127.0.0.1:8000';
+const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
+const BASE = 'https://city-animate-anagram.ngrok-free.dev';
+const MEDIA_BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -161,7 +161,12 @@ export default function Third_Party_Creative() {
                 const flat: ThirdPartyRow[] = [];
                 let rowIndex = 1;
 
-                (Array.isArray(data) ? data : []).forEach(campaign => {
+                // ✅ Only approved campaigns
+                const allCampaigns = Array.isArray(data) ? data : [];
+                const approved = allCampaigns.filter(c => c.approval_status === 'approved');
+
+
+                approved.forEach(campaign => {
                     (campaign.line_items ?? []).forEach((li: any) => {
                         (li.third_party_creatives ?? []).forEach((tp: any, tpIdx: number) => {
                             const inputFile = tp.input_file ?? null;
@@ -430,7 +435,7 @@ export default function Third_Party_Creative() {
             display: 'flex', minHeight: '100vh', background: BG,
             fontFamily: "'Segoe UI', system-ui, sans-serif",
         }}>
-            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+            <CreativeSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
 
             <div style={{
                 marginLeft: sideWidth, flex: 1,

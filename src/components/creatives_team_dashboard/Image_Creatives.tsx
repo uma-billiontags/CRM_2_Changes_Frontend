@@ -5,11 +5,11 @@ import {
   CopyOutlined, CheckOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import Sidebar from '../shared/Sidebar';
+import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -76,7 +76,12 @@ interface ImageCreativeRow {
 function isImageFormat(fmt: string | string[]): boolean {
   const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
   const lower = raw.toLowerCase();
-  return lower.includes('banner') || lower.includes('interstitial') || lower.includes('image');
+  // ✅ Must NOT be video/youtube, must be banner/interstitial
+  return (
+    (lower.includes('banner') || lower.includes('interstitial')) &&
+    !lower.includes('video') &&
+    !lower.includes('youtube')
+  );
 }
 
 function isValidClickUrl(url: string): boolean {
@@ -226,11 +231,21 @@ export default function Image_Creatives() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data) => {
         const campaigns: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
+        // ✅ Only approved campaigns
+        const approved = campaigns.filter(c => (c as any).approval_status === 'approved');
         const flat: ImageCreativeRow[] = [];
 
-        campaigns.forEach(campaign => {
+        approved.forEach(campaign => {
           (campaign.line_items ?? []).forEach(li => {
-            if (!isImageFormat(li.ad_format)) return;
+            // ✅ Check all formats
+            const formats = Array.isArray(li.ad_format)
+              ? li.ad_format
+              : [String(li.ad_format ?? '')];
+
+            const hasImageFormat = formats.some(f => isImageFormat(f));
+
+            // ✅ Only show in image if it's image format AND NOT video
+            if (!hasImageFormat) return;
             (li.creatives ?? []).forEach((cr, idx) => {
               if (cr.type === 'third_party') return;
               flat.push({
@@ -287,7 +302,7 @@ export default function Image_Creatives() {
     }
 
     // Direct browser download — no fetch needed
-    const downloadUrl = `http://127.0.0.1:8000/download_creative/${record.creativeId}/`;
+    const downloadUrl = `https://city-animate-anagram.ngrok-free.dev/download_creative/${record.creativeId}/`;
     const a = document.createElement('a');
     a.href = downloadUrl;
     a.target = '_blank';   // opens in new tab if browser decides to preview instead
@@ -442,48 +457,48 @@ export default function Image_Creatives() {
       render: (v: string) => <TruncCell value={v} />,
     },
     // ── Actions column ──────────────────────────────────────────────────────
-   {
-  title: <span style={colHead()}>Actions</span>,
-  key: 'actions',
-  width: 130,
-  fixed: 'right',
-  render: (_: any, record: ImageCreativeRow) => {
-    const hasAsset = !!record.creativeId;  // ← use creativeId, not mainAssetUrl
+    {
+      title: <span style={colHead()}>Actions</span>,
+      key: 'actions',
+      width: 130,
+      fixed: 'right',
+      render: (_: any, record: ImageCreativeRow) => {
+        const hasAsset = !!record.creativeId;  // ← use creativeId, not mainAssetUrl
 
-    return (
-      <Tooltip title={hasAsset ? 'Download image asset' : 'No asset available'}>
-        <Button
-          size="small"
-          icon={<DownloadOutlined style={{ fontSize: 12 }} />}
-          onClick={(e) => handleDownload(e, record)}
-          disabled={!hasAsset}
-          style={{
-            height: 30,
-            padding: '0 12px',
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            color: hasAsset ? BLUE : SLATE_300,
-            background: hasAsset ? BLUE_LIGHT : '#f8fafc',
-            border: `1px solid ${hasAsset ? '#bfdbfe' : SLATE_300}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            cursor: hasAsset ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s',
-          }}
-        >
-          Download
-        </Button>
-      </Tooltip>
-    );
-  },
-},
+        return (
+          <Tooltip title={hasAsset ? 'Download image asset' : 'No asset available'}>
+            <Button
+              size="small"
+              icon={<DownloadOutlined style={{ fontSize: 12 }} />}
+              onClick={(e) => handleDownload(e, record)}
+              disabled={!hasAsset}
+              style={{
+                height: 30,
+                padding: '0 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: hasAsset ? BLUE : SLATE_300,
+                background: hasAsset ? BLUE_LIGHT : '#f8fafc',
+                border: `1px solid ${hasAsset ? '#bfdbfe' : SLATE_300}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: hasAsset ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
+              }}
+            >
+              Download
+            </Button>
+          </Tooltip>
+        );
+      },
+    },
   ];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      <CreativeSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
 
       <div style={{ marginLeft: sideWidth, flex: 1, display: 'flex', flexDirection: 'column', transition: 'margin-left 0.25s', minWidth: 0 }}>
 

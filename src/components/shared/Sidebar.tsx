@@ -44,7 +44,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const clientName = localStorage.getItem('client_name') ?? '';
 
   const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'A';
-  const displayName    = clientName || 'Campaign Manager';
+  const displayName    = clientName || 'User';
 
   return (
     <aside style={{
@@ -67,13 +67,13 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 9, background: BLUE,
+              width: 32, height: 32, borderRadius: '50%', background: BLUE,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 900, color: WHITE,
-            }}>N</div>
+              color: WHITE, fontSize: 12, fontWeight: 800, flexShrink: 0,
+            }}>{avatarInitials}</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: WHITE, letterSpacing: '-0.3px' }}>
-                Billion <span style={{ color: '#60A5FA' }}>Tags</span>
+                {displayName} 
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
                 CAMPAIGN PLATFORM
@@ -165,7 +165,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             }}>{avatarInitials}</div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: WHITE }}>{displayName}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CAMPAIGN MANAGER</div>
             </div>
           </div>
         )}

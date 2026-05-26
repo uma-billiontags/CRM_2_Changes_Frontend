@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import SuperAdminSidebar from "./AdminSidebar";
 import { Toast } from "../super_admin/SharedComponents";
-import {  C } from "../types/types";
+import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
 
 // ── Context so child pages can trigger approve/reject ─────────────────────────
@@ -23,8 +23,10 @@ export default function AdminLayout() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/get_all_clients/", {
+    fetch("https://city-animate-anagram.ngrok-free.dev/get_all_clients/", {
       headers: { "ngrok-skip-browser-warning": "1" }
     })
       .then(r => r.json())
@@ -58,6 +60,21 @@ export default function AdminLayout() {
       .catch(err => console.error("Failed to fetch clients", err))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch("https://city-animate-anagram.ngrok-free.dev/get_campaigns/", {
+      headers: { "ngrok-skip-browser-warning": "1" },
+    })
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.campaigns) ? data.campaigns : [];
+        setCampaigns(list);
+      })
+      .catch(err => console.error("Failed to fetch campaigns", err));
+  }, []);
+
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const counts: Counts = {
@@ -65,6 +82,7 @@ export default function AdminLayout() {
     pending: clients.filter((c) => c.status === "pending").length,
     approved: clients.filter((c) => c.status === "approved").length,
     rejected: clients.filter((c) => c.status === "rejected").length,
+    campaignTotal: campaigns.length, // ← add this
   };
 
   const showToast = (message: string, type: ToastType = "success") => {
@@ -73,39 +91,39 @@ export default function AdminLayout() {
 
   const handleApprove = async (id: string) => {
     try {
-    await fetch(`http://127.0.0.1:8000/update_client_status/${id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "approved" }),
-    });
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
-      )
-    );
-    showToast("Client approved successfully!", "success");
-  } catch {
-    showToast("Failed to approve client.", "error");
-  }
+      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
+        )
+      );
+      showToast("Client approved successfully!", "success");
+    } catch {
+      showToast("Failed to approve client.", "error");
+    }
   };
 
- const handleReject = async (id: string) => {
-  try {
-    await fetch(`http://127.0.0.1:8000/update_client_status/${id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "rejected" }),
-    });
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: "rejected" as ClientStatus } : c
-      )
-    );
-    showToast("Client has been rejected.", "error");
-  } catch {
-    showToast("Failed to reject client.", "error");
-  }
-};
+  const handleReject = async (id: string) => {
+    try {
+      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" }),
+      });
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, status: "rejected" as ClientStatus } : c
+        )
+      );
+      showToast("Client has been rejected.", "error");
+    } catch {
+      showToast("Failed to reject client.", "error");
+    }
+  };
   const outletContext: SuperAdminOutletContext = {
     clients, counts, handleApprove, handleReject,
   };

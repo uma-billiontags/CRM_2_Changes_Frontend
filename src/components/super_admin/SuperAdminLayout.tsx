@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+// SuperAdminLayout.tsx
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import SuperAdminSidebar from "./SuperAdminSidebar";
 import { Toast } from "./SharedComponents";
-import {  C } from "../types/types";
+import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
-
-// ── Context so child pages can trigger approve/reject ─────────────────────────
-// (Pass via Outlet context — no need for Redux/Zustand for this scale)
 
 export interface SuperAdminOutletContext {
   clients: Client[];
@@ -15,21 +13,139 @@ export interface SuperAdminOutletContext {
   handleReject: (id: string) => void;
 }
 
-// ── Layout ────────────────────────────────────────────────────────────────────
+// ── Notification type ─────────────────────────────────────────────────────────
+interface Notification {
+  id: number;
+  message: string;
+  time: string;
+  read: boolean;
+}
 
 export default function SuperAdminLayout() {
   const navigate = useNavigate();
-  // With this:
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
 
+  // ── Notification state ──────────────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+
+   // Request browser notification permission when admin opens the dashboard
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/get_all_clients/", {
+  if (!("Notification" in window)) {
+    console.warn("This browser does not support desktop notifications");
+    return;
+  }
+  if (Notification.permission === "default") {
+    Notification.requestPermission().then((permission) => {
+      console.log("Notification permission:", permission);
+    });
+  }
+}, []);
+
+// ── Cross-browser desktop notification helper ─────────────────────────────
+const showDesktopNotification = (message: string) => {
+  if (!("Notification" in window)) return;
+
+  const fire = () => {
+    new Notification("🔔 New Client Alert", {
+      body: message,
+      icon: "/icons.svg",
+      tag: `crm-${Date.now()}`,
+    });
+  };
+
+  if (Notification.permission === "granted") {
+    fire();
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") fire();
+    });
+  }
+};
+
+  // ── WebSocket connection ────────────────────────────────────────────────────
+  useEffect(() => {
+    const socket = new WebSocket(
+      "wss://city-animate-anagram.ngrok-free.dev/ws/notifications/"
+    );
+
+    socketRef.current = socket;
+
+    socket.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      // ── Bell notification (existing) ──
+      const newNotif: Notification = {
+        id: Date.now(),
+        message: data.message,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        read: false,
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+
+      // ── Desktop notification (new) ──
+      
+      showDesktopNotification(data.message);
+    };
+
+    socket.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
+    socket.onclose = (event) => {
+      console.log("WebSocket disconnected", event.code);
+    };
+
+    return () => {
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
+      ) {
+        socket.close();
+      }
+    };
+  }, []);
+
+  // ── Close dropdown on outside click ────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearAll = () => {
+    setNotifications([]);
+    setShowDropdown(false);
+  };
+
+  // ── Existing fetches ────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch("https://city-animate-anagram.ngrok-free.dev/get_all_clients/", {
       headers: { "ngrok-skip-browser-warning": "1" }
     })
       .then(r => r.json())
       .then(data => {
-        // Map backend fields to your Client type
         const mapped = data.map((c: any) => ({
           id: c.client_id,
           reporting_id: c.reporting_id,
@@ -46,7 +162,7 @@ export default function SuperAdminLayout() {
           vast_number: c.vast_number,
           place_of_supply: c.place_of_supply,
           is_active: c.is_active,
-          status: c.status ?? "pending",   // ← needs status column in DB
+          status: c.status ?? "pending",
           submitted_at: c.created_at,
           billing: c.billing ?? {},
           contacts: c.contacts ?? [],
@@ -58,6 +174,21 @@ export default function SuperAdminLayout() {
       .catch(err => console.error("Failed to fetch clients", err))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch("https://city-animate-anagram.ngrok-free.dev/get_campaigns/", {
+      headers: { "ngrok-skip-browser-warning": "1" },
+    })
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.campaigns) ? data.campaigns : [];
+        setCampaigns(list);
+      })
+      .catch(err => console.error("Failed to fetch campaigns", err));
+  }, []);
+
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const counts: Counts = {
@@ -65,6 +196,7 @@ export default function SuperAdminLayout() {
     pending: clients.filter((c) => c.status === "pending").length,
     approved: clients.filter((c) => c.status === "approved").length,
     rejected: clients.filter((c) => c.status === "rejected").length,
+    campaignTotal: campaigns.length,
   };
 
   const showToast = (message: string, type: ToastType = "success") => {
@@ -73,39 +205,40 @@ export default function SuperAdminLayout() {
 
   const handleApprove = async (id: string) => {
     try {
-    await fetch(`http://127.0.0.1:8000/update_client_status/${id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "approved" }),
-    });
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
-      )
-    );
-    showToast("Client approved successfully!", "success");
-  } catch {
-    showToast("Failed to approve client.", "error");
-  }
+      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
+        )
+      );
+      showToast("Client approved successfully!", "success");
+    } catch {
+      showToast("Failed to approve client.", "error");
+    }
   };
 
- const handleReject = async (id: string) => {
-  try {
-    await fetch(`http://127.0.0.1:8000/update_client_status/${id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "rejected" }),
-    });
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: "rejected" as ClientStatus } : c
-      )
-    );
-    showToast("Client has been rejected.", "error");
-  } catch {
-    showToast("Failed to reject client.", "error");
-  }
-};
+  const handleReject = async (id: string) => {
+    try {
+      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" }),
+      });
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, status: "rejected" as ClientStatus } : c
+        )
+      );
+      showToast("Client has been rejected.", "error");
+    } catch {
+      showToast("Failed to reject client.", "error");
+    }
+  };
+
   const outletContext: SuperAdminOutletContext = {
     clients, counts, handleApprove, handleReject,
   };
@@ -121,18 +254,19 @@ export default function SuperAdminLayout() {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
         input::placeholder { color: ${C.slate300}; }
       `}</style>
 
-      {/* Sidebar */}
       <SuperAdminSidebar counts={counts} />
 
-      {/* Main area */}
       <div style={{ marginLeft: 240, flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {/* Topbar */}
         <header style={{
           height: 64, background: C.white, borderBottom: `1px solid ${C.border}`,
           padding: "0 28px",
@@ -169,18 +303,125 @@ export default function SuperAdminLayout() {
               </div>
             )}
 
-            <button style={{
-              position: "relative", width: 36, height: 36, borderRadius: 9,
-              border: `1px solid ${C.border}`, background: C.white,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", fontSize: 15,
-            }}>
-              🔔
-              <span style={{
-                position: "absolute", top: 7, right: 7,
-                width: 7, height: 7, borderRadius: "50%", background: C.blue,
-              }} />
-            </button>
+            {/* ── Bell Icon with Dropdown ─────────────────────────────────── */}
+            <div ref={dropdownRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => {
+                  setShowDropdown((prev) => !prev);
+                  if (!showDropdown) markAllRead();
+                }}
+                style={{
+                  position: "relative", width: 36, height: 36, borderRadius: 9,
+                  border: `1px solid ${C.border}`, background: C.white,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", fontSize: 15,
+                }}
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: "absolute", top: -4, right: -4,
+                    minWidth: 18, height: 18, borderRadius: 9,
+                    background: "#EF4444", color: "#fff",
+                    fontSize: 10, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 4px", lineHeight: 1,
+                    border: `2px solid ${C.white}`,
+                  }}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* ── Dropdown Panel ───────────────────────────────────────── */}
+              {showDropdown && (
+                <div style={{
+                  position: "absolute", top: "calc(100% + 10px)", right: 0,
+                  width: 320, background: C.white,
+                  border: `1px solid ${C.border}`, borderRadius: 12,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+                  zIndex: 999,
+                  animation: "slideDown 0.2s ease both",
+                  overflow: "hidden",
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 16px",
+                    borderBottom: `1px solid ${C.border}`,
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.slate }}>
+                      Notifications
+                    </span>
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={clearAll}
+                        style={{
+                          fontSize: 11, color: C.blue, background: "none",
+                          border: "none", cursor: "pointer", fontWeight: 600, padding: 0,
+                        }}
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List */}
+                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                    {notifications.length === 0 ? (
+                      <div style={{
+                        padding: "32px 16px", textAlign: "center",
+                        color: C.slate500, fontSize: 13,
+                      }}>
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔔</div>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          style={{
+                            display: "flex", alignItems: "flex-start", gap: 10,
+                            padding: "12px 16px",
+                            borderBottom: `1px solid ${C.border}`,
+                            background: n.read ? C.white : "#EFF6FF",
+                            transition: "background 0.2s",
+                          }}
+                        >
+                          <div style={{
+                            width: 32, height: 32, borderRadius: "50%",
+                            background: "#DBEAFE", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 14,
+                          }}>
+                            👤
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{
+                              margin: 0, fontSize: 12, color: C.slate,
+                              fontWeight: n.read ? 400 : 600,
+                              lineHeight: 1.4,
+                            }}>
+                              {n.message}
+                            </p>
+                            <p style={{ margin: "3px 0 0", fontSize: 11, color: C.slate500 }}>
+                              {n.time}
+                            </p>
+                          </div>
+                          {!n.read && (
+                            <div style={{
+                              width: 7, height: 7, borderRadius: "50%",
+                              background: C.blue, flexShrink: 0, marginTop: 4,
+                            }} />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* ── End Bell ─────────────────────────────────────────────────── */}
 
             <div style={{
               width: 36, height: 36, borderRadius: "50%", background: C.blue,
@@ -190,7 +431,6 @@ export default function SuperAdminLayout() {
           </div>
         </header>
 
-        {/* Page content rendered here */}
         <main style={{ flex: 1, padding: 28, overflowY: "auto", animation: "fadeUp 0.35s ease both" }}>
           <Outlet context={outletContext} />
         </main>

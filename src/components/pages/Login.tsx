@@ -19,7 +19,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await fetch(
-        "http://127.0.0.1:8000/login_view/",
+        "https://city-animate-anagram.ngrok-free.dev/login_view/",
         {
           method: "POST",
           headers: {
@@ -114,8 +114,8 @@ export default function Login() {
         </div>
 
         {/* Decorative blobs */}
-        <div className="absolute -bottom-32 -right-32 w-[480px] h-[480px] rounded-full gradient-primary opacity-30 blur-3xl" />
-        <div className="absolute top-1/3 -left-24 w-[320px] h-[320px] rounded-full bg-primary opacity-20 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 w-120 h-120 rounded-full gradient-primary opacity-30 blur-3xl" />
+        <div className="absolute top-1/3 -left-24 w-[320px] h-120 rounded-full bg-primary opacity-20 blur-3xl" />
 
         <div className="text-xs text-sidebar-foreground/50 relative z-10">
           SOC 2 · ISO 27001 · GDPR ready
@@ -133,7 +133,7 @@ export default function Login() {
           {/* Error banner */}
           {error && (
             <div className="mt-4 px-4 py-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0">⚠️</span>
+              <span className="mt-0.5 shrink-0">⚠️</span>
               <span>{error}</span>
             </div>
           )}

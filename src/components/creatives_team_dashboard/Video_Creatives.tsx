@@ -6,11 +6,11 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import Sidebar from '../shared/Sidebar';
+import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'http://127.0.0.1:8000/get_campaigns/';
+const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -77,6 +77,7 @@ interface VideoCreativeRow {
 function isVideoFormat(fmt: string | string[]): boolean {
   const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
   const lower = raw.toLowerCase();
+  // ✅ Must be video or youtube
   return lower.includes('video') || lower.includes('youtube');
 }
 
@@ -246,11 +247,20 @@ export default function Video_Creatives() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data) => {
         const campaigns: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
+        // ✅ Only approved campaigns
+        const approved = campaigns.filter(c => (c as any).approval_status === 'approved');
         const flat: VideoCreativeRow[] = [];
 
-        campaigns.forEach(campaign => {
+        approved.forEach(campaign => {
           (campaign.line_items ?? []).forEach(li => {
-            if (!isVideoFormat(li.ad_format)) return;
+            const formats = Array.isArray(li.ad_format)
+              ? li.ad_format
+              : [String(li.ad_format ?? '')];
+
+            // ✅ Only show if it's a video format
+            const hasVideoFormat = formats.some(f => isVideoFormat(f));
+            if (!hasVideoFormat) return;
+
             (li.creatives ?? []).forEach((cr, idx) => {
               flat.push({
                 key: `${campaign.campaign_id}_${li.line_item_id}_${idx}`,
@@ -302,7 +312,7 @@ export default function Video_Creatives() {
       message.warning('No asset available to download');
       return;
     }
-    const downloadUrl = `http://127.0.0.1:8000/download_creative/${record.creativeId}/`;
+    const downloadUrl = `https://city-animate-anagram.ngrok-free.dev/download_creative/${record.creativeId}/`;
     const a = document.createElement('a');
     a.href = downloadUrl;
     a.target = '_blank';
@@ -480,7 +490,7 @@ export default function Video_Creatives() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      <CreativeSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
 
       <div style={{ marginLeft: sideWidth, flex: 1, display: 'flex', flexDirection: 'column', transition: 'margin-left 0.25s', minWidth: 0 }}>
 
