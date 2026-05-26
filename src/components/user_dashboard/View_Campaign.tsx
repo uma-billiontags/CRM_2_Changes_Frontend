@@ -9,7 +9,6 @@ const { Title, Text } = Typography;
 const BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
 
 const BLUE = '#2563EB';
-const BLUE_LIGHT = '#EFF6FF';
 const SLATE = '#0F172A';
 const SLATE_300 = '#CBD5E1';
 const SLATE_500 = '#64748B';

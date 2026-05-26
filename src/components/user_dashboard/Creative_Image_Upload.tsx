@@ -423,8 +423,6 @@ export default function Creative_Image_Upload() {
   const tpInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const tpBackupRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const savedRowsRef = useRef<{ rows: CreativeRow[]; tpRows: ThirdPartyRow[] }>({ rows: [], tpRows: [] });
-
   // Row helpers 
   const updateRow = (key: string, patch: Partial<CreativeRow>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));

@@ -24,7 +24,6 @@ interface Notification {
 export default function SuperAdminLayout() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
   // ── Notification state ──────────────────────────────────────────────────────
@@ -151,7 +150,6 @@ export default function SuperAdminLayout() {
         setClients(mapped);
       })
       .catch(err => console.error("Failed to fetch clients", err))
-      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {

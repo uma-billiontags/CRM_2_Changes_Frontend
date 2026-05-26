@@ -88,25 +88,6 @@ function isValidVideoTag(tag: string): boolean {
   return !!tag && /^https?:\/\/.*\?$/.test(tag.trim());
 }
 
-// ── Download helper ──────────────────────────────────────────────────────────
-async function downloadFile(url: string, fileName: string) {
-  try {
-    const res = await fetch(url, { headers: { 'ngrok-skip-browser-warning': '1' } });
-    if (!res.ok) throw new Error('Network response was not ok');
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = fileName || 'creative';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(blobUrl);
-  } catch {
-    message.error('Download failed. Please try again.');
-  }
-}
-
 // ── TruncCell ────────────────────────────────────────────────────────────────
 function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?: number; mono?: boolean }) {
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;

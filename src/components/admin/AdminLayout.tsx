@@ -21,7 +21,6 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   // With this:
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
@@ -57,8 +56,7 @@ export default function AdminLayout() {
         }));
         setClients(mapped);
       })
-      .catch(err => console.error("Failed to fetch clients", err))
-      .finally(() => setLoading(false));
+      .catch(err => console.error("Failed to fetch clients", err));
   }, []);
 
   useEffect(() => {

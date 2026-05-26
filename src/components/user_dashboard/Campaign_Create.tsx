@@ -1033,10 +1033,9 @@ function LineItemCard({
   const uploadedImageCreatives = lineItemCreatives[item.id + '_image'] || [];
   const uploadedVideoCreatives = lineItemCreatives[item.id + '_video'] || [];
 
-  const [expandedFormat, setExpandedFormat] = useState<string | null>(null);
 
   // ── Unit Cost Calculation ──
-const currencySymbol = clientCurrencySymbol || '...';
+  const currencySymbol = clientCurrencySymbol || '...';
 
   const calculatedUnitCost = useMemo(() => {
     const impressions = parseFloat(item.impressions);
@@ -1106,7 +1105,6 @@ const currencySymbol = clientCurrencySymbol || '...';
     // Auto-select default sub-formats for this format
     onChange(item.id, 'adSubFormat', val ? (AD_FORMAT_DEFAULT_SUBS[val] ?? []) : []);
     onChange(item.id, 'adSubFormatOpen', false);
-    setExpandedFormat(null);
 
     if (val && item.units) {
       const defaultRate = item.units === 'CPM'
@@ -1763,7 +1761,7 @@ const currencySymbol = clientCurrencySymbol || '...';
                   />
                 </Form.Item>
               )}
-            </div> 
+            </div>
 
             {/* Notes — shown only if any value differs from default */}
             {(
@@ -2466,7 +2464,7 @@ export default function Campaign_Create() {
             <span style={{ color: 'var(--slate)', fontWeight: 600 }}>Create Campaign</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            
+
             <div className="cc-topbar-avatar">{clientName ? clientName.charAt(0).toUpperCase() : 'AK'}</div>
           </div>
         </header>
