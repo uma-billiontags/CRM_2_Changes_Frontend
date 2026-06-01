@@ -25,6 +25,8 @@ import All_Campaigns from "./components/super_admin/All_Campaigns";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminOverview from "./components/admin/AdminOverview";
 import Admin_Campaigns from "./components/admin/Admin_Campaigns";
+import Campaign_Dashboard from "./components/campaign_team_dashboard/Campaign_Dashboard";
+import View_Campaign_Team from "./components/campaign_team_dashboard/View_Campaign_Team";
 function App() {
 
   return (
@@ -41,12 +43,16 @@ function App() {
         <Route path="/campaign/:campaign_id" element={<View_Campaign />} />
         <Route path="/update_campaign/:campaign_id" element={<Edit_Campaign />} />
         <Route path="/user_drafts" element={<User_Drafts />} />
+
+
         <Route path="/creative_dashboard" element={<Creative_Dashboard />} />
         <Route path="/image_creatives" element={<Image_Creatives />} />
         <Route path="/video_creatives" element={<Video_Creatives />} />
         <Route path="/creative/:campaign_id" element={<View_Creative />} />
         <Route path="/third_party_creatives" element={<Third_Party_Creative />} />
 
+        <Route path="/campaign_dashboard" element={<Campaign_Dashboard />} />
+        <Route path="/campaign_view_team/:campaign_id" element={<View_Campaign_Team />} />
 
         <Route path="/superadmin" element={<SuperAdminLayout />}>
           <Route index element={<Navigate to="overview" replace />} />

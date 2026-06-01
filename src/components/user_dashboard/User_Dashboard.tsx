@@ -5,6 +5,8 @@ import { ChevronRight } from 'lucide-react';
 import Sidebar from '../shared/Sidebar';
 import UserCampaignsTable, { type Campaign, isActiveCampaign } from '../shared/UserCampaignsTable';
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 const BLUE = '#2563EB';
 const BLUE_LIGHT = '#EFF6FF';
 const BLUE_MID = '#BFDBFE';
@@ -93,7 +95,7 @@ export default function User_Dashboard() {
 
   useEffect(() => {
     const clientId = localStorage.getItem('client_id');
-    fetch(`https://city-animate-anagram.ngrok-free.dev/get_campaigns_by_client/${clientId}/`, {
+    fetch(`${BASE_URL}/get_campaigns_by_client/${clientId}/`, {
       headers: { 'ngrok-skip-browser-warning': '1' },
     })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })

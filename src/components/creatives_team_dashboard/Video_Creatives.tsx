@@ -10,7 +10,7 @@ import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // â†
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -224,7 +224,7 @@ export default function Video_Creatives() {
 
   const fetchData = () => {
     setLoading(true);
-    fetch(GET_CAMPAIGNS_URL, { headers: { 'ngrok-skip-browser-warning': '1' } })
+    fetch(`${BASE_URL}/get_campaigns/`, { headers: { 'ngrok-skip-browser-warning': '1' } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data) => {
         const campaigns: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
@@ -293,7 +293,7 @@ export default function Video_Creatives() {
       message.warning('No asset available to download');
       return;
     }
-    const downloadUrl = `https://city-animate-anagram.ngrok-free.dev/download_creative/${record.creativeId}/`;
+    const downloadUrl = `${BASE_URL}/download_creative/${record.creativeId}/`;
     const a = document.createElement('a');
     a.href = downloadUrl;
     a.target = '_blank';

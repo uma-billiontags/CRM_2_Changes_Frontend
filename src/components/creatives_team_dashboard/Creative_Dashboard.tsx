@@ -7,7 +7,7 @@ import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // â†
 
 const { Text } = Typography;
 
-const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -156,7 +156,7 @@ export default function Creative_Dashboard() {
 
   const fetchCampaigns = () => {
     setLoading(true);
-    fetch(GET_CAMPAIGNS_URL, { headers: { 'ngrok-skip-browser-warning': '1' } })
+    fetch(`${BASE_URL}/get_campaigns/`, { headers: { 'ngrok-skip-browser-warning': '1' } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const list: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];

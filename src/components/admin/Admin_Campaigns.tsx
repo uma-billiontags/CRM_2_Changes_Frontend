@@ -14,7 +14,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 
 const { Option } = Select;
-const BASE_URL = "https://city-animate-anagram.ngrok-free.dev";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 const C = {

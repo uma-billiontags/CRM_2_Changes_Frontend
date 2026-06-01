@@ -6,7 +6,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
-const BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';

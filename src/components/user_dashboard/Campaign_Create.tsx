@@ -20,9 +20,7 @@ dayjs.extend(isBetween);
 
 const { TextArea } = Input;
 
-const SUBMIT_URL = 'https://city-animate-anagram.ngrok-free.dev/create_campaign/';
-// const CLIENT_URL = 'https://city-animate-anagram.ngrok-free.dev/get_client/CLT-2026-00007/';
-const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const DRAFT_KEY = 'campaign_create_draft';
 const NAV_FLAG_KEY = 'campaign_create_nav_to_creative';
@@ -249,7 +247,7 @@ async function fetchLastLineItemOffset(): Promise<number> {
       ? `LI${clientName.replace(/\s+/g, '').substring(0, 4).toUpperCase()}`
       : 'LIUSER';
 
-    const res = await fetch(GET_CAMPAIGNS_URL, {
+    const res = await fetch(`${BASE_URL}/get_campaigns/`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     });
     if (!res.ok) return 1;
@@ -2406,7 +2404,7 @@ export default function Campaign_Create() {
     });
 
     try {
-      const res = await fetch(SUBMIT_URL, {
+      const res = await fetch(`${BASE_URL}/create_campaign/`, {
         method: 'POST',
         body: fd,
         headers: { 'ngrok-skip-browser-warning': '1' },

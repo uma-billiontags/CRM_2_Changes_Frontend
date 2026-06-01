@@ -5,6 +5,31 @@ import SuperAdminSidebar from "./SuperAdminSidebar";
 import { Toast } from "./SharedComponents";
 import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
+import { Button } from "antd";
+
+// ── Firebase imports ────────────────────────────────────────────────────────
+import { initializeApp, getApps } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+
+// ── Firebase config ─────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCm6A3ecdnRuM2BtqcU8hbViNVmtSYowNE",
+  authDomain: "crm-notification-system-b1fbf.firebaseapp.com",
+  projectId: "crm-notification-system-b1fbf",
+  storageBucket: "crm-notification-system-b1fbf.firebasestorage.app",
+  messagingSenderId: "822813005343",
+  appId: "1:822813005343:web:9b60be7829ac4a5615e72a",
+};
+
+// ── VAPID key for FCM ───────────────────────────────────────────────────
+const VAPID_KEY =
+  "BOrsq40DwgRJYZ6MUfTq6evI-iBEF2rknTh-sgONupO8DJNDFiZF-nRY49GAOE8fwUwqa_I2R0nXYTmkUHmC1eU";
+
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// ── Init Firebase once ───────────────────────────────────────────────────────
+const firebaseApp =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export interface SuperAdminOutletContext {
   clients: Client[];
@@ -13,7 +38,7 @@ export interface SuperAdminOutletContext {
   handleReject: (id: string) => void;
 }
 
-// ── Notification type ─────────────────────────────────────────────────────────
+// ── Notification type ────────────────────────────────────────────────────────
 interface Notification {
   id: number;
   message: string;
@@ -26,100 +51,158 @@ export default function SuperAdminLayout() {
   const [clients, setClients] = useState<Client[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
-  // ── Notification state ──────────────────────────────────────────────────────
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // ── Notification state ───────────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    try {
+      const saved = localStorage.getItem("crm_notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }); 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<WebSocket | null>(null);
 
-   // Request browser notification permission when admin opens the dashboard
+  const hasRegistered = useRef(false); // ✅ add this ref
+
   useEffect(() => {
-  if (!("Notification" in window)) {
-    console.warn("This browser does not support desktop notifications");
-    return;
-  }
-  if (Notification.permission === "default") {
-    Notification.requestPermission().then((permission) => {
-      console.log("Notification permission:", permission);
-    });
-  }
-}, []);
+    localStorage.setItem("crm_notifications", JSON.stringify(notifications));
+  }, [notifications]);
 
-// ── Cross-browser desktop notification helper ─────────────────────────────
-const showDesktopNotification = (message: string) => {
-  if (!("Notification" in window)) return;
 
-  const fire = () => {
-    new Notification("🔔 New Client Alert", {
-      body: message,
-      icon: "/icons.svg",
-      tag: `crm-${Date.now()}`,
-    });
+  // ── Helper: add notification to bell list ────────────────────────────────
+  const addNotification = (message: string) => {
+    const newNotif: Notification = {
+      id: Date.now(),
+      message,
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  if (Notification.permission === "granted") {
-    fire();
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") fire();
-    });
-  }
-};
+  // ── Helper: desktop popup notification ──────────────────────────────────
+  const showDesktopNotification = (message: string) => {
+    if (!("Notification" in window)) return;
 
-  // ── WebSocket connection ────────────────────────────────────────────────────
+    const fire = () => {
+      new Notification("🔔 New Client Alert", {
+        body: message,
+        icon: "/icons.svg",
+        tag: `crm-${Date.now()}`,
+      });
+    };
+
+    if (Notification.permission === "granted") {
+      fire();
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") fire();
+      });
+    }
+  };
+
+  // ── 1. Request browser notification permission on mount ──────────────────
   useEffect(() => {
-    const socket = new WebSocket(
-      "wss://city-animate-anagram.ngrok-free.dev/ws/notifications/"
-    );
-
-    socketRef.current = socket;
-
-    socket.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      // ── Bell notification (existing) ──
-      const newNotif: Notification = {
-        id: Date.now(),
-        message: data.message,
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        read: false,
-      };
-      setNotifications((prev) => [newNotif, ...prev]);
-
-      // ── Desktop notification (new) ──
-      
-      showDesktopNotification(data.message);
-    };
-
-    socket.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
-    socket.onclose = (event) => {
-      console.log("WebSocket disconnected", event.code);
-    };
-
-    return () => {
-      if (
-        socket.readyState === WebSocket.OPEN ||
-        socket.readyState === WebSocket.CONNECTING
-      ) {
-        socket.close();
-      }
-    };
+    if (!("Notification" in window)) {
+      console.warn("This browser does not support desktop notifications");
+      return;
+    }
+    if (Notification.permission === "default") {
+      Notification.requestPermission().then((permission) => {
+        console.log("Notification permission:", permission);
+      });
+    }
   }, []);
 
-  // ── Close dropdown on outside click ────────────────────────────────────────
+  // ── 2. Register Service Worker + get FCM token + save to Django ──────────
+  //    This token is used by Django to send push even when browser is closed
+  // ── 2. Register Service Worker + get FCM token + save to Django ──────────
+  useEffect(() => {
+    const registerAndSaveToken = async () => {
+
+      // ✅ Skip if already ran once (prevents React StrictMode double run)
+      if (hasRegistered.current) return;
+      hasRegistered.current = true;
+
+      try {
+        if (!("serviceWorker" in navigator)) return;
+
+        const swRegistration = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js"
+        );
+
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          console.warn("Notification permission not granted");
+          return;
+        }
+
+        const messaging = getMessaging(firebaseApp);
+
+        const token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swRegistration,
+        });
+
+        if (!token) {
+          console.warn("No FCM token received");
+          return;
+        }
+
+        console.log("FCM Token:", token);
+
+        await fetch(`${BASE_URL}/save_fcm_token/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        console.log("FCM token saved to backend");
+      } catch (err) {
+        console.error("FCM setup error:", err);
+      }
+    };
+
+    registerAndSaveToken();
+  }, []);
+
+  // ── 3. FCM Foreground listener ───────────────────────────────────────────
+  //    Fires when tab is open (WebSocket also fires, but FCM is the fallback
+  //    when WebSocket is not connected)
+  useEffect(() => {
+    try {
+      const messaging = getMessaging(firebaseApp);
+
+      const unsubscribe = onMessage(messaging, (payload) => {
+        console.log("FCM foreground message:", payload);
+        const message =
+          payload.notification?.body ||
+          payload.data?.message ||
+          "New notification";
+
+        addNotification(message);
+        showDesktopNotification(message);
+      });
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("FCM onMessage error:", err);
+    }
+  }, []);
+
+  // ── Close dropdown on outside click ─────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -135,16 +218,17 @@ const showDesktopNotification = (message: string) => {
 
   const clearAll = () => {
     setNotifications([]);
+    localStorage.removeItem("crm_notifications");
     setShowDropdown(false);
   };
 
-  // ── Existing fetches ────────────────────────────────────────────────────────
+  // ── Fetch clients ────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch("https://city-animate-anagram.ngrok-free.dev/get_all_clients/", {
-      headers: { "ngrok-skip-browser-warning": "1" }
+    fetch(`${BASE_URL}/get_all_clients/`, {
+      headers: { "ngrok-skip-browser-warning": "1" },
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const mapped = data.map((c: any) => ({
           id: c.client_id,
           reporting_id: c.reporting_id,
@@ -170,21 +254,24 @@ const showDesktopNotification = (message: string) => {
         }));
         setClients(mapped);
       })
-      .catch(err => console.error("Failed to fetch clients", err))
+      .catch((err) => console.error("Failed to fetch clients", err));
   }, []);
 
+  // ── Fetch campaigns ──────────────────────────────────────────────────────
   useEffect(() => {
-    fetch("https://city-animate-anagram.ngrok-free.dev/get_campaigns/", {
+    fetch(`${BASE_URL}/get_campaigns/`, {
       headers: { "ngrok-skip-browser-warning": "1" },
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const list = Array.isArray(data)
           ? data
-          : Array.isArray(data?.campaigns) ? data.campaigns : [];
+          : Array.isArray(data?.campaigns)
+            ? data.campaigns
+            : [];
         setCampaigns(list);
       })
-      .catch(err => console.error("Failed to fetch campaigns", err));
+      .catch((err) => console.error("Failed to fetch campaigns", err));
   }, []);
 
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
@@ -203,14 +290,20 @@ const showDesktopNotification = (message: string) => {
 
   const handleApprove = async (id: string) => {
     try {
-      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+      await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "approved" }),
       });
       setClients((prev) =>
         prev.map((c) =>
-          c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
+          c.id === id
+            ? {
+              ...c,
+              status: "approved" as ClientStatus,
+              approved_at: new Date().toISOString(),
+            }
+            : c
         )
       );
       showToast("Client approved successfully!", "success");
@@ -221,7 +314,7 @@ const showDesktopNotification = (message: string) => {
 
   const handleReject = async (id: string) => {
     try {
-      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+      await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "rejected" }),
@@ -238,15 +331,21 @@ const showDesktopNotification = (message: string) => {
   };
 
   const outletContext: SuperAdminOutletContext = {
-    clients, counts, handleApprove, handleReject,
+    clients,
+    counts,
+    handleApprove,
+    handleReject,
   };
 
   return (
-    <div style={{
-      display: "flex", minHeight: "100vh",
-      background: C.bg,
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-    }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: C.bg,
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+      }}
+    >
       <style>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -264,23 +363,66 @@ const showDesktopNotification = (message: string) => {
 
       <SuperAdminSidebar counts={counts} />
 
-      <div style={{ marginLeft: 240, flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <header style={{
-          height: 64, background: C.white, borderBottom: `1px solid ${C.border}`,
-          padding: "0 28px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, zIndex: 50, flexShrink: 0,
-        }}>
+      <div
+        style={{
+          marginLeft: 240,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+        }}
+      >
+        <header
+          style={{
+            height: 64,
+            background: C.white,
+            borderBottom: `1px solid ${C.border}`,
+            padding: "0 28px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 9, background: C.blue,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 900, color: C.white, flexShrink: 0,
-            }}>SA</div>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 9,
+                background: C.blue,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 900,
+                color: C.white,
+                flexShrink: 0,
+              }}
+            >
+              SA
+            </div>
             <div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.slate }}>Billion </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>Tags</span>
-              <span style={{ fontSize: 11, color: C.slate500, marginLeft: 8 }}>/ Super Admin Portal</span>
+              <span
+                style={{ fontSize: 14, fontWeight: 700, color: C.slate }}
+              >
+                Billion{" "}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>
+                Tags
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: C.slate500,
+                  marginLeft: 8,
+                }}
+              >
+                / Super Admin Portal
+              </span>
             </div>
           </div>
 
@@ -289,89 +431,153 @@ const showDesktopNotification = (message: string) => {
               <div
                 onClick={() => navigate("/superadmin/pending")}
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "5px 12px", borderRadius: 20, cursor: "pointer",
-                  background: C.amberLight, border: `1px solid #FDE68A`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 12px",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  background: C.amberLight,
+                  border: `1px solid #FDE68A`,
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.amber }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.08em" }}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: C.amber,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: C.amber,
+                    letterSpacing: "0.08em",
+                  }}
+                >
                   {counts.pending} PENDING
                 </span>
               </div>
             )}
 
-            {/* ── Bell Icon with Dropdown ─────────────────────────────────── */}
+            {/* ── Bell Icon with Dropdown ──────────────────────────────── */}
             <div ref={dropdownRef} style={{ position: "relative" }}>
-              <button
+              <Button
                 onClick={() => {
                   setShowDropdown((prev) => !prev);
                   if (!showDropdown) markAllRead();
                 }}
                 style={{
-                  position: "relative", width: 36, height: 36, borderRadius: 9,
-                  border: `1px solid ${C.border}`, background: C.white,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", fontSize: 15,
+                  position: "relative",
+                  width: 36,
+                  height: 36,
+                  borderRadius: 9,
+                  border: `1px solid ${C.border}`,
+                  background: C.white,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  fontSize: 15,
                 }}
               >
                 🔔
                 {unreadCount > 0 && (
-                  <span style={{
-                    position: "absolute", top: -4, right: -4,
-                    minWidth: 18, height: 18, borderRadius: 9,
-                    background: "#EF4444", color: "#fff",
-                    fontSize: 10, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "0 4px", lineHeight: 1,
-                    border: `2px solid ${C.white}`,
-                  }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      background: "#EF4444",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0 4px",
+                      lineHeight: 1,
+                      border: `2px solid ${C.white}`,
+                    }}
+                  >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
-              </button>
+              </Button>
 
-              {/* ── Dropdown Panel ───────────────────────────────────────── */}
+              {/* ── Dropdown Panel ───────────────────────────────────── */}
               {showDropdown && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 10px)", right: 0,
-                  width: 320, background: C.white,
-                  border: `1px solid ${C.border}`, borderRadius: 12,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
-                  zIndex: 999,
-                  animation: "slideDown 0.2s ease both",
-                  overflow: "hidden",
-                }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 10px)",
+                    right: 0,
+                    width: 320,
+                    background: C.white,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+                    zIndex: 999,
+                    animation: "slideDown 0.2s ease both",
+                    overflow: "hidden",
+                  }}
+                >
                   {/* Header */}
-                  <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "12px 16px",
-                    borderBottom: `1px solid ${C.border}`,
-                  }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: C.slate }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      borderBottom: `1px solid ${C.border}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: C.slate,
+                      }}
+                    >
                       Notifications
                     </span>
                     {notifications.length > 0 && (
-                      <button
+                      <Button
                         onClick={clearAll}
                         style={{
-                          fontSize: 11, color: C.blue, background: "none",
-                          border: "none", cursor: "pointer", fontWeight: 600, padding: 0,
+                          fontSize: 11,
+                          color: C.blue,
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          padding: 0,
                         }}
                       >
                         Clear all
-                      </button>
+                      </Button>
                     )}
                   </div>
 
                   {/* List */}
                   <div style={{ maxHeight: 320, overflowY: "auto" }}>
                     {notifications.length === 0 ? (
-                      <div style={{
-                        padding: "32px 16px", textAlign: "center",
-                        color: C.slate500, fontSize: 13,
-                      }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔔</div>
+                      <div
+                        style={{
+                          padding: "32px 16px",
+                          textAlign: "center",
+                          color: C.slate500,
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>
+                          🔔
+                        </div>
                         No notifications yet
                       </div>
                     ) : (
@@ -379,38 +585,63 @@ const showDesktopNotification = (message: string) => {
                         <div
                           key={n.id}
                           style={{
-                            display: "flex", alignItems: "flex-start", gap: 10,
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
                             padding: "12px 16px",
                             borderBottom: `1px solid ${C.border}`,
                             background: n.read ? C.white : "#EFF6FF",
                             transition: "background 0.2s",
                           }}
                         >
-                          <div style={{
-                            width: 32, height: 32, borderRadius: "50%",
-                            background: "#DBEAFE", flexShrink: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 14,
-                          }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              background: "#DBEAFE",
+                              flexShrink: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                            }}
+                          >
                             👤
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{
-                              margin: 0, fontSize: 12, color: C.slate,
-                              fontWeight: n.read ? 400 : 600,
-                              lineHeight: 1.4,
-                            }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 12,
+                                color: C.slate,
+                                fontWeight: n.read ? 400 : 600,
+                                lineHeight: 1.4,
+                              }}
+                            >
                               {n.message}
                             </p>
-                            <p style={{ margin: "3px 0 0", fontSize: 11, color: C.slate500 }}>
+                            <p
+                              style={{
+                                margin: "3px 0 0",
+                                fontSize: 11,
+                                color: C.slate500,
+                              }}
+                            >
                               {n.time}
                             </p>
                           </div>
                           {!n.read && (
-                            <div style={{
-                              width: 7, height: 7, borderRadius: "50%",
-                              background: C.blue, flexShrink: 0, marginTop: 4,
-                            }} />
+                            <div
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: C.blue,
+                                flexShrink: 0,
+                                marginTop: 4,
+                              }}
+                            />
                           )}
                         </div>
                       ))
@@ -419,24 +650,47 @@ const showDesktopNotification = (message: string) => {
                 </div>
               )}
             </div>
-            {/* ── End Bell ─────────────────────────────────────────────────── */}
+            {/* ── End Bell ──────────────────────────────────────────────── */}
 
-            <div style={{
-              width: 36, height: 36, borderRadius: "50%", background: C.blue,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 800, color: "#fff", cursor: "pointer",
-            }}>SA</div>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: C.blue,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              SA
+            </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: 28, overflowY: "auto", animation: "fadeUp 0.35s ease both" }}>
+        <main
+          style={{
+            flex: 1,
+            padding: 28,
+            overflowY: "auto",
+            animation: "fadeUp 0.35s ease both",
+          }}
+        >
           <Outlet context={outletContext} />
         </main>
       </div>
 
       {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
-}
+} 

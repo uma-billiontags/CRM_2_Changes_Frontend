@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 export default function Login() {
   const navigate = useNavigate();
 
@@ -19,7 +21,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await fetch(
-        "https://city-animate-anagram.ngrok-free.dev/login_view/",
+        `${BASE_URL}/login_view/`,
         {
           method: "POST",
           headers: {

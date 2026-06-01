@@ -5,6 +5,8 @@ import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import Sidebar from '../shared/Sidebar';
 import UserCampaignsTable, { type Campaign, isActiveCampaign, isClosedCampaign } from '../shared/UserCampaignsTable';
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 const { Title, Text } = Typography;
 const { Option } = Select;
 
@@ -59,7 +61,7 @@ export default function User_Campaigns() {
   const fetchCampaigns = () => {
     const clientId = localStorage.getItem('client_id');
     setLoading(true);
-    fetch(`https://city-animate-anagram.ngrok-free.dev/get_campaigns_by_client/${clientId}/`, {
+    fetch(`${BASE_URL}/get_campaigns_by_client/${clientId}/`, {
       headers: { 'ngrok-skip-browser-warning': '1' },
     })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })

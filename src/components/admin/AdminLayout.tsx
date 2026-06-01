@@ -1,31 +1,234 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import SuperAdminSidebar from "./AdminSidebar";
 import { Toast } from "../super_admin/SharedComponents";
 import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
+import { Button } from "antd";
+
+
+// ── Firebase imports ────────────────────────────────────────────────────────
+import { initializeApp, getApps } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+
+// ── Firebase config ─────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCm6A3ecdnRuM2BtqcU8hbViNVmtSYowNE",
+  authDomain: "crm-notification-system-b1fbf.firebaseapp.com",
+  projectId: "crm-notification-system-b1fbf",
+  storageBucket: "crm-notification-system-b1fbf.firebasestorage.app",
+  messagingSenderId: "822813005343",
+  appId: "1:822813005343:web:9b60be7829ac4a5615e72a",
+};
+
+// ── VAPID key for FCM ───────────────────────────────────────────────────
+const VAPID_KEY =
+  "BOrsq40DwgRJYZ6MUfTq6evI-iBEF2rknTh-sgONupO8DJNDFiZF-nRY49GAOE8fwUwqa_I2R0nXYTmkUHmC1eU";
+
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// ── Init Firebase once ───────────────────────────────────────────────────────
+const firebaseApp =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 // ── Context so child pages can trigger approve/reject ─────────────────────────
 // (Pass via Outlet context — no need for Redux/Zustand for this scale)
 
-export interface SuperAdminOutletContext {
+export interface AdminOutletContext {
   clients: Client[];
   counts: Counts;
   handleApprove: (id: string) => void;
   handleReject: (id: string) => void;
 }
 
-// ── Layout ────────────────────────────────────────────────────────────────────
+// ── Notification type ────────────────────────────────────────────────────────
+interface Notification {
+  id: number;
+  message: string;
+  time: string;
+  read: boolean;
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  // With this:
   const [clients, setClients] = useState<Client[]>([]);
-
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
+
+  // ── Notification state ───────────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    try {
+      const saved = localStorage.getItem("crm_notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const hasRegistered = useRef(false); // ✅ add this ref
+
   useEffect(() => {
-    fetch("https://city-animate-anagram.ngrok-free.dev/get_all_clients/", {
+    localStorage.setItem("crm_notifications", JSON.stringify(notifications));
+  }, [notifications]);
+
+
+  // ── Helper: add notification to bell list ────────────────────────────────
+  const addNotification = (message: string) => {
+    const newNotif: Notification = {
+      id: Date.now(),
+      message,
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
+  // ── Helper: desktop popup notification ──────────────────────────────────
+  const showDesktopNotification = (message: string) => {
+    if (!("Notification" in window)) return;
+
+    const fire = () => {
+      new Notification("🔔 New Client Alert", {
+        body: message,
+        icon: "/icons.svg",
+        tag: `crm-${Date.now()}`,
+      });
+    };
+
+    if (Notification.permission === "granted") {
+      fire();
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") fire();
+      });
+    }
+  };
+
+  // ── 1. Request browser notification permission on mount ──────────────────
+  useEffect(() => {
+    if (!("Notification" in window)) {
+      console.warn("This browser does not support desktop notifications");
+      return;
+    }
+    if (Notification.permission === "default") {
+      Notification.requestPermission().then((permission) => {
+        console.log("Notification permission:", permission);
+      });
+    }
+  }, []);
+
+  // ── 2. Register Service Worker + get FCM token + save to Django ──────────
+  //    This token is used by Django to send push even when browser is closed
+  // ── 2. Register Service Worker + get FCM token + save to Django ──────────
+  useEffect(() => {
+    const registerAndSaveToken = async () => {
+
+      // ✅ Skip if already ran once (prevents React StrictMode double run)
+      if (hasRegistered.current) return;
+      hasRegistered.current = true;
+
+      try {
+        if (!("serviceWorker" in navigator)) return;
+
+        const swRegistration = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js"
+        );
+
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          console.warn("Notification permission not granted");
+          return;
+        }
+
+        const messaging = getMessaging(firebaseApp);
+
+        const token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swRegistration,
+        });
+
+        if (!token) {
+          console.warn("No FCM token received");
+          return;
+        }
+
+        console.log("FCM Token:", token);
+
+        await fetch(`${BASE_URL}/save_fcm_token/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        console.log("FCM token saved to backend");
+      } catch (err) {
+        console.error("FCM setup error:", err);
+      }
+    };
+
+    registerAndSaveToken();
+  }, []);
+
+  // ── 3. FCM Foreground listener ───────────────────────────────────────────
+  //    Fires when tab is open (WebSocket also fires, but FCM is the fallback
+  //    when WebSocket is not connected)
+  useEffect(() => {
+    try {
+      const messaging = getMessaging(firebaseApp);
+
+      const unsubscribe = onMessage(messaging, (payload) => {
+        console.log("FCM foreground message:", payload);
+        const message =
+          payload.notification?.body ||
+          payload.data?.message ||
+          "New notification";
+
+        addNotification(message);
+        showDesktopNotification(message);
+      });
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("FCM onMessage error:", err);
+    }
+  }, []);
+
+  // ── Close dropdown on outside click ─────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearAll = () => {
+    setNotifications([]);
+    localStorage.removeItem("crm_notifications");
+    setShowDropdown(false);
+  };
+
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/get_all_clients/`, {
       headers: { "ngrok-skip-browser-warning": "1" }
     })
       .then(r => r.json())
@@ -60,7 +263,7 @@ export default function AdminLayout() {
   }, []);
 
   useEffect(() => {
-    fetch("https://city-animate-anagram.ngrok-free.dev/get_campaigns/", {
+    fetch(`${BASE_URL}/get_campaigns/`, {
       headers: { "ngrok-skip-browser-warning": "1" },
     })
       .then(r => r.json())
@@ -89,7 +292,7 @@ export default function AdminLayout() {
 
   const handleApprove = async (id: string) => {
     try {
-      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+      await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "approved" }),
@@ -107,7 +310,7 @@ export default function AdminLayout() {
 
   const handleReject = async (id: string) => {
     try {
-      await fetch(`https://city-animate-anagram.ngrok-free.dev/update_client_status/${id}/`, {
+      await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "rejected" }),
@@ -122,7 +325,7 @@ export default function AdminLayout() {
       showToast("Failed to reject client.", "error");
     }
   };
-  const outletContext: SuperAdminOutletContext = {
+  const outletContext: AdminOutletContext = {
     clients, counts, handleApprove, handleReject,
   };
 
@@ -160,11 +363,11 @@ export default function AdminLayout() {
               width: 34, height: 34, borderRadius: 9, background: C.blue,
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 13, fontWeight: 900, color: C.white, flexShrink: 0,
-            }}>SA</div>
+            }}>A</div>
             <div>
               <span style={{ fontSize: 14, fontWeight: 700, color: C.slate }}>Billion </span>
               <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>Tags</span>
-              <span style={{ fontSize: 11, color: C.slate500, marginLeft: 8 }}>/ Super Admin Portal</span>
+              <span style={{ fontSize: 11, color: C.slate500, marginLeft: 8 }}>/ Admin Portal</span>
             </div>
           </div>
 
@@ -185,24 +388,212 @@ export default function AdminLayout() {
               </div>
             )}
 
-            <button style={{
-              position: "relative", width: 36, height: 36, borderRadius: 9,
-              border: `1px solid ${C.border}`, background: C.white,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", fontSize: 15,
-            }}>
-              🔔
-              <span style={{
-                position: "absolute", top: 7, right: 7,
-                width: 7, height: 7, borderRadius: "50%", background: C.blue,
-              }} />
-            </button>
+            {/* ── Bell Icon with Dropdown ──────────────────────────────── */}
+            <div ref={dropdownRef} style={{ position: "relative" }}>
+              <Button
+                onClick={() => {
+                  setShowDropdown((prev) => !prev);
+                  if (!showDropdown) markAllRead();
+                }}
+                style={{
+                  position: "relative",
+                  width: 36,
+                  height: 36,
+                  borderRadius: 9,
+                  border: `1px solid ${C.border}`,
+                  background: C.white,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  fontSize: 15,
+                }}
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      background: "#EF4444",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0 4px",
+                      lineHeight: 1,
+                      border: `2px solid ${C.white}`,
+                    }}
+                  >
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Button>
+              {/* ── Dropdown Panel ───────────────────────────────────── */}
+              {showDropdown && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 10px)",
+                    right: 0,
+                    width: 320,
+                    background: C.white,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+                    zIndex: 999,
+                    animation: "slideDown 0.2s ease both",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      borderBottom: `1px solid ${C.border}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: C.slate,
+                      }}
+                    >
+                      Notifications
+                    </span>
+                    {notifications.length > 0 && (
+                      <Button
+                        onClick={clearAll}
+                        style={{
+                          fontSize: 11,
+                          color: C.blue,
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          padding: 0,
+                        }}
+                      >
+                        Clear all
+                      </Button>
+                    )}
+                  </div>
 
-            <div style={{
-              width: 36, height: 36, borderRadius: "50%", background: C.blue,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 800, color: "#fff", cursor: "pointer",
-            }}>SA</div>
+                  {/* List */}
+                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                    {notifications.length === 0 ? (
+                      <div
+                        style={{
+                          padding: "32px 16px",
+                          textAlign: "center",
+                          color: C.slate500,
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>
+                          🔔
+                        </div>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
+                            padding: "12px 16px",
+                            borderBottom: `1px solid ${C.border}`,
+                            background: n.read ? C.white : "#EFF6FF",
+                            transition: "background 0.2s",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              background: "#DBEAFE",
+                              flexShrink: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                            }}
+                          >
+                            👤
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 12,
+                                color: C.slate,
+                                fontWeight: n.read ? 400 : 600,
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {n.message}
+                            </p>
+                            <p
+                              style={{
+                                margin: "3px 0 0",
+                                fontSize: 11,
+                                color: C.slate500,
+                              }}
+                            >
+                              {n.time}
+                            </p>
+                          </div>
+                          {!n.read && (
+                            <div
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: C.blue,
+                                flexShrink: 0,
+                                marginTop: 4,
+                              }}
+                            />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* ── End Bell ──────────────────────────────────────────────── */}
+
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: C.blue,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              A
+            </div>
           </div>
         </header>
 

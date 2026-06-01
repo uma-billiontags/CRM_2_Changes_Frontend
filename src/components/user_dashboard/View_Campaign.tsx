@@ -6,7 +6,7 @@ import Sidebar from '../shared/Sidebar';
 
 const { Title, Text } = Typography;
 
-const BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const BLUE = '#2563EB';
 const SLATE = '#0F172A';

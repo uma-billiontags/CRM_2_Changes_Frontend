@@ -6,6 +6,8 @@ import { Button, Input, Modal, Table } from "antd";
 import { CheckCircleOutlined, SearchOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 interface ClientTablePageProps {
   clients: Client[];
   filterStatus: ClientStatus | null;
@@ -65,7 +67,7 @@ export default function ClientTablePage({
     setCredSending(true);
     setCredMsg("");
     try {
-      const res = await fetch(`https://city-animate-anagram.ngrok-free.dev/approve_client/`, {
+      const res = await fetch(`${BASE_URL}/approve_client/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

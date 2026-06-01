@@ -13,10 +13,7 @@ import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // �
 
 const { Text } = Typography;
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const GET_CAMPAIGNS_URL = 'https://city-animate-anagram.ngrok-free.dev/get_campaigns/';
-const BASE = 'https://city-animate-anagram.ngrok-free.dev';
-const MEDIA_BASE_URL = 'https://city-animate-anagram.ngrok-free.dev';
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const PURPLE = '#7c3aed';
 const PURPLE_LIGHT = '#f5f3ff';
@@ -67,7 +64,7 @@ function extractExt(fileName: string): string {
 function buildPreviewUrl(relativePath: string | null | undefined): string | null {
     if (!relativePath) return null;
     if (relativePath.startsWith('http')) return relativePath;
-    return `${MEDIA_BASE_URL}/media/${relativePath}`;
+    return `${BASE_URL}/media/${relativePath}`;
 }
 
 
@@ -106,7 +103,7 @@ function ExtBadge({ ext }: { ext: string }) {
 
 async function downloadInputFile(tpId: number, fileName: string) {
     try {
-        const url = `${BASE}/download_thirdparty/${tpId}/`;
+        const url = `${BASE_URL}/download_thirdparty/${tpId}/`;
         const res = await fetch(url, {
             headers: { 'ngrok-skip-browser-warning': '1' },
         });
@@ -124,7 +121,7 @@ async function downloadInputFile(tpId: number, fileName: string) {
 
 async function downloadBackupImage(tpId: number, fileName: string) {
     try {
-        const url = `${BASE}/download_backup_image/${tpId}/`;
+        const url = `${BASE_URL}/download_backup_image/${tpId}/`;
         const res = await fetch(url, {
             headers: { 'ngrok-skip-browser-warning': '1' },
         });
@@ -153,7 +150,7 @@ export default function Third_Party_Creative() {
     // ── Fetch & flatten ──────────────────────────────────────────────────────
     const fetchData = () => {
         setLoading(true);
-        fetch(GET_CAMPAIGNS_URL, {
+        fetch(`${BASE_URL}/get_campaigns/`, {
             headers: { 'ngrok-skip-browser-warning': '1' },
         })
             .then(r => (r.ok ? r.json() : Promise.reject()))

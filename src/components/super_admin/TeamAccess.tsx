@@ -26,14 +26,16 @@ const C = {
   yellowLight: "#FEFCE8",
 };
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 const API = {
-  create:       "https://city-animate-anagram.ngrok-free.dev/create_team_member/",
-  getAll:       "https://city-animate-anagram.ngrok-free.dev/get_team_members/",
-  delete:       "https://city-animate-anagram.ngrok-free.dev/delete_team_member/",
-  edit:         "https://city-animate-anagram.ngrok-free.dev/edit_team_member/",
-  getClients:   "https://city-animate-anagram.ngrok-free.dev/get_client_users/",
-  editClient:   "https://city-animate-anagram.ngrok-free.dev/edit_client_user/",
-  deleteClient: "https://city-animate-anagram.ngrok-free.dev/delete_client_user/",
+  create:       `${BASE_URL}/create_team_member/`,
+  getAll:       `${BASE_URL}/get_team_members/`,
+  delete:       `${BASE_URL}/delete_team_member/`,
+  edit:         `${BASE_URL}/edit_team_member/`,
+  getClients:   `${BASE_URL}/get_client_users/`,
+  editClient:   `${BASE_URL}/edit_client_user/`,
+  deleteClient: `${BASE_URL}/delete_client_user/`,
 };
 
 const NGROK_HEADERS = {
