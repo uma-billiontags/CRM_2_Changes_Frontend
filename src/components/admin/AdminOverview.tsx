@@ -1,7 +1,7 @@
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { C, fmt } from "../types/types";
 import { StatusBadge } from "../super_admin/SharedComponents";
-import type { SuperAdminOutletContext } from "./AdminLayout";
+import type { AdminOutletContext } from "./AdminLayout";
 import type { Client } from "../types/types";
 
 // ── Types (local) ─────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ interface StatItem {
 // ── Overview page ─────────────────────────────────────────────────────────────
 
 export default function AdminOverview() {
-  const { clients, counts } = useOutletContext<SuperAdminOutletContext>();
+  const { clients, counts } = useOutletContext<AdminOutletContext>();
   const navigate = useNavigate();
 
   const stats: StatItem[] = [

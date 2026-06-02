@@ -59,7 +59,7 @@ export default function SuperAdminLayout() {
     } catch {
       return [];
     }
-  }); 
+  });
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -290,10 +290,11 @@ export default function SuperAdminLayout() {
 
   const handleApprove = async (id: string) => {
     try {
+      const teamId = localStorage.getItem('user_id');
       await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "approved" }),
+        body: JSON.stringify({ status: "approved", team_id: teamId }),
       });
       setClients((prev) =>
         prev.map((c) =>
@@ -314,10 +315,12 @@ export default function SuperAdminLayout() {
 
   const handleReject = async (id: string) => {
     try {
+      const teamId = localStorage.getItem('user_id');  // ← get from localStorage
+
       await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "rejected" }),
+        body: JSON.stringify({ status: "rejected", team_id: teamId }),  // ← include team_id in body
       });
       setClients((prev) =>
         prev.map((c) =>

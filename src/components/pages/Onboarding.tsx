@@ -16,7 +16,7 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 // API
-const SUBMIT_URL = "https://city-animate-anagram.ngrok-free.dev/create_client/";
+const SUBMIT_URL = "http://127.0.0.1:8000/create_client/";
 
 // Dropdown choices — all data lives here on the frontend
 const DEFAULT_CHOICES = {

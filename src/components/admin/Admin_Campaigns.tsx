@@ -8,10 +8,12 @@ import {
     SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
     PlusOutlined, DeleteOutlined, FileImageOutlined,
     CloudUploadOutlined, SaveOutlined, InfoCircleOutlined,
-    CodeOutlined, CheckCircleOutlined, CloseOutlined
+    CodeOutlined, CheckCircleOutlined, CloseOutlined,
+    MessageOutlined
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
+import ChatCampaigns from "./Chat_Campaigns"; // Adjust path if needed
 
 const { Option } = Select;
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -1394,6 +1396,8 @@ export default function Admin_Campaigns() {
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
     const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
 
+    const [chatCampaign, setChatCampaign] = useState<Campaign | null>(null);
+
     const fetchCampaigns = useCallback(() => {
         setLoading(true);
         fetch(`${BASE_URL}/get_campaigns/`, { headers: { "ngrok-skip-browser-warning": "1" } })
@@ -1509,6 +1513,23 @@ export default function Admin_Campaigns() {
                         style={{ fontSize: 11, fontWeight: 600, color: C.slate, background: C.white, border: `1px solid ${C.slate300}`, borderRadius: 6 }}>
                         Edit
                     </Button>
+                    {/* New Chat Button */}
+                    <Button
+                        size="small"
+                        icon={<MessageOutlined />}
+                        onClick={() => setChatCampaign((prev) => (prev?.id === record.id ? null : record))}
+                        style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: chatCampaign?.id === record.id ? "#fff" : "#7C3AED",
+                            background: chatCampaign?.id === record.id ? "#7C3AED" : "#EDE9FE",
+                            border: "1px solid #C4B5FD",
+                            borderRadius: 6,
+                            transition: "all 0.2s",
+                        }}
+                    >
+                        Chat
+                    </Button>
                     {record.approval_status !== "approved" ? (
                         <Button size="small" onClick={() => handleApproveCampaign(record)}
                             style={{ fontSize: 11, fontWeight: 600, height: 26, color: C.green, background: C.greenLight, border: `1px solid #86efac`, borderRadius: 6, display: "flex", alignItems: "center", gap: 4 }}>
@@ -1606,6 +1627,12 @@ export default function Admin_Campaigns() {
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {/* Chat Popup */}
+            {chatCampaign && (
+                <ChatCampaigns
+                    campaign={chatCampaign}
+                    onClose={() => setChatCampaign(null)}
+                />)}
 
             <style>{`
                 .all-campaigns-row:hover td { background: #F8FAFC !important; }

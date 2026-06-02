@@ -58,8 +58,8 @@ export default function Login() {
       // ── Redirect based on role (frontend decides) ─────────────────────────
       const role = data.user.role.toLowerCase();
       const redirectMap: Record<string, string> = {
-        superadmin:    "/superadmin_dashboard",
-        admin:         "/admin_dashboard",
+        super_admin:    "/superadmin",
+        admin:         "/admin",
         creative_team: "/creative_dashboard",
         campaign_team: "/campaign_dashboard",
         client:        "/user_dashboard",

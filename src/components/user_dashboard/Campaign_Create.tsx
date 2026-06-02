@@ -650,7 +650,7 @@ function Step1({ setClient, setClientId, advertiser, setAdvertiser, websiteUrl, 
       return;
     }
 
-    fetch(`https://city-animate-anagram.ngrok-free.dev/get_client/${clientId}/`, {
+    fetch(`${BASE_URL}/get_client/${clientId}/`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => res.json())

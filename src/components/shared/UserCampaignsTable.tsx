@@ -1,7 +1,9 @@
 import { Table, Tag, Button, Typography, Badge } from 'antd';
-import { EyeOutlined, EditOutlined } from '@ant-design/icons';
+import { EyeOutlined, EditOutlined, MessageOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
+import { useState } from 'react';
+import User_Campaign_Chat from '../user_dashboard/User_Campaign_Chat';
 
 const { Text } = Typography;
 
@@ -90,6 +92,8 @@ export default function UserCampaignsTable({
   pageSize?: number;
 }) {
   const navigate = useNavigate();
+  const [chatCampaign, setChatCampaign] = useState<Campaign | null>(null);
+
 
   const columns: ColumnsType<Campaign> = [
     {
@@ -256,7 +260,7 @@ export default function UserCampaignsTable({
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
+      width: 220,
       fixed: 'right',
       render: (_: any, record: Campaign) => (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -276,6 +280,27 @@ export default function UserCampaignsTable({
           >
             Edit
           </Button>
+          {/* Chat Button - FIXED */}
+          <Button
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={() =>
+              setChatCampaign((prev) =>
+                prev?.campaign_id === record.campaign_id ? null : record
+              )
+            }
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: chatCampaign?.campaign_id === record.campaign_id ? "#fff" : "#7C3AED",
+              background: chatCampaign?.campaign_id === record.campaign_id ? "#7C3AED" : "#EDE9FE",
+              border: "1px solid #C4B5FD",
+              borderRadius: 6,
+              transition: "all 0.2s",
+            }}
+          >
+            Chat
+          </Button>
         </div>
       ),
     },
@@ -283,6 +308,13 @@ export default function UserCampaignsTable({
 
   return (
     <>
+      {chatCampaign && (
+        <User_Campaign_Chat
+          campaign={chatCampaign}
+          onClose={() => setChatCampaign(null)}
+        />
+      )}
+
       <style>{`
         .campaign-row:hover td { background: #F8FAFC !important; }
         .campaign-row-closed td { opacity: 0.75; }

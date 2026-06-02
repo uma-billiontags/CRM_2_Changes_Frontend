@@ -3,8 +3,9 @@ import { C, fmt } from "../types/types";
 import { StatusBadge, ClientDetailModal } from "./SharedComponents";
 import type { Client, ClientStatus } from "../types/types";
 import { Button, Input, Modal, Table } from "antd";
-import { CheckCircleOutlined, SearchOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, MessageOutlined, SearchOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import Chat from "../admin/Chat"; // ← Chat component
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -27,6 +28,7 @@ export default function ClientTablePage({
 }: ClientTablePageProps) {
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [chatClient, setChatClient] = useState<Client | null>(null); // ← chat state
 
   const [credClient, setCredClient] = useState<Client | null>(null);
   const [credPassword, setCredPassword] = useState("");
@@ -238,6 +240,28 @@ export default function ClientTablePage({
             }}
           >
             View
+          </Button>
+          {/* ── Chat Button ───────────────────────────────────────────── */}
+          <Button
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={() =>
+              setChatClient((prev) =>
+                prev?.id === c.id ? null : c
+              )
+            }
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: chatClient?.id === c.id ? "#fff" : "#7C3AED",
+              background:
+                chatClient?.id === c.id ? "#7C3AED" : "#EDE9FE",
+              border: "1px solid #C4B5FD",
+              borderRadius: 6,
+              transition: "all 0.2s",
+            }}
+          >
+            Chat
           </Button>
 
           {/* Pending actions */}
@@ -536,6 +560,11 @@ export default function ClientTablePage({
           </div>
         )}
       </Modal>
+
+      {/* ── Chat Popup ── */}
+      {chatClient && (
+        <Chat client={chatClient} onClose={() => setChatClient(null)} />
+      )}
 
       <style>{`
         .client-table-row:hover td { background: #F8FAFC !important; }
