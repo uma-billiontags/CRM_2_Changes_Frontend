@@ -13,7 +13,7 @@ import {
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
-import ChatCampaigns from "./Chat_Campaigns"; // Adjust path if needed
+import Admin_Campaign_Chat from "./Admin_Campaign_Chat"; // Adjust path if needed
 
 const { Option } = Select;
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -1629,7 +1629,7 @@ export default function Admin_Campaigns() {
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             {/* Chat Popup */}
             {chatCampaign && (
-                <ChatCampaigns
+                <Admin_Campaign_Chat
                     campaign={chatCampaign}
                     onClose={() => setChatCampaign(null)}
                 />)}

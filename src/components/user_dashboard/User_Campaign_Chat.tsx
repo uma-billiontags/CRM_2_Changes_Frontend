@@ -48,54 +48,54 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
     }, [messages]);
 
     // Load Chat History
-        const loadHistory = useCallback(async () => {
-            if (!campaign.campaign_id) return;
-            setLoading(true);
+    const loadHistory = useCallback(async () => {
+        if (!campaign.campaign_id) return;
+        setLoading(true);
+        try {
+            const res = await fetch(`${BASE_URL}/get_chat_history/${campaign.campaign_id}/`);
+            const data = await res.json();
+            setMessages(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to load chat history", err);
+        } finally {
+            setLoading(false);
+        }
+    }, [campaign.campaign_id]);
+
+    // Connect WebSocket
+    useEffect(() => {
+        if (!campaign.campaign_id) return;
+
+        loadHistory();
+
+        const wsUrl = `ws://127.0.0.1:8000/ws/chat/${campaign.campaign_id}/`; // Change for production
+        const socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
+
+        socket.onopen = () => console.log(`✅ Admin connected to chat: ${campaign.campaign_id}`);
+
+        socket.onmessage = (event) => {
             try {
-                const res = await fetch(`${BASE_URL}/get_chat_history/${campaign.campaign_id}/`);
-                const data = await res.json();
-                setMessages(Array.isArray(data) ? data : []);
-            } catch (err) {
-                console.error("Failed to load chat history", err);
-            } finally {
-                setLoading(false);
-            }
-        }, [campaign.campaign_id]);
-    
-        // Connect WebSocket
-        useEffect(() => {
-            if (!campaign.campaign_id) return;
-    
-            loadHistory();
-    
-            const wsUrl = `ws://127.0.0.1:8000/ws/chat/${campaign.campaign_id}/`; // Change for production
-            const socket = new WebSocket(wsUrl);
-            socketRef.current = socket;
-    
-            socket.onopen = () => console.log(`✅ Admin connected to chat: ${campaign.campaign_id}`);
-    
-            socket.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.content) {
-                        setMessages(prev => {
-            // Avoid duplicate: skip if same content+timestamp already exists
-            const isDuplicate = prev.some(m => m.id === data.message_id);
-            if (isDuplicate) return prev;
-            return [...prev, data];
-        });
-                    }
-                } catch (e) {
-                    console.error("WebSocket message error", e);
+                const data = JSON.parse(event.data);
+                if (data.content) {
+                    setMessages(prev => {
+                        // Avoid duplicate: skip if same content+timestamp already exists
+                        const isDuplicate = prev.some(m => m.id === data.message_id);
+                        if (isDuplicate) return prev;
+                        return [...prev, data];
+                    });
                 }
-            };
-    
-            socket.onclose = () => console.log("WebSocket closed");
-    
-            return () => {
-                socket.close();
-            };
-        }, [campaign.campaign_id, loadHistory]);
+            } catch (e) {
+                console.error("WebSocket message error", e);
+            }
+        };
+
+        socket.onclose = () => console.log("WebSocket closed");
+
+        return () => {
+            socket.close();
+        };
+    }, [campaign.campaign_id, loadHistory]);
 
     // Close on Escape
     useEffect(() => {
@@ -291,7 +291,7 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
                     </div>
 
 
-                      {messages.map((msg) => {
+                    {messages.map((msg) => {
                         const isAdmin = msg.sender_type === "client";
                         return (
                             <div key={msg.id} style={{

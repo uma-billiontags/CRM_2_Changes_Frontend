@@ -36,7 +36,7 @@ interface ChatCampaignProps {
 
 // const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-export default function ChatCampaigns({ campaign, onClose }: ChatCampaignProps) {
+export default function Admin_Campaign_Chat ({ campaign, onClose }: ChatCampaignProps) {
     const { user } = useAuth();   // ← Get logged-in user
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
