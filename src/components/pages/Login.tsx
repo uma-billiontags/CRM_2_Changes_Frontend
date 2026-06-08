@@ -48,6 +48,7 @@ export default function Login() {
       localStorage.setItem("user_name",   data.user.username  || "");
       localStorage.setItem("client_id",   data.user.client_id || "");
       localStorage.setItem("user_source", data.user.source    || "");
+      localStorage.setItem("client_name",  data.user.client_name || data.user.username || ""); // ← ADD THIS
 
       if (remember) {
         localStorage.setItem("remembered_email", email.trim());

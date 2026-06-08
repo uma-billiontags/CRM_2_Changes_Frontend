@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Megaphone, Plus, Layers,
   FileText, Settings, LogOut, Wallet, Radio,
 } from 'lucide-react';
+import { DollarOutlined } from '@ant-design/icons/es/icons/index';
 
 const BLUE  = '#2563EB';
 const WHITE = '#FFFFFF';
@@ -16,6 +17,7 @@ const CAMPAIGN_NAV = [
       { label: 'Create Campaign',  icon: Plus,            to: '/campaign_create'  },
       { label: 'My Drafts',        icon: Layers,          to: '/user_drafts'      },
       { label: 'Insertion Orders', icon: FileText,        to: '/user_io'          },
+      { label: 'Invoices', icon: DollarOutlined, to: '/user_invoices' },
     ],
   },
   {

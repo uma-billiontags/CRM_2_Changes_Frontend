@@ -71,7 +71,7 @@ function apiLineItemToForm(li: any): LineItem {
   return {
     id: li.line_item_id ?? li.id ?? '',
     lineItemName: li.line_item_name ?? '',
-    ethnicity: parseArray(li.ethnicity),
+    ethnicity: li.ethnicity,
     startDate: li.start_date ?? '',
     endDate: li.end_date ?? '',
     adFormat: li.ad_format ? (Array.isArray(li.ad_format) ? li.ad_format[0] : li.ad_format) : '',  // ← string, not array
@@ -235,8 +235,8 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </Form.Item>
           <Form.Item label={<span style={{ fontSize: 12.5, color: SLATE_500 }}>Ethnicity</span>} style={{ marginBottom: 14 }}>
             <Select
-              mode="multiple" value={item.ethnicity}
-              onChange={(vals: string[]) => onChange(item.id, 'ethnicity', vals)}
+              value={item.ethnicity || undefined}                             // ← string, not array
+              onChange={(val: string) => onChange(item.id, 'ethnicity', val)}
               placeholder="Select ethnicity…" style={{ width: '100%' }}
               maxTagCount="responsive" menuItemSelectedIcon={null}
               options={ETHNICITY_OPTIONS.map(e => ({ value: e, label: e }))}
@@ -494,6 +494,17 @@ export default function Edit_Campaign() {
         vcr: li.vcr,
       }))
     ));
+
+    const userId   = localStorage.getItem('user_id');
+const userSource = localStorage.getItem('user_source'); // "team" or "user"
+
+if (userSource === 'team') {
+  // logged-in user is a team member → send team_id
+  fd.append('team_id', userId ?? '');
+} else {
+  // logged-in user is a client/admin → send user_id
+  fd.append('user_id', userId ?? '');
+}
 
     try {
       const res = await fetch(`${BASE_URL}/update_campaign/${campaign_id}/`, {
@@ -901,7 +912,7 @@ export default function Edit_Campaign() {
                                 { label: 'Ad Format', value: li.adFormat || '—' },       // ← no .join()
 
                                 { label: 'Impressions', value: li.impressions ? Number(li.impressions).toLocaleString('en-IN') : '—' },
-                                { label: 'Ethnicity', value: li.ethnicity.join(', ') },
+                                { label: 'Ethnicity', value: li.ethnicity || '—' },
                               ].map((row, j) => (
                                 <div key={row.label} className="cc-review-row" style={{ background: j % 2 === 0 ? WHITE : 'var(--slate-100)' }}>
                                   <span className="cc-review-row-key">{row.label}</span>

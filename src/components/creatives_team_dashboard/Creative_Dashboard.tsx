@@ -4,6 +4,7 @@ import { Table, Tag, Badge, Input, Button, Typography } from 'antd';
 import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
+import CreativesCell from './CreativesCell';
 
 const { Text } = Typography;
 
@@ -19,6 +20,7 @@ const SLATE_300 = '#CBD5E1';
 const SLATE_500 = '#64748B';
 const WHITE = '#FFFFFF';
 const BG = '#F8FAFC';
+const BORDER = '#E2E8F0';
 
 interface CreativeDetail {
   type?: 'standard' | 'third_party';
@@ -63,86 +65,6 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'gold', draft: 'default', completed: 'purple', cancelled: 'red',
 };
 
-function CreativesCell({ li }: { li: LineItem }) {
-  const imageNames = li.image_creatives ?? [];
-  const videoNames = li.video_creatives ?? [];
-
-  const standardCreatives = (li.creatives ?? []).filter(c => !c.type || c.type === 'standard');
-  const thirdPartyFromCreatives = (li.creatives ?? []).filter(c => c.type === 'third_party');
-  const thirdPartyFromArray = li.third_party_creatives ?? [];
-  const allThirdParty = thirdPartyFromCreatives.length > 0 ? thirdPartyFromCreatives : thirdPartyFromArray;
-
-  const hasAny =
-    imageNames.length > 0 || videoNames.length > 0 ||
-    standardCreatives.length > 0 || allThirdParty.length > 0;
-
-  if (!hasAny) return <Text style={{ color: SLATE_500, fontSize: 11 }}>—</Text>;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {imageNames.map((name, i) => (
-        <div key={`img-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            fontSize: 9, fontWeight: 700, color: BLUE,
-            background: BLUE_LIGHT, padding: '1px 5px',
-            borderRadius: 3, border: '1px solid #bfdbfe', flexShrink: 0,
-          }}>IMG</span>
-          <span style={{ fontSize: 11, color: SLATE }}>{name}</span>
-        </div>
-      ))}
-
-      {standardCreatives.map((c, i) => {
-        const adFormats = Array.isArray(li.ad_format)
-          ? li.ad_format.map(a => a.toLowerCase())
-          : [li.ad_format?.toLowerCase()];
-        const isVideo = adFormats.some(a => a?.includes('video'));
-        return (
-          <div key={`std-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{
-              fontSize: 9, fontWeight: 700,
-              color: isVideo ? PURPLE : BLUE,
-              background: isVideo ? PURPLE_LIGHT : BLUE_LIGHT,
-              padding: '1px 5px', borderRadius: 3,
-              border: isVideo ? `1px solid ${PURPLE_MID}` : '1px solid #bfdbfe',
-              flexShrink: 0,
-            }}>{isVideo ? 'VID' : 'IMG'}</span>
-            <span style={{ fontSize: 11, color: SLATE }}>{c.creative_name || `Creative ${i + 1}`}</span>
-          </div>
-        );
-      })}
-
-      {videoNames.map((name, i) => (
-        <div key={`vid-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            fontSize: 9, fontWeight: 700, color: PURPLE,
-            background: PURPLE_LIGHT, padding: '1px 5px',
-            borderRadius: 3, border: `1px solid ${PURPLE_MID}`, flexShrink: 0,
-          }}>VID</span>
-          <span style={{ fontSize: 11, color: SLATE }}>{name}</span>
-        </div>
-      ))}
-
-      {allThirdParty.map((tp, i) => {
-        const fileName = (tp.input_file ? tp.input_file.split('/').pop() : undefined)
-          || `Third Party ${i + 1}`;
-        const ext = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : null;
-        return (
-          <div key={`tp-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            {ext && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, color: '#92400e',
-                background: '#fff7ed', padding: '1px 5px',
-                borderRadius: 3, border: '1px solid #fed7aa',
-                flexShrink: 0, fontFamily: 'monospace',
-              }}>{ext}</span>
-            )}
-            <span style={{ fontSize: 11, color: SLATE }}>{fileName}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function Creative_Dashboard() {
   const navigate = useNavigate();
@@ -153,6 +75,9 @@ export default function Creative_Dashboard() {
   const [filtered, setFiltered] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  const clientName = localStorage.getItem('client_name') ?? '';
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';
 
   const fetchCampaigns = () => {
     setLoading(true);
@@ -196,7 +121,7 @@ export default function Creative_Dashboard() {
       width: 160, fixed: 'left',
       render: (id: string) => (
         <span style={{
-          fontSize: 12, fontWeight: 700, color: PURPLE,
+          fontSize: 12, fontWeight: 700, color: BLUE,
           background: PURPLE_LIGHT, padding: '3px 8px',
           borderRadius: 6, fontFamily: 'monospace',
         }}>{id}</span>
@@ -234,7 +159,7 @@ export default function Creative_Dashboard() {
     {
       title: 'Line Items', key: 'line_items_count', width: 100,
       render: (_: any, r: Campaign) => (
-        <Tag color="purple" style={{ fontSize: 11 }}>
+        <Tag color="blue" style={{ fontSize: 11 }}>
           {r.line_items?.length ?? 0} item{(r.line_items?.length ?? 0) !== 1 ? 's' : ''}
         </Tag>
       ),
@@ -246,7 +171,7 @@ export default function Creative_Dashboard() {
           size="small"
           icon={<EyeOutlined />}
           onClick={() => navigate(`/creative/${r.campaign_id}`)}
-          style={{ fontSize: 11, fontWeight: 600, color: PURPLE, background: PURPLE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
+          style={{ fontSize: 11, fontWeight: 600, color: BLUE, background: BLUE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
         >
           View
         </Button>
@@ -301,11 +226,7 @@ export default function Creative_Dashboard() {
           : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
       },
     },
-    {
-      title: 'Creatives', key: 'creatives', width: 220,
-      render: (_: any, r: LineItem) => <CreativesCell li={r} />,
-    },
-    {
+     {
       title: 'Status', dataIndex: 'status', width: 100,
       render: (v: string) => (
         <Badge
@@ -314,6 +235,11 @@ export default function Creative_Dashboard() {
         />
       ),
     },
+    {
+      title: 'Creatives', key: 'creatives', width: 220,
+      render: (_: any, r: LineItem) => <CreativesCell li={r} />,
+    },
+   
   ];
 
   return (
@@ -336,11 +262,13 @@ export default function Creative_Dashboard() {
             <div style={{ fontSize: 11, color: SLATE_500, letterSpacing: '0.04em' }}>VIEW &amp; MANAGE CREATIVES ACROSS CAMPAIGNS</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%', background: PURPLE,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: WHITE, fontSize: 13, fontWeight: 700,
-            }}>CT</div>
+             <div style={{
+          width: 36, height: 36, borderRadius: '50%', background: BLUE,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: WHITE, fontSize: 12, fontWeight: 800, cursor: 'pointer',
+        }}>
+          {avatarInitials ?? 'U'}
+        </div>
           </div>
         </header>
 
@@ -372,22 +300,23 @@ export default function Creative_Dashboard() {
 
           {/* Filters */}
           <div style={{
-            background: WHITE, borderRadius: 12, padding: '14px 20px',
-            border: `1px solid ${SLATE_300}`, marginBottom: 16,
-            display: 'flex', alignItems: 'center', gap: 12,
+            background: WHITE, borderRadius: 12, padding: '14px 18PX',
+            border: `1px solid ${BORDER}`, marginBottom: 16,
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
             <Input
               placeholder="Search by campaign name, ID…"
               prefix={<SearchOutlined style={{ color: SLATE_500 }} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: 280, height: 36 }}
+              style={{ flex: 1, minWidth: 240, height: 36 }}
               allowClear
             />
+            
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchCampaigns}
-              style={{ height: 36, color: SLATE_500, border: `1px solid ${SLATE_300}` }}
+              style={{ height: 36, borderRadius: 8, border: `1px solid ${BORDER}`, background: WHITE, color: SLATE_500, fontSize: 12, fontWeight: 600 }}
             >
               Refresh
             </Button>

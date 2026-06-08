@@ -3,7 +3,7 @@ import { Table, Input, Button, Typography, Tooltip, Modal, message } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, VideoCameraOutlined,
   PlayCircleOutlined, CopyOutlined, CheckOutlined,
-  DownloadOutlined,
+  DownloadOutlined, CloseOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
@@ -12,13 +12,10 @@ const { Text } = Typography;
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-const PURPLE = '#7c3aed';
-const PURPLE_LIGHT = '#f5f3ff';
-const PURPLE_MID = '#ddd6fe';
 const BLUE = '#2563EB';
 const BLUE_LIGHT = '#EFF6FF';
 const SLATE = '#0F172A';
-const SLATE_100 = '#F1F5F9';
+// const SLATE_100 = '#F1F5F9';
 const SLATE_300 = '#CBD5E1';
 const SLATE_500 = '#64748B';
 const WHITE = '#FFFFFF';
@@ -28,8 +25,10 @@ const GREEN_LIGHT = '#f0fdf4';
 const GREEN_BORDER = '#86efac';
 
 interface Creative {
+  id?: number;
   creative_name: string;
   main_asset_url?: string;
+  main_asset?: string;
   dimensions?: string;
   aspect_ratio?: string;
   file_size?: string;
@@ -51,11 +50,13 @@ interface Campaign {
   campaign_id: string;
   campaign_name: string;
   advertiser?: string;
+  approval_status?: string;
   line_items?: LineItem[];
 }
 
 interface VideoCreativeRow {
   key: string;
+  rowIndex?: number;
   creativeId?: number;   // ← add this
   campaignId: string;
   campaignName: string;
@@ -74,6 +75,29 @@ interface VideoCreativeRow {
   notes?: string;
 }
 
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getExt(url?: string): string {
+  if (!url) return '';
+  const name = url.split('/').pop()?.split('?')[0] ?? '';
+  return name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+}
+
+function isImage(url?: string) {
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(getExt(url));
+}
+
+function isVideo(url?: string) {
+  return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(getExt(url));
+}
+
+function resolveUrl(path?: string): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 function isVideoFormat(fmt: string | string[]): boolean {
   const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
   const lower = raw.toLowerCase();
@@ -86,6 +110,112 @@ function isValidClickUrl(url: string): boolean {
 }
 function isValidVideoTag(tag: string): boolean {
   return !!tag && /^https?:\/\/.*\?$/.test(tag.trim());
+}
+
+interface PreviewModalProps {
+  open: boolean;
+  onClose: () => void;
+  url: string;
+  name: string;
+  ext: string;
+}
+
+function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
+  const resolved = resolveUrl(url);
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      centered
+      width={780}
+      styles={{
+        body: { padding: 0, background: '#0f172a' },
+      }}
+      closeIcon={
+        <div style={{
+          width: 30, height: 30, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 13,
+        }}>
+          <CloseOutlined />
+        </div>
+      }
+    >
+      {/* Header */}
+      <div style={{
+        padding: '14px 20px',
+        background: 'rgba(255,255,255,0.04)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 800, color: '#fff',
+            background: 'rgba(255,255,255,0.15)',
+            padding: '2px 7px', borderRadius: 4,
+            fontFamily: 'monospace', letterSpacing: '0.05em',
+          }}>{ext.toUpperCase()}</span>
+          <span style={{
+            fontSize: 13, fontWeight: 600, color: '#e2e8f0',
+            maxWidth: 460, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {name}
+          </span>
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const response = await fetch(resolved, {
+                headers: { 'ngrok-skip-browser-warning': '1' },
+              });
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
+            } catch {
+              message.error('Download failed');
+            }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            fontSize: 11, fontWeight: 600, color: '#93c5fd',
+            background: 'rgba(37,99,235,0.15)',
+            padding: '4px 10px', borderRadius: 6,
+            border: '1px solid rgba(37,99,235,0.3)',
+            cursor: 'pointer',
+          }}
+        >
+          <DownloadOutlined style={{ fontSize: 12 }} /> Download
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{
+        minHeight: 320, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', padding: 24,
+        background: '#0f172a',
+      }}>
+        {isVideo(url) ? (
+          <video
+            src={resolved}
+            controls
+            autoPlay
+            style={{ maxWidth: '100%', maxHeight: 480, borderRadius: 8 }}
+          />
+        ) : (
+          <div>Preview not available</div>
+        )}
+      </div>
+    </Modal>
+  );
 }
 
 // ── TruncCell ────────────────────────────────────────────────────────────────
@@ -168,41 +298,6 @@ function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }
   );
 }
 
-// ── Video Preview Modal ──────────────────────────────────────────────────────
-function VideoPreviewModal({ visible, url, name, onClose }: {
-  visible: boolean; url?: string; name?: string; onClose: () => void;
-}) {
-  return (
-    <Modal
-      open={visible}
-      onCancel={onClose}
-      footer={null}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <PlayCircleOutlined style={{ color: PURPLE }} />
-          <span style={{ fontSize: 13, fontWeight: 700 }}>{name || 'Preview'}</span>
-        </div>
-      }
-      width={720}
-      centered
-    >
-      {url ? (
-        <video
-          src={url}
-          controls
-          autoPlay
-          style={{ width: '100%', borderRadius: 8, border: `1px solid ${SLATE_300}` }}
-        />
-      ) : (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: SLATE_500 }}>
-          <PlayCircleOutlined style={{ fontSize: 40, marginBottom: 12 }} />
-          <div>No preview available</div>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
 function colHead(): React.CSSProperties {
   return {
     fontSize: 11, fontWeight: 700, color: SLATE_500,
@@ -219,14 +314,31 @@ export default function Video_Creatives() {
   const [filtered, setFiltered] = useState<VideoCreativeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [previewVisible, setPreviewVisible] = useState(false);
+
+  const clientName = localStorage.getItem('client_name') ?? '';
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';
+
+  // ── Preview state ──────────────────────────────────────────────────────────
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<VideoCreativeRow | null>(null);
+
+
+  // ── Open preview ───────────────────────────────────────────────────────────
+  const openPreview = (record: VideoCreativeRow) => {
+    if (!record.mainAssetUrl) {
+      message.warning('No asset URL available for preview');
+      return;
+    }
+    setPreviewRow(record);
+    setPreviewOpen(true);
+  };
 
   const fetchData = () => {
     setLoading(true);
     fetch(`${BASE_URL}/get_campaigns/`, { headers: { 'ngrok-skip-browser-warning': '1' } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data) => {
+        let rowIndex = 1;
         const campaigns: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
         // ✅ Only approved campaigns
         const approved = campaigns.filter(c => (c as any).approval_status === 'approved');
@@ -243,8 +355,11 @@ export default function Video_Creatives() {
             if (!hasVideoFormat) return;
 
             (li.creatives ?? []).forEach((cr, idx) => {
+                            const assetUrl = cr.main_asset_url || cr.main_asset || '';
+              if (isImage(assetUrl)) return;
               flat.push({
                 key: `${campaign.campaign_id}_${li.line_item_id}_${idx}`,
+                rowIndex,
                 creativeId: (cr as any).id,   // ← add this
                 campaignId: campaign.campaign_id,
                 campaignName: campaign.campaign_name,
@@ -252,7 +367,7 @@ export default function Video_Creatives() {
                 lineItemId: li.line_item_id,
                 lineItemName: li.line_item_name,
                 creativeName: cr.creative_name ?? `Video ${idx + 1}`,
-                mainAssetUrl: cr.main_asset_url ?? '',
+                mainAssetUrl: cr.main_asset_url || cr.main_asset || '',
                 mainAssetName: cr.creative_name ?? '',
                 dimensions: cr.dimensions ?? '',
                 aspectRatio: cr.aspect_ratio ?? '',
@@ -262,6 +377,7 @@ export default function Video_Creatives() {
                 integrationCode: cr.integration_code ?? '',
                 notes: cr.notes ?? '',
               });
+              rowIndex++;
             });
           });
         });
@@ -287,34 +403,53 @@ export default function Video_Creatives() {
   }, [search, rows]);
 
   // ── Download handler ─────────────────────────────────────────────────────
-  const handleDownload = (e: React.MouseEvent, record: VideoCreativeRow) => {
+  const handleDownload = async (e: React.MouseEvent, record: VideoCreativeRow) => {
     e.stopPropagation();
-    if (!record.creativeId) {
+
+    const url = record.mainAssetUrl;
+    if (!url) {
       message.warning('No asset available to download');
       return;
     }
-    const downloadUrl = `${BASE_URL}/download_creative/${record.creativeId}/`;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+
+    const resolved = resolveUrl(url);
+    const name = record.mainAssetName || record.creativeName || 'creative';
+
+    try {
+      const response = await fetch(resolved, {
+        headers: { 'ngrok-skip-browser-warning': '1' },
+      });
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      message.error('Download failed');
+    }
   };
+
   const withAsset = rows.filter(r => r.mainAssetUrl).length;
   const withClickUrl = rows.filter(r => r.clickThroughUrl && isValidClickUrl(r.clickThroughUrl)).length;
   const withTag = rows.filter(r => r.appendedHtmlTag && isValidVideoTag(r.appendedHtmlTag)).length;
 
   const columns: ColumnsType<VideoCreativeRow> = [
     {
-      title: <span style={colHead()}>#</span>,
-      key: 'index', width: 52, fixed: 'left',
-      render: (_: any, __: VideoCreativeRow, index: number) => (
+      title: 'ID',
+      dataIndex: 'rowIndex',
+      key: 'rowIndex',
+      width: 52,
+      render: (v: number) => (
         <div style={{
-          width: 24, height: 24, borderRadius: '50%',
-          background: SLATE_100, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 11, color: SLATE_500, fontWeight: 600,
-        }}>{index + 1}</div>
+          width: 26, height: 26, borderRadius: '50%',
+          background: BLUE_LIGHT, border: `1px solid ${BLUE}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: BLUE,
+        }}>{v}</div>
       ),
     },
     {
@@ -323,8 +458,8 @@ export default function Video_Creatives() {
       render: (v: string, record: VideoCreativeRow) => (
         <div>
           <span style={{
-            fontSize: 11, fontWeight: 700, color: PURPLE,
-            background: PURPLE_LIGHT, padding: '2px 6px',
+            fontSize: 11, fontWeight: 700, color: BLUE,
+            background: BLUE_LIGHT, padding: '2px 6px',
             borderRadius: 4, fontFamily: 'monospace',
             display: 'block', marginBottom: 2,
           }}>{v}</span>
@@ -341,33 +476,40 @@ export default function Video_Creatives() {
     {
       title: <span style={colHead()}>Creative Name</span>,
       dataIndex: 'creativeName', key: 'creativeName', width: 240, fixed: 'left',
-      render: (v: string, record: VideoCreativeRow) => (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-          onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
-        >
-          <div style={{
-            width: 32, height: 32, borderRadius: 6,
-            background: PURPLE_LIGHT, border: `1px solid ${PURPLE_MID}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <PlayCircleOutlined style={{ fontSize: 16, color: PURPLE }} />
+      render: (v: string, record: VideoCreativeRow) => {
+        const url = record.mainAssetUrl;
+        const canPreview = !!url;
+
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 6, background: BLUE_LIGHT,
+              border: `1px solid #bfdbfe`, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0,
+            }}>
+              <PlayCircleOutlined style={{ fontSize: 14, color: BLUE }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Tooltip title={canPreview ? 'Click to preview' : 'No asset available'} placement="topLeft">
+                <span
+                  onClick={() => canPreview && openPreview(record)}
+                  style={{
+                    fontSize: 12, fontWeight: 600,
+                    color: canPreview ? BLUE : SLATE,
+                    display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', maxWidth: 170,
+                    textDecoration: canPreview ? 'underline' : 'none',
+                    textDecorationStyle: 'dotted',
+                    textUnderlineOffset: 3,
+                    cursor: canPreview ? 'pointer' : 'default',
+                  }}
+                >{v}</span>
+              </Tooltip>
+              <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
+            </div>
           </div>
-          <div>
-            <Tooltip title="Click to preview" placement="topLeft">
-              <span style={{
-                fontSize: 12, fontWeight: 600, color: PURPLE,
-                display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', maxWidth: 170,
-                textDecoration: 'underline', textDecorationStyle: 'dotted',
-                textUnderlineOffset: 3,
-              }}>{v}</span>
-            </Tooltip>
-            <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: <span style={colHead()}>Dimensions</span>,
@@ -381,9 +523,9 @@ export default function Video_Creatives() {
       dataIndex: 'aspectRatio', key: 'aspectRatio', width: 110,
       render: (v: string) => v
         ? <span style={{
-          fontSize: 11, color: PURPLE, background: PURPLE_LIGHT,
+          fontSize: 11, color: BLUE, background: BLUE_LIGHT,
           padding: '2px 8px', borderRadius: 4, fontWeight: 600,
-          border: `1px solid ${PURPLE_MID}`,
+          border: `1px solid ${BLUE}`,
         }}>{v}</span>
         : <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>,
     },
@@ -451,9 +593,9 @@ export default function Video_Creatives() {
                 borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 600,
-                color: hasAsset ? PURPLE : SLATE_300,
-                background: hasAsset ? PURPLE_LIGHT : '#f8fafc',
-                border: `1px solid ${hasAsset ? PURPLE_MID : SLATE_300}`,
+                color: hasAsset ? BLUE : SLATE_300,
+                background: hasAsset ? BLUE_LIGHT : '#f8fafc',
+                border: `1px solid ${hasAsset ? BLUE : SLATE_300}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
@@ -468,6 +610,12 @@ export default function Video_Creatives() {
       },
     },
   ];
+
+
+  // ── Derive preview modal props safely ─────────────────────────────────────
+  const previewUrl = previewRow?.mainAssetUrl ?? '';
+  const previewName = previewRow?.mainAssetName || previewRow?.creativeName || 'creative';
+  const previewExt = getExt(previewUrl) || 'file';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
@@ -487,10 +635,10 @@ export default function Video_Creatives() {
             <div style={{ fontSize: 11, color: SLATE_500, letterSpacing: '0.04em' }}>ALL VIDEO CREATIVES ACROSS CAMPAIGNS</div>
           </div>
           <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: PURPLE,
+            width: 36, height: 36, borderRadius: '50%', background: BLUE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: WHITE, fontSize: 13, fontWeight: 700,
-          }}>CT</div>
+          }}>{avatarInitials}</div>
         </header>
 
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
@@ -498,7 +646,7 @@ export default function Video_Creatives() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
             {[
-              { label: 'Total Video Creatives', value: rows.length, color: PURPLE, bg: PURPLE_LIGHT, border: PURPLE_MID },
+              { label: 'Total Video Creatives', value: rows.length, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
               { label: 'With Asset', value: withAsset, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
               { label: 'Valid Click URLs', value: withClickUrl, color: GREEN, bg: GREEN_LIGHT, border: GREEN_BORDER },
               { label: 'Valid HTML Tags', value: withTag, color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
@@ -531,7 +679,7 @@ export default function Video_Creatives() {
               prefix={<SearchOutlined style={{ color: SLATE_500 }} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: 320, height: 36 }}
+              style={{ flex: 1, minWidth: 240, height: 36 }}
               allowClear
             />
             <Button icon={<ReloadOutlined />} onClick={fetchData}
@@ -558,7 +706,7 @@ export default function Video_Creatives() {
               <span>Click copy icon to copy URL / tag</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
-              <PlayCircleOutlined style={{ fontSize: 11, color: PURPLE }} />
+              <PlayCircleOutlined style={{ fontSize: 11, color: BLUE }} />
               <span>Click creative name to preview</span>
             </div>
           </div>
@@ -593,12 +741,16 @@ export default function Video_Creatives() {
         </main>
       </div>
 
-      <VideoPreviewModal
-        visible={previewVisible}
-        url={previewRow?.mainAssetUrl}
-        name={previewRow?.creativeName}
-        onClose={() => { setPreviewVisible(false); setPreviewRow(null); }}
-      />
+      {/* Preview Modal — rendered outside table, uses derived safe props */}
+      {previewOpen && previewUrl && (
+        <PreviewModal
+          open={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
+          url={previewUrl}
+          name={previewName}
+          ext={previewExt}
+        />
+      )}
 
       <style>{`
         .ant-table-thead > tr > th {

@@ -2,22 +2,22 @@ import { useState, useEffect } from 'react';
 import { Table, Input, Button, Typography, Tooltip, Modal, message } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, FileImageOutlined,
-  CopyOutlined, CheckOutlined, DownloadOutlined
+  CopyOutlined, CheckOutlined, DownloadOutlined, CloseOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar'; // ← updated import
+import CreativeSidebar from '../creatives_team_dashboard/CreativeSidebar';
 
 const { Text } = Typography;
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-const PURPLE = '#7c3aed';
-const PURPLE_LIGHT = '#f5f3ff';
-const PURPLE_MID = '#ddd6fe';
+// const PURPLE = '#7c3aed';
+// const PURPLE_LIGHT = '#f5f3ff';
+// const PURPLE_MID = '#ddd6fe';
 const BLUE = '#2563EB';
 const BLUE_LIGHT = '#EFF6FF';
 const SLATE = '#0F172A';
-const SLATE_100 = '#F1F5F9';
+// const SLATE_100 = '#F1F5F9';
 const SLATE_300 = '#CBD5E1';
 const SLATE_500 = '#64748B';
 const WHITE = '#FFFFFF';
@@ -26,9 +26,13 @@ const GREEN = '#059669';
 const GREEN_LIGHT = '#f0fdf4';
 const GREEN_BORDER = '#86efac';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface Creative {
+  id?: number;
   creative_name: string;
   main_asset_url?: string;
+  main_asset?: string;
   dimensions?: string;
   aspect_ratio?: string;
   file_size?: string;
@@ -50,12 +54,14 @@ interface Campaign {
   campaign_id: string;
   campaign_name: string;
   advertiser?: string;
+  approval_status?: string;
   line_items?: LineItem[];
 }
 
 interface ImageCreativeRow {
   key: string;
-  creativeId?: number;   // ← add this
+  rowIndex?: number;
+  creativeId?: number;
   campaignId: string;
   campaignName: string;
   advertiser: string;
@@ -73,10 +79,31 @@ interface ImageCreativeRow {
   notes?: string;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getExt(url?: string): string {
+  if (!url) return '';
+  const name = url.split('/').pop()?.split('?')[0] ?? '';
+  return name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+}
+
+function isImage(url?: string) {
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(getExt(url));
+}
+
+function isVideo(url?: string) {
+  return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(getExt(url));
+}
+
+function resolveUrl(path?: string): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 function isImageFormat(fmt: string | string[]): boolean {
   const raw = (Array.isArray(fmt) ? fmt[0] : fmt) ?? '';
   const lower = raw.toLowerCase();
-  // ✅ Must NOT be video/youtube, must be banner/interstitial
   return (
     (lower.includes('banner') || lower.includes('interstitial')) &&
     !lower.includes('video') &&
@@ -87,11 +114,124 @@ function isImageFormat(fmt: string | string[]): boolean {
 function isValidClickUrl(url: string): boolean {
   return !!url && url.toLowerCase().includes('trackclk');
 }
+
 function isValidHtmlTag(tag: string): boolean {
   return !!tag && (tag.toLowerCase().includes('trackimpi') || tag.toLowerCase().includes('trackimp'));
 }
 
-// ── TruncCell ────────────────────────────────────────────────────────────────
+// ─── Preview Modal (matches CreativesCell) ────────────────────────────────────
+
+interface PreviewModalProps {
+  open: boolean;
+  onClose: () => void;
+  url: string;
+  name: string;
+  ext: string;
+}
+
+function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
+  const resolved = resolveUrl(url);
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      centered
+      width={780}
+      styles={{
+        body: { padding: 0, background: '#0f172a' },
+      }}
+      closeIcon={
+        <div style={{
+          width: 30, height: 30, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 13,
+        }}>
+          <CloseOutlined />
+        </div>
+      }
+    >
+      {/* Header */}
+      <div style={{
+        padding: '14px 20px',
+        background: 'rgba(255,255,255,0.04)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 800, color: '#fff',
+            background: 'rgba(255,255,255,0.15)',
+            padding: '2px 7px', borderRadius: 4,
+            fontFamily: 'monospace', letterSpacing: '0.05em',
+          }}>{ext.toUpperCase()}</span>
+          <span style={{
+            fontSize: 13, fontWeight: 600, color: '#e2e8f0',
+            maxWidth: 460, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {name}
+          </span>
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const response = await fetch(resolved, {
+                headers: { 'ngrok-skip-browser-warning': '1' },
+              });
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
+            } catch {
+              message.error('Download failed');
+            }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            fontSize: 11, fontWeight: 600, color: '#93c5fd',
+            background: 'rgba(37,99,235,0.15)',
+            padding: '4px 10px', borderRadius: 6,
+            border: '1px solid rgba(37,99,235,0.3)',
+            cursor: 'pointer',
+          }}
+        >
+          <DownloadOutlined style={{ fontSize: 12 }} /> Download
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{
+        minHeight: 320, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', padding: 24,
+        background: '#0f172a',
+      }}>
+        {isImage(url) ? (
+          <img
+            src={resolved}
+            alt={name}
+            style={{
+              maxWidth: '100%', maxHeight: 500,
+              objectFit: 'contain', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            }}
+          />
+        ) : (
+          <div>Preview not available</div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ─── TruncCell ────────────────────────────────────────────────────────────────
+
 function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?: number; mono?: boolean }) {
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
   return (
@@ -106,7 +246,8 @@ function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?:
   );
 }
 
-// ── TrackerCell — with copy icon ─────────────────────────────────────────────
+// ─── TrackerCell ──────────────────────────────────────────────────────────────
+
 function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }) {
   const [copied, setCopied] = useState(false);
 
@@ -127,13 +268,10 @@ function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 60 }}>
-      {/* Validation dot */}
       <div style={{
         width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
         background: isValid ? '#16a34a' : '#ef4444',
       }} />
-
-      {/* Truncated value */}
       <Tooltip title={value} placement="topLeft">
         <span style={{
           fontSize: 12, color: SLATE,
@@ -142,66 +280,23 @@ function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }
           whiteSpace: 'nowrap', maxWidth: 110, cursor: 'default',
         }}>{value}</span>
       </Tooltip>
-
-      {/* Copy button */}
       <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'}>
         <button
           onClick={handleCopy}
           style={{
             background: copied ? '#f0fdf4' : '#f8fafc',
             border: `1px solid ${copied ? '#86efac' : '#e2e8f0'}`,
-            borderRadius: 4,
-            cursor: 'pointer',
-            padding: '2px 5px',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            outline: 'none',
+            borderRadius: 4, cursor: 'pointer', padding: '2px 5px', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s', outline: 'none',
           }}
         >
           {copied
             ? <CheckOutlined style={{ fontSize: 10, color: '#16a34a' }} />
-            : <CopyOutlined style={{ fontSize: 10, color: SLATE_500 }} />
-          }
+            : <CopyOutlined style={{ fontSize: 10, color: SLATE_500 }} />}
         </button>
       </Tooltip>
     </div>
-  );
-}
-
-// ── Image Preview Modal ──────────────────────────────────────────────────────
-function ImagePreviewModal({ visible, url, name, onClose }: {
-  visible: boolean; url?: string; name?: string; onClose: () => void;
-}) {
-  return (
-    <Modal
-      open={visible}
-      onCancel={onClose}
-      footer={null}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileImageOutlined style={{ color: BLUE }} />
-          <span style={{ fontSize: 13, fontWeight: 700 }}>{name || 'Preview'}</span>
-        </div>
-      }
-      width={680}
-      centered
-    >
-      {url ? (
-        <img
-          src={url}
-          alt={name}
-          style={{ width: '100%', borderRadius: 8, border: `1px solid ${SLATE_300}` }}
-        />
-      ) : (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: SLATE_500 }}>
-          <FileImageOutlined style={{ fontSize: 40, marginBottom: 12 }} />
-          <div>No preview available</div>
-        </div>
-      )}
-    </Modal>
   );
 }
 
@@ -212,7 +307,8 @@ function colHead(): React.CSSProperties {
   };
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function Image_Creatives() {
   const [collapsed, setCollapsed] = useState(false);
   const sideWidth = collapsed ? 64 : 240;
@@ -221,43 +317,60 @@ export default function Image_Creatives() {
   const [filtered, setFiltered] = useState<ImageCreativeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [previewVisible, setPreviewVisible] = useState(false);
+
+  const clientName = localStorage.getItem('client_name') ?? '';
+  const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';
+
+  // ── Preview state ──────────────────────────────────────────────────────────
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<ImageCreativeRow | null>(null);
 
+  // ── Open preview ───────────────────────────────────────────────────────────
+  const openPreview = (record: ImageCreativeRow) => {
+    if (!record.mainAssetUrl) {
+      message.warning('No asset URL available for preview');
+      return;
+    }
+    setPreviewRow(record);
+    setPreviewOpen(true);
+  };
 
+  // ── Fetch data ─────────────────────────────────────────────────────────────
   const fetchData = () => {
     setLoading(true);
     fetch(`${BASE_URL}/get_campaigns/`, { headers: { 'ngrok-skip-browser-warning': '1' } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data) => {
+        let rowIndex = 1;
         const campaigns: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
-        // ✅ Only approved campaigns
-        const approved = campaigns.filter(c => (c as any).approval_status === 'approved');
+        const approved = campaigns.filter(c => c.approval_status === 'approved');
         const flat: ImageCreativeRow[] = [];
 
         approved.forEach(campaign => {
           (campaign.line_items ?? []).forEach(li => {
-            // ✅ Check all formats
             const formats = Array.isArray(li.ad_format)
               ? li.ad_format
               : [String(li.ad_format ?? '')];
 
             const hasImageFormat = formats.some(f => isImageFormat(f));
-
-            // ✅ Only show in image if it's image format AND NOT video
             if (!hasImageFormat) return;
+
             (li.creatives ?? []).forEach((cr, idx) => {
               if (cr.type === 'third_party') return;
+              // Skip creatives whose asset file is a video
+              const assetUrl = cr.main_asset_url || cr.main_asset || '';
+              if (isVideo(assetUrl)) return;
               flat.push({
                 key: `${campaign.campaign_id}_${li.line_item_id}_${idx}`,
-                creativeId: (cr as any).id,   // ← add this — id comes from serializer
+                rowIndex,
+                creativeId: cr.id,
                 campaignId: campaign.campaign_id,
                 campaignName: campaign.campaign_name,
                 advertiser: campaign.advertiser ?? '',
                 lineItemId: li.line_item_id,
                 lineItemName: li.line_item_name,
                 creativeName: cr.creative_name ?? `Creative ${idx + 1}`,
-                mainAssetUrl: cr.main_asset_url ?? '',
+                mainAssetUrl: cr.main_asset_url || cr.main_asset || '',
                 mainAssetName: cr.creative_name ?? '',
                 dimensions: cr.dimensions ?? '',
                 aspectRatio: cr.aspect_ratio ?? '',
@@ -267,6 +380,7 @@ export default function Image_Creatives() {
                 integrationCode: cr.integration_code ?? '',
                 notes: cr.notes ?? '',
               });
+              rowIndex++;
             });
           });
         });
@@ -292,39 +406,54 @@ export default function Image_Creatives() {
     ));
   }, [search, rows]);
 
-  // ── Download handler ─────────────────────────────────────────────────────
-  const handleDownload = (e: React.MouseEvent, record: ImageCreativeRow) => {
+  // ── Download handler (mirrors CreativesCell PreviewModal download) ─────────
+  const handleDownload = async (e: React.MouseEvent, record: ImageCreativeRow) => {
     e.stopPropagation();
 
-    if (!record.creativeId) {
+    const url = record.mainAssetUrl;
+    if (!url) {
       message.warning('No asset available to download');
       return;
     }
 
-    // Direct browser download — no fetch needed
-    const downloadUrl = `${BASE_URL}/download_creative/${record.creativeId}/`;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.target = '_blank';   // opens in new tab if browser decides to preview instead
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    const resolved = resolveUrl(url);
+    const name = record.mainAssetName || record.creativeName || 'creative';
+
+    try {
+      const response = await fetch(resolved, {
+        headers: { 'ngrok-skip-browser-warning': '1' },
+      });
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      message.error('Download failed');
+    }
   };
 
-  const withAsset = rows.filter(r => r.mainAssetUrl || r.mainAssetName).length;
+  const withAsset = rows.filter(r => !!r.mainAssetUrl).length;
   const withClickUrl = rows.filter(r => r.clickThroughUrl && isValidClickUrl(r.clickThroughUrl)).length;
   const withHtmlTag = rows.filter(r => r.appendedHtmlTag && isValidHtmlTag(r.appendedHtmlTag)).length;
 
   const columns: ColumnsType<ImageCreativeRow> = [
     {
-      title: <span style={colHead()}>#</span>,
-      key: 'index', width: 52, fixed: 'left',
-      render: (_: any, __: ImageCreativeRow, index: number) => (
+      title: 'ID',
+      dataIndex: 'rowIndex',
+      key: 'rowIndex',
+      width: 52,
+      render: (v: number) => (
         <div style={{
-          width: 24, height: 24, borderRadius: '50%',
-          background: SLATE_100, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 11, color: SLATE_500, fontWeight: 600,
-        }}>{index + 1}</div>
+          width: 26, height: 26, borderRadius: '50%',
+          background: BLUE_LIGHT, border: `1px solid ${BLUE}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: BLUE,
+        }}>{v}</div>
       ),
     },
     {
@@ -336,8 +465,8 @@ export default function Image_Creatives() {
       render: (v: string, record: ImageCreativeRow) => (
         <div>
           <span style={{
-            fontSize: 11, fontWeight: 700, color: PURPLE,
-            background: PURPLE_LIGHT, padding: '2px 6px',
+            fontSize: 11, fontWeight: 700, color: BLUE,
+            background: BLUE_LIGHT, padding: '2px 6px',
             borderRadius: 4, fontFamily: 'monospace',
             display: 'block', marginBottom: 2,
           }}>{v}</span>
@@ -355,24 +484,14 @@ export default function Image_Creatives() {
       title: <span style={colHead()}>Creative Name</span>,
       dataIndex: 'creativeName',
       key: 'creativeName',
-      width: 240,
+      width: 260,
       fixed: 'left',
-      render: (v: string, record: ImageCreativeRow) => (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-          onClick={() => { setPreviewRow(record); setPreviewVisible(true); }}
-        >
-          {record.mainAssetUrl ? (
-            <img
-              src={record.mainAssetUrl}
-              alt={v}
-              style={{
-                width: 32, height: 32, objectFit: 'cover',
-                borderRadius: 6, border: `1px solid #bfdbfe`, flexShrink: 0,
-              }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
+      render: (v: string, record: ImageCreativeRow) => {
+        const url = record.mainAssetUrl;
+        const canPreview = !!url;
+
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 6, background: BLUE_LIGHT,
               border: `1px solid #bfdbfe`, display: 'flex', alignItems: 'center',
@@ -380,21 +499,27 @@ export default function Image_Creatives() {
             }}>
               <FileImageOutlined style={{ fontSize: 14, color: BLUE }} />
             </div>
-          )}
-          <div>
-            <Tooltip title="Click to preview" placement="topLeft">
-              <span style={{
-                fontSize: 12, fontWeight: 600, color: BLUE,
-                display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', maxWidth: 170,
-                textDecoration: 'underline', textDecorationStyle: 'dotted',
-                textUnderlineOffset: 3,
-              }}>{v}</span>
-            </Tooltip>
-            <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Tooltip title={canPreview ? 'Click to preview' : 'No asset available'} placement="topLeft">
+                <span
+                  onClick={() => canPreview && openPreview(record)}
+                  style={{
+                    fontSize: 12, fontWeight: 600,
+                    color: canPreview ? BLUE : SLATE,
+                    display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', maxWidth: 170,
+                    textDecoration: canPreview ? 'underline' : 'none',
+                    textDecorationStyle: 'dotted',
+                    textUnderlineOffset: 3,
+                    cursor: canPreview ? 'pointer' : 'default',
+                  }}
+                >{v}</span>
+              </Tooltip>
+              <span style={{ fontSize: 10, color: SLATE_500 }}>{record.lineItemId}</span>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: <span style={colHead()}>Dimensions</span>,
@@ -456,14 +581,14 @@ export default function Image_Creatives() {
       dataIndex: 'notes', key: 'notes', width: 160,
       render: (v: string) => <TruncCell value={v} />,
     },
-    // ── Actions column ──────────────────────────────────────────────────────
+    // ── Actions column ────────────────────────────────────────────────────────
     {
       title: <span style={colHead()}>Actions</span>,
       key: 'actions',
       width: 130,
       fixed: 'right',
       render: (_: any, record: ImageCreativeRow) => {
-        const hasAsset = !!record.creativeId;  // ← use creativeId, not mainAssetUrl
+        const hasAsset = !!record.mainAssetUrl;
 
         return (
           <Tooltip title={hasAsset ? 'Download image asset' : 'No asset available'}>
@@ -496,6 +621,11 @@ export default function Image_Creatives() {
     },
   ];
 
+  // ── Derive preview modal props safely ─────────────────────────────────────
+  const previewUrl = previewRow?.mainAssetUrl ?? '';
+  const previewName = previewRow?.mainAssetName || previewRow?.creativeName || 'creative';
+  const previewExt = getExt(previewUrl) || 'file';
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
       <CreativeSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
@@ -517,7 +647,7 @@ export default function Image_Creatives() {
             width: 36, height: 36, borderRadius: '50%', background: BLUE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: WHITE, fontSize: 13, fontWeight: 700,
-          }}>CT</div>
+          }}>{avatarInitials}</div>
         </header>
 
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
@@ -526,7 +656,7 @@ export default function Image_Creatives() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
             {[
               { label: 'Total Image Creatives', value: rows.length, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
-              { label: 'With Asset', value: withAsset, color: PURPLE, bg: PURPLE_LIGHT, border: PURPLE_MID },
+              { label: 'With Asset', value: withAsset, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
               { label: 'Valid Click URLs', value: withClickUrl, color: GREEN, bg: GREEN_LIGHT, border: GREEN_BORDER },
               { label: 'Valid HTML Tags', value: withHtmlTag, color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
             ].map(s => (
@@ -558,7 +688,7 @@ export default function Image_Creatives() {
               prefix={<SearchOutlined style={{ color: SLATE_500 }} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: 320, height: 36 }}
+              style={{ flex: 1, minWidth: 240, height: 36 }}
               allowClear
             />
             <Button icon={<ReloadOutlined />} onClick={fetchData}
@@ -586,7 +716,7 @@ export default function Image_Creatives() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
               <FileImageOutlined style={{ fontSize: 11, color: BLUE }} />
-              <span>Click creative name to preview</span>
+              <span>Click creative name or eye icon to preview</span>
             </div>
           </div>
 
@@ -620,12 +750,16 @@ export default function Image_Creatives() {
         </main>
       </div>
 
-      <ImagePreviewModal
-        visible={previewVisible}
-        url={previewRow?.mainAssetUrl}
-        name={previewRow?.creativeName}
-        onClose={() => { setPreviewVisible(false); setPreviewRow(null); }}
-      />
+      {/* Preview Modal — rendered outside table, uses derived safe props */}
+      {previewOpen && previewUrl && (
+        <PreviewModal
+          open={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
+          url={previewUrl}
+          name={previewName}
+          ext={previewExt}
+        />
+      )}
 
       <style>{`
         .ant-table-thead > tr > th {

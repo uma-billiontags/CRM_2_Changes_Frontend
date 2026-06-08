@@ -21,7 +21,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto h-16 px-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold text-sm">B</div>
-            <span className="font-semibold tracking-tight">Billion <span className="text-primary">Media</span></span>
+            <span className="font-semibold tracking-tight">Billion <span className="text-primary">Tag</span></span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-ink-soft">
             <a href="#features" className="hover:text-ink">Features</a>

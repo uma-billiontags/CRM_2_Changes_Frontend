@@ -1438,6 +1438,7 @@ export default function Admin_Campaigns() {
             cancelText: "Cancel",
             onOk: async () => {
                 try {
+                    console.log("Approving campaign ID:", record.campaign_id);
                     const res = await fetch(`${BASE_URL}/approve_campaign/${record.id}/`, { method: "POST", headers: { "ngrok-skip-browser-warning": "1" } });
                     if (res.ok) {
                         const data = await res.json();

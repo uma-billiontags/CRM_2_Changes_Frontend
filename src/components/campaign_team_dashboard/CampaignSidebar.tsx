@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Settings, LogOut,
 } from 'lucide-react';
 
-const PURPLE = '#7c3aed';
+const BLUE = '#2563EB';
 const WHITE  = '#FFFFFF';
 
 const CAMPAIGN_NAV = [
@@ -48,14 +48,14 @@ export default function CampaignSidebar({ collapsed, onToggle }: CampaignSidebar
       }}>
         {!collapsed && (
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 9, background: PURPLE,
+           <div style={{
+              width: 32, height: 32, borderRadius: '50%', background: BLUE,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 900, color: WHITE,
-            }}>N</div>
+              color: WHITE, fontSize: 12, fontWeight: 800, flexShrink: 0,
+            }}>{avatarInitials}</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: WHITE, letterSpacing: '-0.3px' }}>
-                Billion <span style={{ color: '#C4B5FD' }}>Tags</span>
+                {displayName} 
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.1em' }}>
                 CAMPAIGN PLATFORM
@@ -66,10 +66,10 @@ export default function CampaignSidebar({ collapsed, onToggle }: CampaignSidebar
 
         {collapsed && (
           <div style={{
-            width: 34, height: 34, borderRadius: 9, background: PURPLE,
+            width: 34, height: 34, borderRadius: 9, background: BLUE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 900, color: WHITE,
-          }}>N</div>
+          }}>{avatarInitials}</div>
         )}
 
         <button
@@ -114,7 +114,7 @@ export default function CampaignSidebar({ collapsed, onToggle }: CampaignSidebar
                     fontSize: 13, fontWeight: active ? 600 : 400,
                     marginBottom: 1,
                     color: active ? WHITE : 'rgba(255,255,255,0.45)',
-                    background: active ? 'rgba(124,58,237,0.85)' : 'transparent',
+                    background: active ? BLUE  : 'transparent',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.15s',
                   }}>
@@ -141,7 +141,7 @@ export default function CampaignSidebar({ collapsed, onToggle }: CampaignSidebar
             background: 'rgba(255,255,255,0.05)', marginBottom: 6,
           }}>
             <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: PURPLE,
+              width: 32, height: 32, borderRadius: '50%', background: BLUE,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: WHITE, fontSize: 12, fontWeight: 800, flexShrink: 0,
             }}>{avatarInitials}</div>

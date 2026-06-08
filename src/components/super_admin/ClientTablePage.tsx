@@ -242,7 +242,7 @@ export default function ClientTablePage({
             View
           </Button>
           {/* ── Chat Button ───────────────────────────────────────────── */}
-          <Button
+          {/* <Button
             size="small"
             icon={<MessageOutlined />}
             onClick={() =>
@@ -262,7 +262,7 @@ export default function ClientTablePage({
             }}
           >
             Chat
-          </Button>
+          </Button> */}
 
           {/* Pending actions */}
           {c.status === "pending" && (

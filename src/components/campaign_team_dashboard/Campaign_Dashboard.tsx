@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Tag, Badge, Button, Input, Select } from "antd";
-import { SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import Sidebar from "./CampaignSidebar";
 
@@ -36,13 +36,13 @@ const C = {
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; dot: string }> = {
-    live:      { bg: C.greenLight,  border: "#BBF7D0", color: C.green,  dot: C.green  },
-    active:    { bg: C.blueLight,   border: C.blueMid, color: C.blue,   dot: C.blue   },
-    paused:    { bg: C.amberLight,  border: "#FDE68A", color: C.amber,  dot: C.amber  },
-    pending:   { bg: C.amberLight,  border: "#FDE68A", color: C.amber,  dot: C.amber  },
-    draft:     { bg: C.slate100,    border: C.border,  color: C.slate500, dot: C.slate400 },
+    live: { bg: C.greenLight, border: "#BBF7D0", color: C.green, dot: C.green },
+    active: { bg: C.blueLight, border: C.blueMid, color: C.blue, dot: C.blue },
+    paused: { bg: C.amberLight, border: "#FDE68A", color: C.amber, dot: C.amber },
+    pending: { bg: C.amberLight, border: "#FDE68A", color: C.amber, dot: C.amber },
+    draft: { bg: C.slate100, border: C.border, color: C.slate500, dot: C.slate400 },
     completed: { bg: C.purpleLight, border: C.purpleMid, color: C.purple, dot: C.purple },
-    cancelled: { bg: C.redLight,    border: "#FECACA", color: C.red,    dot: C.red    },
+    cancelled: { bg: C.redLight, border: "#FECACA", color: C.red, dot: C.red },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -60,6 +60,8 @@ interface LineItem {
     vcr?: string;
     status?: string;
     ethnicity?: string | string[];
+    creatives?: { creative_id?: string }[];
+    third_party_creatives?: { creative_id?: string }[];
 }
 
 interface Campaign {
@@ -289,6 +291,45 @@ function DeleteModal({
     );
 }
 
+function CreativeIdCell({ id }: { id: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(id).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+                fontSize: 10, fontWeight: 700,
+                color: '#4f46e5', background: '#eef2ff',
+                padding: '2px 8px', borderRadius: 4,
+                border: '1px solid #c7d2fe',
+                fontFamily: 'monospace',
+            }}>{id}</span>
+            <button
+                onClick={handleCopy}
+                title={copied ? 'Copied!' : 'Copy Creative ID'}
+                style={{
+                    background: copied ? '#f0fdf4' : '#f8fafc',
+                    border: `1px solid ${copied ? '#86efac' : '#e2e8f0'}`,
+                    borderRadius: 4, cursor: 'pointer', padding: '2px 5px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.2s', outline: 'none',
+                }}
+            >
+                {copied
+                    ? <CheckOutlined style={{ fontSize: 10, color: '#16a34a' }} />
+                    : <CopyOutlined style={{ fontSize: 10, color: '#64748B' }} />}
+            </button>
+        </div>
+    );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Campaign_Dashboard() {
     const navigate = useNavigate();
@@ -303,6 +344,9 @@ export default function Campaign_Dashboard() {
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
     const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    const clientName = localStorage.getItem('client_name') ?? '';
+    const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
@@ -328,7 +372,7 @@ export default function Campaign_Dashboard() {
 
     useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
-    const totalCount  = campaigns.length;
+    const totalCount = campaigns.length;
     const activeCount = campaigns.filter(isActiveCampaign).length;
     const closedCount = campaigns.filter(isClosedCampaign).length;
 
@@ -477,6 +521,34 @@ export default function Campaign_Dashboard() {
             key: "status",
             render: (v: string) => <StatusBadge status={v} />,
         },
+        {
+            title: "Creative ID",
+            key: "creatives",
+            width: 100,
+            render: (_: any, record: LineItem) => {
+                const allCreatives = [
+                    ...(record.creatives ?? []),
+                    ...(record.third_party_creatives ?? []),
+                ];
+
+                const ids = allCreatives
+                    .map((c: any) => c.creative_id)
+                    .filter(Boolean);
+
+                if (ids.length === 0) {
+                    return <span style={{ color: C.slate400, fontSize: 11 }}>—</span>;
+                }
+
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {ids.map((id: string, i: number) => (
+                            <CreativeIdCell key={i} id={id} />
+                        ))}
+
+                    </div>
+                );
+            },
+        },
     ];
 
     // ── Main campaign table columns ───────────────────────────────────────────
@@ -591,8 +663,8 @@ export default function Campaign_Dashboard() {
                     v === "approved"
                         ? { color: C.green, bg: C.greenLight, border: "#BBF7D0" }
                         : v === "rejected"
-                        ? { color: C.red, bg: C.redLight, border: "#FECACA" }
-                        : { color: C.amber, bg: C.amberLight, border: "#FDE68A" };
+                            ? { color: C.red, bg: C.redLight, border: "#FECACA" }
+                            : { color: C.amber, bg: C.amberLight, border: "#FDE68A" };
                 return (
                     <span style={{
                         fontSize: 10, fontWeight: 700, textTransform: "uppercase",
@@ -624,7 +696,7 @@ export default function Campaign_Dashboard() {
                 : <span style={{ color: C.slate500 }}>—</span>,
         },
         {
-            title: "Actions", key: "actions", width: 185, fixed: "right",
+            title: "Actions", key: "actions", width: 100, fixed: "right",
             render: (_: any, record: Campaign) => (
                 <div style={{ display: "flex", gap: 6 }}>
                     <Button
@@ -638,18 +710,6 @@ export default function Campaign_Dashboard() {
                         }}
                     >
                         View
-                    </Button>
-                    <Button
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        onClick={() => setDeleteCampaign(record)}
-                        style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: C.red, background: C.redLight,
-                            border: "1px solid #FECACA", borderRadius: 6,
-                        }}
-                    >
-                        Delete
                     </Button>
                 </div>
             ),
@@ -674,13 +734,13 @@ export default function Campaign_Dashboard() {
                         <div style={{ fontSize: 11, color: C.slate500, letterSpacing: "0.04em" }}>MANAGE &amp; TRACK ALL CLIENT CAMPAIGNS</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                       
+
                         <div style={{
-                            width: 36, height: 36, borderRadius: "50%", background: C.blue,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            color: C.white, fontSize: 13, fontWeight: 700,
+                            width: 36, height: 36, borderRadius: '50%', background: C.blue,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: C.white, fontSize: 12, fontWeight: 800, cursor: 'pointer',
                         }}>
-                            {(localStorage.getItem("client_name") ?? "U").charAt(0).toUpperCase()}
+                            {avatarInitials}
                         </div>
                     </div>
                 </header>

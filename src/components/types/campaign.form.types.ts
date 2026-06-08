@@ -1,7 +1,7 @@
 export interface LineItem {
   id: string;
   lineItemName: string;
-  ethnicity: string[];
+  ethnicity: string;
   startDate: string;
   endDate: string;
   adFormat: string;
@@ -14,8 +14,15 @@ export interface LineItem {
   ctrNotes: string;    // new
   unitCost: string;  // ← add this
   adSubFormatOpen: boolean;   // ← add
-  adSubFormat: string[]; 
+  adSubFormat: string[];
   rate: string;  // editable rate field
+  age: string[];
+  gender: string[];
+  geoLocations: GeoLocation[];
+  platforms: string[];
+  freqCap: string;
+  brandSafety: string;
+  lineItemViewability: string;
 }
 
 export interface GeoLocation {

@@ -27,6 +27,8 @@ import AdminOverview from "./components/admin/AdminOverview";
 import Admin_Campaigns from "./components/admin/Admin_Campaigns";
 import Campaign_Dashboard from "./components/campaign_team_dashboard/Campaign_Dashboard";
 import View_Campaign_Team from "./components/campaign_team_dashboard/View_Campaign_Team";
+import User_IO from "./components/user_dashboard/User_IO";
+import User_Invoice from "./components/user_dashboard/User_Invoice";
 function App() {
 
   return (
@@ -43,6 +45,8 @@ function App() {
         <Route path="/campaign/:campaign_id" element={<View_Campaign />} />
         <Route path="/update_campaign/:campaign_id" element={<Edit_Campaign />} />
         <Route path="/user_drafts" element={<User_Drafts />} />
+        <Route path="/user_io" element={<User_IO />} />
+        <Route path="/user_invoices" element={<User_Invoice />} />
 
 
         <Route path="/creative_dashboard" element={<Creative_Dashboard />} />
