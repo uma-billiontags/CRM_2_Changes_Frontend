@@ -97,8 +97,6 @@ function apiLineItemToForm(li: any): LineItem {
     platforms: li.platforms ? (Array.isArray(li.platforms) ? li.platforms : li.platforms.split(',').map((s: string) => s.trim()).filter(Boolean)) : [],
     freqCap: li.frequency_cap ? String(li.frequency_cap) : '',
     brandSafety: li.brand_safety ?? '',
-    lineItemViewability: li.viewability_goal ? String(li.viewability_goal) : '',
-
   };
 }
 
@@ -418,8 +416,6 @@ export default function Edit_Campaign() {
         setPlatforms(parseArray(c.platforms));
         setFreqCap(c.frequency_cap ? String(c.frequency_cap) : '');
         setBrandSafety(c.brand_safety ?? '');
-        setViewability(c.viewability_goal ? String(c.viewability_goal) : '');
-
         // Step 4 — line items
         const lis = Array.isArray(c.line_items) ? c.line_items.map(apiLineItemToForm) : [];
         setLineItems(lis.length > 0 ? lis : []);
@@ -485,8 +481,6 @@ export default function Edit_Campaign() {
     if (purchaseOrderId) fd.append('purchase_order_ID', purchaseOrderId);
     if (notes) fd.append('notes', notes);
     if (freqCap) fd.append('frequency_cap', freqCap);
-    if (viewability) fd.append('viewability_goal', viewability);
-
     fd.append('line_items', JSON.stringify(
       lineItems.map(li => ({
         line_item_id: li.id,

@@ -172,7 +172,6 @@ interface Campaign {
     platforms?: string;
     frequency_cap?: string;
     brand_safety?: string;
-    viewability_goal?: string;
     geo_targeting?: GeoLocation[] | string;
     line_items?: LineItem[];
     new_cpm?: string | number;
@@ -981,7 +980,6 @@ function EditCampaignModal({
                 platforms: campaign.platforms ? campaign.platforms.split(", ").filter(Boolean) : [],
                 frequency_cap: campaign.frequency_cap,
                 brand_safety: campaign.brand_safety,
-                viewability_goal: campaign.viewability_goal,
                 new_cpm: campaign.new_cpm,
                 new_price: campaign.new_price,
             });
@@ -1033,7 +1031,6 @@ function EditCampaignModal({
         if (values.purchase_order_ID) fd.append("purchase_order_ID", values.purchase_order_ID);
         if (values.notes) fd.append("notes", values.notes);
         if (values.frequency_cap) fd.append("frequency_cap", values.frequency_cap);
-        if (values.viewability_goal) fd.append("viewability_goal", values.viewability_goal);
         if (values.new_cpm) fd.append("new_cpm", values.new_cpm);
         if (values.new_price) fd.append("new_price", values.new_price);
 
@@ -1206,9 +1203,6 @@ function EditCampaignModal({
                                 <Option value="Strict">Strict</Option>
                                 <Option value="Custom">Custom</Option>
                             </Select>
-                        </Form.Item>
-                        <Form.Item label={<FL>Viewability Goal (%)</FL>} name="viewability_goal">
-                            <Input style={{ height: 38, borderRadius: 8 }} placeholder="e.g. 70" suffix="%" />
                         </Form.Item>
                     </div>
 

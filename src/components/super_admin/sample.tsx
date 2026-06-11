@@ -1,338 +1,246 @@
-// Creative_Dashboard.tsx
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Table, Tag, Badge, Input, Button, Typography } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import CreativesCell from './CreativesCell';
+import { Link, useLocation } from "react-router-dom";
+import type { Counts } from "../types/types";
+import { LogOut, Settings } from 'lucide-react';
 
-const { Text } = Typography;
-
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-const PURPLE = '#7c3aed';
-const PURPLE_LIGHT = '#f5f3ff';
-const PURPLE_MID = '#ddd6fe';
-const BLUE = '#2563EB';
-const BLUE_LIGHT = '#EFF6FF';
-const SLATE = '#0F172A';
-const SLATE_300 = '#CBD5E1';
-const SLATE_500 = '#64748B';
-const WHITE = '#FFFFFF';
-const BORDER = '#E2E8F0';
-
-interface CreativeDetail {
-  type?: 'standard' | 'third_party';
-  creative_name?: string;
-  dimensions?: string;
-  click_through_url?: string;
-  appended_html_tag?: string;
-  input_file?: string;
-  backup_image_name?: string;
-}
-
-interface LineItem {
-  line_item_id: string;
-  line_item_name: string;
-  start_date: string;
-  end_date: string;
-  ad_format: string | string[];
-  ad_sub_format?: string;
-  ethnicity?: string | string[];
-  impressions?: string;
-  status?: string;
-  creatives?: CreativeDetail[];
-  image_creatives?: string[];
-  video_creatives?: string[];
-  third_party_creatives?: { input_file?: string; backup_image_name?: string }[];
-}
-
-interface Campaign {
-  campaign_id: string;
-  campaign_name: string;
-  advertiser?: string;
-  client_name?: string;
-  start_date?: string;
-  end_date?: string;
-  status?: string;
-  line_items?: LineItem[];
-  approval_status?: string;
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  live: 'green', active: 'blue', paused: 'orange',
-  pending: 'gold', draft: 'default', completed: 'purple', cancelled: 'red',
+const SC = {
+  blue: "#2563EB",
+  green: "#16A34A",
+  amber: "#D97706",
+  red: "#DC2626",
+  sidebarBg: "#0F172A",
+  sidebarBorder: "rgba(255,255,255,0.07)",
+  sidebarText: "rgba(255,255,255,0.45)",
+  sidebarTextMuted: "rgba(255,255,255,0.25)",
+  sidebarActive: "rgba(37,99,235,0.85)",
+  white: "#FFFFFF",
 };
 
-export default function Creative_Dashboard() {
-  const navigate = useNavigate();
+interface NavItem {
+  label: string;
+  icon: string;
+  to: string;
+  accent?: string;
+  countKey?: keyof Counts;
+  children?: { label: string; icon: string; to: string }[];
+}
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [filtered, setFiltered] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+interface NavGroup {
+  group: string;
+  items: NavItem[];
+}
 
-  const fetchCampaigns = () => {
-    setLoading(true);
-    fetch(`${BASE_URL}/get_campaigns/`, { headers: { 'ngrok-skip-browser-warning': '1' } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        const list: Campaign[] = Array.isArray(data) ? data : data?.campaigns ?? [];
-        const approved = list.filter(c => c.approval_status === 'approved');
-        setCampaigns(approved);
-        setFiltered(approved);
-      })
-      .catch(() => { setCampaigns([]); setFiltered([]); })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { fetchCampaigns(); }, []);
-
-  useEffect(() => {
-    if (!search.trim()) { setFiltered(campaigns); return; }
-    const q = search.toLowerCase();
-    setFiltered(campaigns.filter(c =>
-      c.campaign_name?.toLowerCase().includes(q) ||
-      c.campaign_id?.toLowerCase().includes(q) ||
-      c.advertiser?.toLowerCase().includes(q)
-    ));
-  }, [search, campaigns]);
-
-  const totalCampaigns = campaigns.length;
-  const totalLineItems = campaigns.reduce((acc, c) => acc + (c.line_items?.length ?? 0), 0);
-  const totalCreatives = campaigns.reduce((acc, c) =>
-    acc + (c.line_items?.reduce((a, li) =>
-      a + (li.image_creatives?.length ?? 0) +
-      (li.video_creatives?.length ?? 0) +
-      (li.creatives?.length ?? 0) +
-      (li.third_party_creatives?.length ?? 0), 0) ?? 0), 0);
-
-  const columns: ColumnsType<Campaign> = [
-    {
-      title: 'Campaign ID', dataIndex: 'campaign_id', key: 'campaign_id',
-      width: 160, fixed: 'left',
-      render: (id: string) => (
-        <span style={{
-          fontSize: 12, fontWeight: 700, color: BLUE,
-          background: PURPLE_LIGHT, padding: '3px 8px',
-          borderRadius: 6, fontFamily: 'monospace',
-        }}>{id}</span>
-      ),
-    },
-    {
-      title: 'Campaign Name', dataIndex: 'campaign_name', key: 'campaign_name', width: 200,
-      render: (v: string) => <Text strong style={{ fontSize: 13, color: SLATE }}>{v || '—'}</Text>,
-    },
-    {
-      title: 'Advertiser', dataIndex: 'advertiser', key: 'advertiser', width: 160,
-      render: (v: string) => <Text style={{ fontSize: 12, color: SLATE_500 }}>{v || '—'}</Text>,
-    },
-    {
-      title: 'Start Date', dataIndex: 'start_date', key: 'start_date', width: 130,
-      render: (v: string) => v
-        ? <Text style={{ fontSize: 12 }}>{new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
-        : <Text style={{ color: SLATE_500 }}>—</Text>,
-    },
-    {
-      title: 'End Date', dataIndex: 'end_date', key: 'end_date', width: 130,
-      render: (v: string) => v
-        ? <Text style={{ fontSize: 12 }}>{new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
-        : <Text style={{ color: SLATE_500 }}>—</Text>,
-    },
-    {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 110,
-      render: (s: string) => (
-        <Badge
-          color={STATUS_COLOR[s ?? 'pending'] ?? 'default'}
-          text={<span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{s ?? 'pending'}</span>}
-        />
-      ),
-    },
-    {
-      title: 'Line Items', key: 'line_items_count', width: 100,
-      render: (_: any, r: Campaign) => (
-        <Tag color="blue" style={{ fontSize: 11 }}>
-          {r.line_items?.length ?? 0} item{(r.line_items?.length ?? 0) !== 1 ? 's' : ''}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Actions', key: 'actions', width: 100, fixed: 'right',
-      render: (_: any, r: Campaign) => (
-        <Button
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => navigate(`/creative/${r.campaign_id}`)}
-          style={{ fontSize: 11, fontWeight: 600, color: BLUE, background: BLUE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
-        >
-          View
-        </Button>
-      ),
-    },
-  ];
-
-  const lineItemColumns: ColumnsType<LineItem> = [
-    {
-      title: 'Line Item ID', dataIndex: 'line_item_id', width: 140,
-      render: (v: string) => (
-        <span style={{
-          fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
-          color: PURPLE, background: PURPLE_LIGHT, padding: '2px 6px', borderRadius: 4,
-        }}>{v}</span>
-      ),
-    },
-    {
-      title: 'Line Item Name', dataIndex: 'line_item_name', width: 180,
-      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-    },
-    {
-      title: 'Start Date', dataIndex: 'start_date', width: 110,
-      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-    },
-    {
-      title: 'End Date', dataIndex: 'end_date', width: 110,
-      render: (v: string) => <Text style={{ fontSize: 12 }}>{v || '—'}</Text>,
-    },
-    {
-      title: 'Ad Format', dataIndex: 'ad_format', width: 140,
-      render: (v: string | string[], r: LineItem) => {
-        const fmt = Array.isArray(v) ? v[0] : v;
-        const sub = r.ad_sub_format;
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {fmt && <Tag color="blue" style={{ fontSize: 10, width: 'fit-content' }}>{fmt}</Tag>}
-            {sub && <Tag color="purple" style={{ fontSize: 10, width: 'fit-content' }}>{sub}</Tag>}
-            {!fmt && <Text style={{ color: SLATE_500 }}>—</Text>}
-          </div>
-        );
+const NAV_GROUPS: NavGroup[] = [
+  {
+    group: "ADMINISTRATION",
+    items: [
+      { label: "Overview", icon: "◈", to: "/admin/overview" },
+    ],
+  },
+  {
+    group: "CLIENTS",
+    items: [
+      { label: "All Clients", icon: "🏢", to: "/admin/clients", countKey: "total" },
+    ],
+  },
+  {
+    group: "CAMPAIGNS",
+    items: [
+      {
+        label: "All Campaigns",
+        icon: "📊",
+        to: "/admin/campaigns",
+        countKey: "campaignTotal",
+        children: [
+          { label: "Campaign Reports", icon: "📄", to: "/admin/campaign_reports" },
+        ],
       },
-    },
-    {
-      title: 'Ethnicity', dataIndex: 'ethnicity', width: 140,
-      render: (v: string | string[]) => {
-        const arr = Array.isArray(v) ? v : (v ? [v] : []);
-        return arr.length > 0
-          ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {arr.map((e: string) => <Tag key={e} style={{ fontSize: 10 }}>{e}</Tag>)}
-          </div>
-          : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
-      },
-    },
-    {
-      title: 'Status', dataIndex: 'status', width: 100,
-      render: (v: string) => (
-        <Badge
-          color={STATUS_COLOR[v ?? 'pending'] ?? 'default'}
-          text={<span style={{ fontSize: 11, textTransform: 'uppercase' }}>{v ?? 'pending'}</span>}
-        />
-      ),
-    },
-    {
-      title: 'Creatives', key: 'creatives', width: 220,
-      render: (_: any, r: LineItem) => <CreativesCell li={r} />,
-    },
-  ];
+    ],
+  },
+  {
+    group: "SETTINGS",
+    items: [
+      { label: "System Settings", icon: "⚙️", to: "/admin/system-settings" },
+      { label: "Audit Logs", icon: "📋", to: "/admin/audit-logs" },
+    ],
+  },
+];
+
+interface AdminSidebarProps {
+  counts: Counts;
+}
+
+export default function AdminSidebar({ counts }: AdminSidebarProps) {
+  const location = useLocation();
 
   return (
-    <>
-      {/* Page heading */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: SLATE }}>Creative Dashboard</div>
-        <div style={{ fontSize: 11, color: SLATE_500, letterSpacing: '0.04em', marginTop: 2 }}>
-          VIEW &amp; MANAGE CREATIVES ACROSS CAMPAIGNS
+    <aside style={{
+      width: 240,
+      minHeight: "100vh",
+      background: SC.sidebarBg,
+      borderRight: `1px solid ${SC.sidebarBorder}`,
+      display: "flex",
+      flexDirection: "column",
+      position: "fixed",
+      top: 0, left: 0, bottom: 0,
+      zIndex: 100,
+    }}>
+      {/* Logo */}
+      <div style={{
+        height: 64,
+        display: "flex", alignItems: "center",
+        padding: "0 16px",
+        borderBottom: `1px solid ${SC.sidebarBorder}`,
+        gap: 10,
+      }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 9,
+          background: SC.blue,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 13, fontWeight: 900, color: SC.white,
+        }}>A</div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: SC.white }}>Admin</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>BILLION TAGS</div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        {[
-          { label: 'Total Campaigns', value: totalCampaigns, color: PURPLE, bg: PURPLE_LIGHT, border: PURPLE_MID },
-          { label: 'Total Line Items', value: totalLineItems, color: BLUE, bg: BLUE_LIGHT, border: '#bfdbfe' },
-          { label: 'Total Creatives', value: totalCreatives, color: '#059669', bg: '#f0fdf4', border: '#86efac' },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: WHITE, border: `1px solid ${SLATE_300}`,
-            borderRadius: 12, padding: '16px 20px',
-            display: 'flex', alignItems: 'center', gap: 14,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}>
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
+        {NAV_GROUPS.map(({ group, items }) => (
+          <div key={group} style={{ marginBottom: 4 }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 10,
-              background: s.bg, border: `1px solid ${s.border}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 800, color: s.color,
-            }}>{s.value}</div>
-            <div style={{ fontSize: 13, color: SLATE_500, fontWeight: 500 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+              fontSize: 9, fontWeight: 700,
+              color: SC.sidebarTextMuted,
+              padding: "12px 10px 4px",
+              letterSpacing: "0.12em",
+            }}>{group}</div>
 
-      {/* Filters */}
-      <div style={{
-        background: WHITE, borderRadius: 12, padding: '14px 18px',
-        border: `1px solid ${BORDER}`, marginBottom: 16,
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-      }}>
-        <Input
-          placeholder="Search by campaign name, ID…"
-          prefix={<SearchOutlined style={{ color: SLATE_500 }} />}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, minWidth: 240, height: 36 }}
-          allowClear
-        />
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={fetchCampaigns}
-          style={{ height: 36, borderRadius: 8, border: `1px solid ${BORDER}`, background: WHITE, color: SLATE_500, fontSize: 12, fontWeight: 600 }}
-        >
-          Refresh
-        </Button>
-        <Text style={{ marginLeft: 'auto', fontSize: 12, color: SLATE_500 }}>
-          {filtered.length} of {totalCampaigns} campaigns
-        </Text>
-      </div>
+            {items.map((item) => {
+              const active =
+                location.pathname === item.to ||
+                (item.to !== "/admin/overview" && location.pathname.startsWith(item.to));
+              const count = item.countKey !== undefined ? counts[item.countKey] : undefined;
+              const hasChildren = item.children && item.children.length > 0;
 
-      {/* Table */}
-      <div style={{
-        background: WHITE, borderRadius: 12,
-        border: `1px solid ${SLATE_300}`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden',
-      }}>
-        <Table
-          columns={columns}
-          dataSource={filtered}
-          rowKey="campaign_id"
-          loading={loading}
-          scroll={{ x: 1100 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t, r) => `${r[0]}–${r[1]} of ${t}` }}
-          expandable={{
-            expandedRowRender: (record: Campaign) => {
-              if (!record.line_items?.length) {
-                return <Text style={{ color: SLATE_500, fontSize: 12 }}>No line items.</Text>;
-              }
               return (
-                <div style={{ padding: '8px 0' }}>
-                  <Text strong style={{ fontSize: 12, color: SLATE, marginBottom: 8, display: 'block' }}>
-                    Line Items ({record.line_items.length})
-                  </Text>
-                  <Table
-                    size="small"
-                    dataSource={record.line_items}
-                    rowKey="line_item_id"
-                    pagination={false}
-                    columns={lineItemColumns}
-                    scroll={{ x: 1100 }}
-                    style={{ background: '#fafbff', borderRadius: 8 }}
-                  />
+                <div key={item.to}>
+                  {/* Main item */}
+                  <Link to={item.to} style={{ textDecoration: "none" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                      marginBottom: 2,
+                      background: active ? SC.sidebarActive : "transparent",
+                      color: active ? SC.white : SC.sidebarText,
+                      fontSize: 13, fontWeight: active ? 600 : 400,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={(e) => {
+                        if (!active) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                      }}
+                    >
+                      <span style={{
+                        flexShrink: 0, width: 18, height: 18,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, lineHeight: "1",
+                      }}>{item.icon}</span>
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      {count !== undefined && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 10,
+                          background: item.accent ? `${item.accent}25` : "rgba(255,255,255,0.08)",
+                          color: item.accent ?? "rgba(255,255,255,0.5)",
+                        }}>{count}</span>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* Sub-items — always visible, no toggle */}
+                  {hasChildren && (
+                    <div style={{ paddingLeft: 18, marginBottom: 4 }}>
+                      {item.children!.map((child) => {
+                        const childActive = location.pathname === child.to;
+                        return (
+                          <Link key={child.to} to={child.to} style={{ textDecoration: "none" }}>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "7px 10px", borderRadius: 6,
+                              marginBottom: 2,
+                              color: childActive ? SC.white : "rgba(255,255,255,0.35)",
+                              fontSize: 12, fontWeight: childActive ? 600 : 400,
+                              background: childActive ? "rgba(37,99,235,0.6)" : "transparent",
+                              borderLeft: "2px solid rgba(255,255,255,0.08)",
+                              cursor: "pointer",
+                              transition: "all 0.15s",
+                            }}
+                              onMouseEnter={(e) => {
+                                if (!childActive) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.05)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!childActive) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                              }}
+                            >
+                              <span style={{ fontSize: 13 }}>{child.icon}</span>
+                              {child.label}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
-            },
-            rowExpandable: () => true,
-          }}
-          style={{ fontSize: 13 }}
-        />
+            })}
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div style={{ borderTop: `1px solid ${SC.sidebarBorder}`, padding: "10px" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px", borderRadius: 10,
+          background: "rgba(255,255,255,0.05)",
+          marginBottom: 4,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: SC.blue,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: SC.white, fontSize: 12, fontWeight: 800, flexShrink: 0,
+          }}>A</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: SC.white }}>Admin</div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>ADMINISTRATOR</div>
+          </div>
+        </div>
+
+        <Link to="/portal_settings" style={{ textDecoration: 'none' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 10px', borderRadius: 8,
+            color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 500,
+            cursor: 'pointer', marginBottom: 3,
+          }}>
+            <Settings size={14} /> Settings
+          </div>
+        </Link>
+
+        <Link to="/login" style={{ textDecoration: 'none' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 10px', borderRadius: 8,
+            color: 'rgba(248,113,113,0.85)', fontSize: 12, fontWeight: 600,
+            cursor: 'pointer',
+          }}>
+            <LogOut size={14} /> Sign Out
+          </div>
+        </Link>
       </div>
-    </>
+    </aside>
   );
 }

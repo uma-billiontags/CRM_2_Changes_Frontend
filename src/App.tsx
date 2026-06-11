@@ -42,6 +42,7 @@ import AdminOverview from "./components/admin/AdminOverview";
 import Admin_Campaigns from "./components/admin/Admin_Campaigns";
 import CreativeLayout from "./components/creatives_team_dashboard/CreativeLayout";
 import CampaignLayout from "./components/campaign_team_dashboard/CampaignLayout";
+import CampaignReports from "./components/admin/CampaignReports";
 
 function App() {
   return (
@@ -108,6 +109,7 @@ function App() {
           <Route path="system-settings" element={<SystemSettingsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="campaigns" element={<Admin_Campaigns />} />
+          <Route path="campaign_reports" element={<CampaignReports />} />
         </Route>
       </Routes>
     </BrowserRouter>

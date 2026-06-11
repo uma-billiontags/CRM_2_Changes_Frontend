@@ -22,7 +22,6 @@ export interface LineItem {
   platforms: string[];
   freqCap: string;
   brandSafety: string;
-  lineItemViewability: string;
 }
 
 export interface GeoLocation {

@@ -127,7 +127,6 @@ function emptyLineItem(index: number, offset: number = 1): LineItem {
     platforms: [],
     freqCap: '',
     brandSafety: '',
-    lineItemViewability: '',
   };
 }
 
@@ -1253,11 +1252,6 @@ function LineItemCard({
                 { value: 'Custom', label: 'Custom' },
               ]} />
           </Form.Item>
-          <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b' }}>Viewability Goal</span>} style={{ marginBottom: 14 }}>
-            <Input placeholder="e.g. 70" value={item.lineItemViewability}
-              onChange={e => onChange(item.id, 'lineItemViewability', e.target.value.replace(/[^0-9]/g, ''))}
-              suffix={<span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>} style={{ height: 38 }} />
-          </Form.Item>
         </div>
 
       </Form>
@@ -1418,7 +1412,6 @@ function Step4Review({
                     { label: 'Platforms', value: Array.isArray(li.platforms) && li.platforms.length > 0 ? li.platforms.join(', ') : '—' },
                     { label: 'Frequency Cap', value: li.freqCap ? `${li.freqCap} impr/user` : '—' },
                     { label: 'Brand Safety', value: li.brandSafety || '—' },
-                    { label: 'Viewability Goal', value: li.lineItemViewability ? `${li.lineItemViewability}%` : '—' },
                     { label: 'Image Creatives', value: imgCreatives.length > 0 ? `${imgCreatives.length} file(s): ${imgCreatives.map((c: CreativeData) => c.creative_name).join(', ')}` : '—' },
                     { label: 'Video Creatives', value: vidCreatives.length > 0 ? `${vidCreatives.length} file(s): ${vidCreatives.map((c: CreativeData) => c.creative_name).join(', ')}` : '—' },
                     { label: 'Total Creatives', value: totalCreatives > 0 ? `${totalCreatives} file(s)` : '—' },
@@ -1701,7 +1694,6 @@ export default function Campaign_Create() {
           platforms: Array.isArray(li.platforms) ? li.platforms.join(', ') : '',
           frequency_cap: li.freqCap || '',
           brand_safety: li.brandSafety || '',
-          viewability_goal: li.lineItemViewability || '',
           creatives: allCreatives.filter(c => c.type !== 'third_party').map(creative => ({
             creative_name: creative.creative_name,
             dimensions: creative.dimensions,

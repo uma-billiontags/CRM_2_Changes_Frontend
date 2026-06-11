@@ -80,7 +80,6 @@ interface Campaign {
     platforms?: string;
     frequency_cap?: string;
     brand_safety?: string;
-    viewability_goal?: string;
     status?: string;
     approval_status?: string;
     created_at?: string;
@@ -543,9 +542,6 @@ export default function View_Campaign_Team() {
                                                     {campaign.brand_safety}
                                                 </Tag>
                                             } />
-                                        )}
-                                        {campaign.viewability_goal && (
-                                            <InfoRow label="Viewability Goal" value={`${campaign.viewability_goal}%`} />
                                         )}
 
                                         {/* Status */}

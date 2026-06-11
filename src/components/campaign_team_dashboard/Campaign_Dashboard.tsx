@@ -82,7 +82,6 @@ interface Campaign {
     geo_targeting?: any[];
     platforms?: string;
     brand_safety?: string;
-    viewability_goal?: string;
     frequency_cap?: string;
     age?: string;
     gender?: string;
