@@ -3,7 +3,7 @@ import { C, fmt } from "../types/types";
 import { StatusBadge, ClientDetailModal } from "./SharedComponents";
 import type { Client, ClientStatus } from "../types/types";
 import { Button, Input, Modal, Table } from "antd";
-import { CheckCircleOutlined, MessageOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import Chat from "../admin/Chat"; // ← Chat component
 import { useNavigate } from "react-router-dom";

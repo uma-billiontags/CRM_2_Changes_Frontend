@@ -1520,7 +1520,7 @@ export default function Campaign_Create() {
   const [clientId, setClientId] = useState<string>(restoredData?.clientId ?? '');
   const [advertiser, setAdvertiser] = useState<string>(restoredData?.advertiser ?? '');
   const [websiteUrl, setWebsiteUrl] = useState<string>(restoredData?.websiteUrl ?? '');
-  const [clientCountry, setClientCountry] = useState<string>('');
+  const [_clientCountry, setClientCountry] = useState<string>('');
   const [clientCurrencySymbol, setClientCurrencySymbol] = useState<string>('');
 
   // Step 2

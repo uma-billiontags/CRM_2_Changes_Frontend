@@ -40,12 +40,6 @@ interface ChatCampaignProps {
     onClose: () => void;
 }
 
-function resolveUrl(url?: string): string {
-    if (!url) return "";
-    if (url.startsWith("http")) return url;       // already absolute (from history API)
-    return `${BASE_URL}${url}`;                   // relative → make absolute (from WebSocket)
-}
-
 function getFileIcon(fileName?: string): string {
     if (!fileName) return "📎";
     const ext = fileName.split(".").pop()?.toLowerCase();
