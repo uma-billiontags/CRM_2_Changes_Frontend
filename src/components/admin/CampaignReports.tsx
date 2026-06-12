@@ -3,7 +3,7 @@ import { Table, Button, Input, Tag, Tooltip, Spin } from "antd";
 import {
     SearchOutlined, ReloadOutlined,
     FileExcelOutlined, DownloadOutlined, CheckCircleOutlined,
-    ClockCircleOutlined, EyeOutlined, SaveOutlined, CloseOutlined,
+    ClockCircleOutlined, EyeOutlined, SaveOutlined, CloseOutlined, CloudUploadOutlined
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import * as XLSX from 'xlsx';
@@ -50,6 +50,7 @@ interface CampaignRow {
     excel_generated: boolean;
     excel_url: string | null;
     generated_at: string | null;
+    publish_status: string | null;   // ✅ ADD THIS
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -78,7 +79,10 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 // ── Preview Modal ─────────────────────────────────────────────────────────────
 interface PreviewModalProps {
     open: boolean;
-    editedData: any[][];
+    editedData: any[][];        // current active sheet data
+    sheetNames: string[];       // all sheet names
+    activeSheet: string;        // currently selected sheet
+    onSheetChange: (name: string) => void;
     campaignId: string;
     reportType: 'cpm' | 'cpc';
     saving: boolean;
@@ -93,17 +97,12 @@ const EDITABLE_ROW_MAP: Record<number, string> = {
     8: 'end_date',
     9: 'units',
     10: 'ctr',
-    17: 'viewability',
-    19: 'vcr',
-    20: 'kpi_notes',
     21: 'sitelist',
 };
-
 // Read-only rows — grayed out in preview
-const READ_ONLY_ROWS = new Set([0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 18]);
+const READ_ONLY_ROWS = new Set([0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
 
-
-function PreviewModal({ open, editedData, campaignId, reportType, saving, onClose, onSave, onChange }: PreviewModalProps) {
+function PreviewModal({ open, editedData, sheetNames, activeSheet, onSheetChange, campaignId, reportType, saving, onClose, onSave, onChange }: PreviewModalProps) {
     if (!open) return null;
 
     // Identify header row (row index 0 is title, rows 1+ are label/value pairs)
@@ -208,6 +207,33 @@ function PreviewModal({ open, editedData, campaignId, reportType, saving, onClos
                     }}>
                         <CloseOutlined style={{ fontSize: 16 }} />
                     </button>
+                </div>
+                {/* Sheet Tabs */}
+                <div style={{
+                    display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`,
+                    padding: '0 24px', background: '#F8FAFC', flexShrink: 0,
+                }}>
+                    {sheetNames.map(name => (
+                        <button
+                            key={name}
+                            onClick={() => onSheetChange(name)}
+                            style={{
+                                padding: '10px 18px',
+                                fontSize: 12,
+                                fontWeight: activeSheet === name ? 700 : 500,
+                                color: activeSheet === name ? C.blue : C.slate500,
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: activeSheet === name ? `2px solid ${C.blue}` : '2px solid transparent',
+                                cursor: 'pointer',
+                                marginBottom: -1,
+                                transition: 'all 0.15s',
+                                fontFamily: 'monospace',
+                            }}
+                        >
+                            📄 {name}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Table — scrollable */}
@@ -322,12 +348,17 @@ export default function CampaignReports() {
     const [showPreview, setShowPreview] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [editedData, setEditedData] = useState<any[][]>([]);
+    // WITH this:
+    const [allSheetsData, setAllSheetsData] = useState<Record<string, any[][]>>({});
+    const [sheetNames, setSheetNames] = useState<string[]>([]);
+    const [activeSheet, setActiveSheet] = useState<string>('');
     const [previewCampaignId, setPreviewCampaignId] = useState('');
     const [previewReportType, setPreviewReportType] = useState<'cpm' | 'cpc'>('cpm');
 
     // Add this state to store the full workbook
     const [originalWorkbook, setOriginalWorkbook] = useState<XLSX.WorkBook | null>(null);
+
+    const [publishing, setPublishing] = useState<string | null>(null);
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
@@ -391,11 +422,18 @@ export default function CampaignReports() {
             });
             const arrayBuffer = await res.arrayBuffer();
             const wb = XLSX.read(arrayBuffer, { type: 'array' });
-            // ✅ Store full workbook to preserve styles later
             setOriginalWorkbook(wb);
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-            setEditedData(JSON.parse(JSON.stringify(data)));
+
+            // ✅ Load ALL sheets
+            const allSheets: Record<string, any[][]> = {};
+            wb.SheetNames.forEach(name => {
+                const ws = wb.Sheets[name];
+                allSheets[name] = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+            });
+
+            setAllSheetsData(JSON.parse(JSON.stringify(allSheets)));
+            setSheetNames(wb.SheetNames);
+            setActiveSheet(wb.SheetNames[0]); // default first sheet
         } catch {
             showToast("Failed to load Excel for preview.", "error");
             setShowPreview(false);
@@ -403,13 +441,12 @@ export default function CampaignReports() {
             setPreviewLoading(false);
         }
     };
-
     // ── Handle cell edit ──────────────────────────────────────────────────
     const handleCellChange = (rIdx: number, cIdx: number, value: string) => {
-        setEditedData(prev => {
-            const copy = prev.map(r => [...r]);
-            copy[rIdx][cIdx] = value;
-            return copy;
+        setAllSheetsData(prev => {
+            const sheetCopy = prev[activeSheet].map(r => [...r]);
+            sheetCopy[rIdx][cIdx] = value;
+            return { ...prev, [activeSheet]: sheetCopy };
         });
     };
 
@@ -422,7 +459,8 @@ export default function CampaignReports() {
             if (!originalWorkbook) throw new Error("No workbook loaded");
 
             // ── Extract line_item_id from row index 11 (Line Item ID row) ──
-            const lineItemId = editedData[11]?.[1] ? String(editedData[11][1]) : null;
+            const currentData = allSheetsData[activeSheet];
+            const lineItemId = currentData[11]?.[1] ? String(currentData[11][1]) : null;
             if (!lineItemId) throw new Error("Line Item ID not found in Excel");
 
             // ── Build payload from editable rows ──
@@ -431,7 +469,7 @@ export default function CampaignReports() {
                 line_item_id: lineItemId,
             };
 
-            editedData.forEach((row, rIdx) => {
+            currentData.forEach((row, rIdx) => {
                 const field = EDITABLE_ROW_MAP[rIdx];
                 if (field && row[1] !== undefined && row[1] !== null) {
                     payload[field] = String(row[1]);
@@ -475,6 +513,36 @@ export default function CampaignReports() {
         a.click();
     };
 
+    const handlePublish = async (record: CampaignRow) => {
+        const key = `${record.campaign_id_raw}_${record.report_type}`;
+        setPublishing(key);
+        try {
+            const res = await fetch(
+                `${BASE_URL}/publish_campaign_excel/${record.campaign_id_raw}/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': '1',
+                    },
+                    body: JSON.stringify({ report_type: record.report_type }),
+                }
+            );
+            if (!res.ok) throw new Error();
+
+            // ✅ Update local state immediately
+            setCampaigns(prev => prev.map(c =>
+                c.campaign_id_raw === record.campaign_id_raw && c.report_type === record.report_type
+                    ? { ...c, publish_status: 'published' }
+                    : c
+            ));
+            showToast(`${record.campaign_id} published successfully!`);
+        } catch {
+            showToast('Failed to publish. Try again.', 'error');
+        } finally {
+            setPublishing(null);
+        }
+    };
     // ── Filter ──────────────────────────────────────────────────────────────
     const filtered = campaigns.filter(c => {
         if (!search.trim()) return true;
@@ -595,6 +663,31 @@ export default function CampaignReports() {
             ),
         },
         {
+            title: "Publish Status",
+            dataIndex: "publish_status",
+            key: "publish_status",
+            width: 130,
+            render: (v: string | null) => v === 'published' ? (
+                <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "3px 10px", borderRadius: 20,
+                    background: C.greenLight, border: `1px solid ${C.greenMid}`,
+                    fontSize: 11, fontWeight: 700, color: C.green,
+                }}>
+                    ✅ Published
+                </span>
+            ) : (
+                <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "3px 10px", borderRadius: 20,
+                    background: '#F8FAFC', border: `1px solid ${C.border}`,
+                    fontSize: 11, fontWeight: 700, color: C.slate500,
+                }}>
+                    — Not Published
+                </span>
+            ),
+        },
+        {
             title: "Actions",
             key: "actions",
             width: 240,
@@ -605,53 +698,67 @@ export default function CampaignReports() {
                 return (
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
 
-                        {/* Preview — only if generated */}
-                        {record.excel_generated && (
+                        {/* ── NOT YET GENERATED: show only Generate button ── */}
+                        {!record.excel_generated && (
                             <Button
                                 size="small"
-                                icon={<EyeOutlined />}
-                                onClick={() => handlePreview(record)}
+                                icon={<FileExcelOutlined />}
+                                loading={isGenerating}
+                                onClick={() => handleGenerate(record)}
                                 style={{
                                     fontSize: 11, fontWeight: 600, height: 30,
-                                    background: C.amberLight, color: C.amber,
-                                    border: "1px solid #FDE68A", borderRadius: 6,
+                                    background: C.greenLight, color: C.green,
+                                    border: `1px solid ${C.greenMid}`, borderRadius: 6,
                                 }}
                             >
-                                Preview
+                                Generate
                             </Button>
                         )}
 
-                        {/* Generate / Re-generate */}
-                        <Button
-                            size="small"
-                            icon={<FileExcelOutlined />}
-                            loading={isGenerating}
-                            onClick={() => handleGenerate(record)}
-                            style={{
-                                fontSize: 11, fontWeight: 600, height: 30,
-                                background: record.excel_generated ? C.purpleLight : C.greenLight,
-                                color: record.excel_generated ? C.purple : C.green,
-                                border: `1px solid ${record.excel_generated ? C.purpleMid : C.greenMid}`,
-                                borderRadius: 6,
-                            }}
-                        >
-                            {record.excel_generated ? "Re-generate" : "Generate"}
-                        </Button>
-
-                        {/* Download — only if generated */}
+                        {/* ── GENERATED: show Preview, Download, Publish only ── */}
                         {record.excel_generated && (
-                            <Button
-                                size="small"
-                                icon={<DownloadOutlined />}
-                                onClick={() => handleDownload(record)}
-                                style={{
-                                    fontSize: 11, fontWeight: 600, height: 30,
-                                    background: C.blueLight, color: C.blue,
-                                    border: `1px solid ${C.blueMid}`, borderRadius: 6,
-                                }}
-                            >
-                                Download
-                            </Button>
+                            <>
+                                <Button
+                                    size="small"
+                                    icon={<EyeOutlined />}
+                                    onClick={() => handlePreview(record)}
+                                    style={{
+                                        fontSize: 11, fontWeight: 600, height: 30,
+                                        background: C.amberLight, color: C.amber,
+                                        border: "1px solid #FDE68A", borderRadius: 6,
+                                    }}
+                                >
+                                    Preview
+                                </Button>
+
+                                <Button
+                                    size="small"
+                                    icon={<DownloadOutlined />}
+                                    onClick={() => handleDownload(record)}
+                                    style={{
+                                        fontSize: 11, fontWeight: 600, height: 30,
+                                        background: C.blueLight, color: C.blue,
+                                        border: `1px solid ${C.blueMid}`, borderRadius: 6,
+                                    }}
+                                >
+                                    Download
+                                </Button>
+
+                                <Button
+                                    size="small"
+                                    icon={record.publish_status === 'published' ? null : <CloudUploadOutlined />}
+                                    loading={publishing === key}
+                                    onClick={() => handlePublish(record)}
+                                    disabled={record.publish_status === 'published'}
+                                    style={{
+                                        fontSize: 11, fontWeight: 600, height: 30,
+                                        background: C.blueLight, color: C.blue,
+                                        border: `1px solid ${C.blueMid}`, borderRadius: 6,
+                                    }}
+                                >
+                                    {record.publish_status === 'published' ? '✅ Published' : 'Publish'}
+                                </Button>
+                            </>
                         )}
                     </div>
                 );
@@ -780,7 +887,10 @@ export default function CampaignReports() {
                 ) : (
                     <PreviewModal
                         open={showPreview}
-                        editedData={editedData}
+                        editedData={allSheetsData[activeSheet] ?? []}   // ✅ active sheet data
+                        sheetNames={sheetNames}
+                        activeSheet={activeSheet}
+                        onSheetChange={(name) => setActiveSheet(name)}   // ✅ switch sheet
                         campaignId={previewCampaignId}
                         reportType={previewReportType}
                         saving={saving}

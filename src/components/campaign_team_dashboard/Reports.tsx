@@ -2,19 +2,17 @@ import { useEffect, useState, useCallback } from "react";
 import { Table, Button, Input, Tag, Tooltip } from "antd";
 import {
     SearchOutlined, ReloadOutlined,
-    FileExcelOutlined, DownloadOutlined, CheckCircleOutlined, ClockCircleOutlined,
+    DownloadOutlined,
+    CheckCircleOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-// ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
-    bg: "#F8FAFC",
     white: "#FFFFFF",
     slate: "#0F172A",
     slate500: "#64748B",
-    slate300: "#CBD5E1",
     border: "#E2E8F0",
     blue: "#2563EB",
     blueLight: "#EFF6FF",
@@ -24,13 +22,16 @@ const C = {
     greenMid: "#86EFAC",
     amber: "#D97706",
     amberLight: "#FFFBEB",
-    purple: "#7C3AED",
-    purpleLight: "#F5F3FF",
+    teal: "#0F766E",
+    tealLight: "#F0FDFA",
+    tealMid: "#99F6E4",
+    red: "#DC2626",
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 interface CampaignRow {
     campaign_id: string;
+    campaign_id_raw: string;
+    report_type: 'cpm' | 'cpc';
     campaign_name: string;
     client_name: string;
     client_id: string;
@@ -40,21 +41,20 @@ interface CampaignRow {
     excel_generated: boolean;
     excel_url: string | null;
     generated_at: string | null;
+    publish_status: string | null;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(v?: string) {
     if (!v) return "—";
     return new Date(v).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
-    const color = type === "success" ? C.green : "#DC2626";
+    const color = type === "success" ? C.green : C.red;
     return (
         <div style={{
-            position: "fixed", bottom: 24, right: 24, zIndex: 999,
+            position: "fixed", bottom: 24, right: 24, zIndex: 9999,
             background: C.white, border: `1px solid ${color}55`, borderRadius: 12,
             padding: "14px 20px", display: "flex", alignItems: "center", gap: 10,
             boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 280,
@@ -65,66 +65,42 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
     );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function Reports() {
     const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [generating, setGenerating] = useState<string | null>(null); // campaign_id being generated
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
 
-    // ── Fetch list ──────────────────────────────────────────────────────────
     const fetchList = useCallback(() => {
         setLoading(true);
         fetch(`${BASE_URL}/get_campaigns_excel_list/`, {
             headers: { "ngrok-skip-browser-warning": "1" },
         })
             .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-            .then(data => setCampaigns(Array.isArray(data) ? data : []))
-            .catch(() => showToast("Failed to load campaigns.", "error"))
+            .then((data: CampaignRow[]) => {
+                // ── Only show published reports ──
+                const published = Array.isArray(data)
+                    ? data.filter(c => c.publish_status === 'published')
+                    : [];
+                setCampaigns(published);
+            })
+            .catch(() => showToast("Failed to load reports.", "error"))
             .finally(() => setLoading(false));
     }, []);
 
     useEffect(() => { fetchList(); }, [fetchList]);
 
-    // ── Generate Excel ──────────────────────────────────────────────────────
-    const handleGenerate = async (campaignId: string) => {
-        setGenerating(campaignId);
-        try {
-            const res = await fetch(`${BASE_URL}/generate_campaign_excel/${campaignId}/`, {
-                method: "POST",
-                headers: { "ngrok-skip-browser-warning": "1" },
-            });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-
-            // Update row in state
-            setCampaigns(prev => prev.map(c =>
-                c.campaign_id === campaignId
-                    ? { ...c, excel_generated: true, excel_url: data.download_url, generated_at: data.generated_at }
-                    : c
-            ));
-            showToast(`Excel generated for ${campaignId}!`);
-        } catch {
-            showToast("Failed to generate Excel. Try again.", "error");
-        } finally {
-            setGenerating(null);
-        }
-    };
-
-    // ── Download Excel ──────────────────────────────────────────────────────
-    const handleDownload = (campaignId: string, campaignName: string) => {
-        const url = `${BASE_URL}/download_campaign_excel/${campaignId}/`;
+    const handleDownload = (record: CampaignRow) => {
+        const url = `${BASE_URL}/download_campaign_excel/${record.campaign_id_raw}/?report_type=${record.report_type}`;
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${campaignId}.xlsx`;
+        a.download = `${record.campaign_id}.xlsx`;
         a.click();
     };
 
-    // ── Filter ──────────────────────────────────────────────────────────────
     const filtered = campaigns.filter(c => {
         if (!search.trim()) return true;
         const q = search.toLowerCase();
@@ -132,31 +108,47 @@ export default function Reports() {
             .some(f => f?.toLowerCase().includes(q));
     });
 
-    // ── Stats ───────────────────────────────────────────────────────────────
     const totalCount = campaigns.length;
-    const generatedCount = campaigns.filter(c => c.excel_generated).length;
-    const pendingCount = totalCount - generatedCount;
+    const cpmCount = campaigns.filter(c => c.report_type === 'cpm').length;
+    const cpcCount = campaigns.filter(c => c.report_type === 'cpc').length;
 
-    // ── Columns ─────────────────────────────────────────────────────────────
     const columns: ColumnsType<CampaignRow> = [
         {
             title: "Campaign ID",
             dataIndex: "campaign_id",
             key: "campaign_id",
             width: 160,
-            render: (v: string) => (
+            render: (v: string, record) => (
                 <span style={{
                     fontFamily: "monospace", fontSize: 12, fontWeight: 700,
-                    color: C.blue, background: C.blueLight,
-                    padding: "3px 8px", borderRadius: 6,
+                    color: record.report_type === 'cpm' ? C.blue : C.teal,
+                    background: record.report_type === 'cpm' ? C.blueLight : C.tealLight,
+                    padding: "3px 8px", borderRadius: 6, display: "inline-block",
                 }}>{v}</span>
+            ),
+        },
+        {
+            title: "Type",
+            dataIndex: "report_type",
+            key: "report_type",
+            width: 140,
+            render: (v: 'cpm' | 'cpc') => (
+                <span style={{
+                    fontSize: 11, fontWeight: 700, padding: "3px 10px",
+                    borderRadius: 20, textTransform: "uppercase",
+                    background: v === 'cpm' ? C.blueLight : C.tealLight,
+                    color: v === 'cpm' ? C.blue : C.teal,
+                    border: `1px solid ${v === 'cpm' ? C.blueMid : C.tealMid}`,
+                }}>
+                    {v === 'cpm' ? '📊 CPM — Impressions' : '🖱️ CPC — Clicks'}
+                </span>
             ),
         },
         {
             title: "Campaign Name",
             dataIndex: "campaign_name",
             key: "campaign_name",
-            width: 220,
+            width: 200,
             render: (v: string) => (
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>{v || "—"}</span>
             ),
@@ -165,7 +157,7 @@ export default function Reports() {
             title: "Client",
             dataIndex: "client_name",
             key: "client_name",
-            width: 160,
+            width: 150,
             render: (v: string, record) => (
                 <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>{v || "—"}</div>
@@ -177,14 +169,14 @@ export default function Reports() {
             title: "Start Date",
             dataIndex: "start_date",
             key: "start_date",
-            width: 120,
+            width: 110,
             render: (v: string) => <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>,
         },
         {
             title: "End Date",
             dataIndex: "end_date",
             key: "end_date",
-            width: 120,
+            width: 110,
             render: (v: string) => <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>,
         },
         {
@@ -197,99 +189,59 @@ export default function Reports() {
             ),
         },
         {
-            title: "Excel Status",
-            dataIndex: "excel_generated",
-            key: "excel_generated",
-            width: 140,
-            render: (generated: boolean, record) => generated ? (
-                <Tooltip title={`Generated: ${record.generated_at ? fmtDate(record.generated_at) : "—"}`}>
+            title: "Published On",
+            dataIndex: "generated_at",
+            key: "generated_at",
+            width: 120,
+            render: (v: string) => (
+                <Tooltip title={v ? new Date(v).toLocaleString() : "—"}>
                     <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "3px 10px", borderRadius: 20,
-                        background: C.greenLight, border: `1px solid ${C.greenMid}`,
-                        fontSize: 11, fontWeight: 700, color: C.green,
+                        fontSize: 11, display: "inline-flex", alignItems: "center", gap: 5,
+                        color: C.green, fontWeight: 600,
                     }}>
-                        <CheckCircleOutlined style={{ fontSize: 11 }} /> Generated
+                        <CheckCircleOutlined style={{ fontSize: 11 }} />
+                        {fmtDate(v)}
                     </span>
                 </Tooltip>
-            ) : (
-                <span style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                    padding: "3px 10px", borderRadius: 20,
-                    background: C.amberLight, border: "1px solid #FDE68A",
-                    fontSize: 11, fontWeight: 700, color: C.amber,
-                }}>
-                    <ClockCircleOutlined style={{ fontSize: 11 }} /> Pending
-                </span>
             ),
         },
         {
             title: "Actions",
             key: "actions",
-            width: 200,
+            width: 120,
             fixed: "right",
-            render: (_: any, record: CampaignRow) => {
-                const isGenerating = generating === record.campaign_id;
-                return (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        {/* Generate / Re-generate */}
-                        <Button
-                            size="small"
-                            icon={<FileExcelOutlined />}
-                            loading={isGenerating}
-                            onClick={() => handleGenerate(record.campaign_id)}
-                            style={{
-                                fontSize: 11, fontWeight: 600, height: 30,
-                                background: record.excel_generated ? C.purpleLight : C.greenLight,
-                                color: record.excel_generated ? C.purple : C.green,
-                                border: `1px solid ${record.excel_generated ? "#DDD6FE" : C.greenMid}`,
-                                borderRadius: 6,
-                            }}
-                        >
-                            {record.excel_generated ? "Re-generate" : "Generate"}
-                        </Button>
-
-                        {/* Download — only if generated */}
-                        {record.excel_generated && (
-                            <Button
-                                size="small"
-                                icon={<DownloadOutlined />}
-                                onClick={() => handleDownload(record.campaign_id, record.campaign_name)}
-                                style={{
-                                    fontSize: 11, fontWeight: 600, height: 30,
-                                    background: C.blueLight, color: C.blue,
-                                    border: `1px solid ${C.blueMid}`, borderRadius: 6,
-                                }}
-                            >
-                                Download
-                            </Button>
-                        )}
-                    </div>
-                );
-            },
+            render: (_: any, record: CampaignRow) => (
+                <Button
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={() => handleDownload(record)}
+                    style={{
+                        fontSize: 11, fontWeight: 600, height: 30,
+                        background: C.blueLight, color: C.blue,
+                        border: `1px solid ${C.blueMid}`, borderRadius: 6,
+                    }}
+                >
+                    Download
+                </Button>
+            ),
         },
     ];
 
     return (
         <>
             <div style={{ marginBottom: 20 }}>
-                <h1
-                    style={{ fontSize: 18, fontWeight: 700, color: C.slate, }}>
-                    Reports
-                </h1>
-                <p
-                    style={{ fontSize: 11, color: C.slate500, marginTop: 1, letterSpacing: "0.04em", fontWeight: 500, }}
-                >
-                    GENERATE &amp; DOWNLOAD CAMPAIGN EXCEL REPORTS
+                <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate }}>Reports</h1>
+                <p style={{ fontSize: 11, color: C.slate500, marginTop: 1, letterSpacing: "0.04em", fontWeight: 500 }}>
+                    PUBLISHED CAMPAIGN EXCEL REPORTS — AVAILABLE FOR DOWNLOAD
                 </p>
             </div>
 
             {/* Stat Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
                 {[
-                    { label: "Total Campaigns", value: totalCount, color: C.blue, bg: C.blueLight, icon: "📊" },
-                    { label: "Excel Generated", value: generatedCount, color: C.green, bg: C.greenLight, icon: "✅" },
-                    { label: "Pending", value: pendingCount, color: C.amber, bg: C.amberLight, icon: "⏳" },
+                    { label: "Total Published", value: totalCount, color: C.green, bg: C.greenLight, icon: "✅" },
+                    { label: "CPM Reports", value: cpmCount, color: C.blue, bg: C.blueLight, icon: "📊" },
+                    { label: "CPC Reports", value: cpcCount, color: C.teal, bg: C.tealLight, icon: "🖱️" },
                 ].map(card => (
                     <div key={card.label} style={{
                         background: C.white, borderRadius: 14, padding: 20,
@@ -332,42 +284,66 @@ export default function Reports() {
                     Refresh
                 </Button>
                 <span style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}>
-                    {filtered.length} of {campaigns.length} campaigns
+                    {filtered.length} of {campaigns.length} reports
                 </span>
             </div>
 
             {/* Info Banner */}
             <div style={{
-                background: C.blueLight, border: `1px solid ${C.blueMid}`,
+                background: C.greenLight, border: `1px solid ${C.greenMid}`,
                 borderRadius: 10, padding: "10px 16px", marginBottom: 16,
                 display: "flex", alignItems: "center", gap: 10,
-                fontSize: 12.5, color: C.blue, fontWeight: 500,
+                fontSize: 12.5, color: C.green, fontWeight: 500,
             }}>
-                <FileExcelOutlined style={{ fontSize: 16 }} />
-                Each Excel file contains one sheet per Line Item. Click <strong>Generate</strong> to create the Excel, then <strong>Download</strong> to save it.
+                <CheckCircleOutlined style={{ fontSize: 16 }} />
+                Showing only <strong>published</strong> reports. Click <strong>Download</strong> to save the Excel file.
             </div>
 
+            {/* Empty State */}
+            {!loading && filtered.length === 0 && (
+                <div style={{
+                    background: C.white, borderRadius: 14, border: `1px solid ${C.border}`,
+                    padding: "48px 24px", textAlign: "center",
+                }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: C.slate, marginBottom: 6 }}>
+                        No published reports yet
+                    </div>
+                    <div style={{ fontSize: 13, color: C.slate500 }}>
+                        Reports will appear here once admin generates and publishes them.
+                    </div>
+                </div>
+            )}
+
             {/* Table */}
-            <div style={{
-                background: C.white, borderRadius: 14, border: `1px solid ${C.border}`,
-                overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-            }}>
-                <Table
-                    columns={columns}
-                    dataSource={filtered}
-                    rowKey="campaign_id"
-                    loading={loading}
-                    scroll={{ x: 1200 }}
-                    pagination={{
-                        pageSize: 10,
-                        showSizeChanger: true,
-                        pageSizeOptions: ["10", "20", "50"],
-                        showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} campaigns`,
-                        style: { padding: "12px 16px" },
-                    }}
-                    style={{ fontSize: 13 }}
-                />
-            </div>
+            {(loading || filtered.length > 0) && (
+                <div style={{
+                    background: C.white, borderRadius: 14, border: `1px solid ${C.border}`,
+                    overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}>
+                    <Table
+                        columns={columns}
+                        dataSource={filtered}
+                        rowKey={r => `${r.campaign_id_raw}_${r.report_type}`}
+                        loading={loading}
+                        scroll={{ x: 1200 }}
+                        pagination={{
+                            pageSize: 10,
+                            showSizeChanger: true,
+                            pageSizeOptions: ["10", "20", "50"],
+                            showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} reports`,
+                            style: { padding: "12px 16px" },
+                        }}
+                        style={{ fontSize: 13 }}
+                        rowClassName={(record, index) => {
+                            const prevRecord = filtered[index - 1];
+                            return prevRecord && prevRecord.campaign_id_raw !== record.campaign_id_raw
+                                ? 'campaign-group-start'
+                                : '';
+                        }}
+                    />
+                </div>
+            )}
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
@@ -381,6 +357,9 @@ export default function Reports() {
                     letter-spacing: 0.04em;
                 }
                 .ant-table-row:hover td { background: #F8FAFC !important; }
+                .campaign-group-start td {
+                    border-top: 2px solid #E2E8F0 !important;
+                }
             `}</style>
         </>
     );
