@@ -7,7 +7,6 @@ import {
     CheckCircleOutlined,
     ClockCircleOutlined,
     DownloadOutlined,
-    FilePdfOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
@@ -110,7 +109,6 @@ export default function User_IO() {
     const [rows, setRows] = useState<IORow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [generating, setGenerating] = useState<string | null>(null);
     const [toast, setToast] = useState<{
         message: string;
         type: "success" | "error";
@@ -139,37 +137,6 @@ export default function User_IO() {
     useEffect(() => {
         fetchList();
     }, [fetchList]);
-
-    // ── Generate IO PDF ─────────────────────────────────────────────────────
-    const handleGenerate = async (campaignId: string) => {
-        setGenerating(campaignId);
-        try {
-            const res = await fetch(`${BASE_URL}/generate_io_pdf/${campaignId}/`, {
-                method: "POST",
-                headers: { "ngrok-skip-browser-warning": "1" },
-            });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-
-            setRows((prev) =>
-                prev.map((r) =>
-                    r.campaign_id === campaignId
-                        ? {
-                              ...r,
-                              pdf_generated: true,
-                              pdf_url: data.download_url,
-                              io_id: data.io_id,
-                          }
-                        : r
-                )
-            );
-            showToast(`IO PDF generated for ${campaignId}!`);
-        } catch {
-            showToast("Failed to generate IO PDF. Try again.", "error");
-        } finally {
-            setGenerating(null);
-        }
-    };
 
     // ── Download IO PDF ─────────────────────────────────────────────────────
     const handleDownload = (campaignId: string, ioId: string) => {
@@ -387,34 +354,10 @@ export default function User_IO() {
             width: 210,
             fixed: "right",
             render: (_: any, record: IORow) => {
-                const isGenerating = generating === record.campaign_id;
                 return (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        {/* Generate / Re-generate */}
-                        <Button
-                            size="small"
-                            icon={<FilePdfOutlined />}
-                            loading={isGenerating}
-                            onClick={() => handleGenerate(record.campaign_id)}
-                            style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                height: 30,
-                                background: record.pdf_generated
-                                    ? C.purpleLight
-                                    : C.greenLight,
-                                color: record.pdf_generated ? C.purple : C.green,
-                                border: `1px solid ${
-                                    record.pdf_generated ? C.purpleMid : C.greenMid
-                                }`,
-                                borderRadius: 6,
-                            }}
-                        >
-                            {record.pdf_generated ? "Re-generate" : "Generate"}
-                        </Button>
-
                         {/* Download — only if generated */}
-                        {record.pdf_generated && (
+                        {record.pdf_generated ? (
                             <Button
                                 size="small"
                                 icon={<DownloadOutlined />}
@@ -434,9 +377,20 @@ export default function User_IO() {
                                     borderRadius: 6,
                                 }}
                             >
-                                Download
+                                Download IO
                             </Button>
-                        )}
+                        ) : (
+                            <span style={{
+                                fontSize: 11,
+                                color: C.amber,
+                                background: C.amberLight,
+                                border: "1px solid #FDE68A",
+                                borderRadius: 6,
+                                padding: "3px 10px",
+                                fontWeight: 600,
+                            }}>
+                                Awaiting Approval
+                            </span>)}
                     </div>
                 );
             },

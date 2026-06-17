@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Table, Input, Button, Modal, Form, DatePicker } from "antd";
 import {
     SearchOutlined,
     ReloadOutlined,
     FilterOutlined,
     PlusOutlined,
+    DownloadOutlined,
+    UploadOutlined
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
@@ -57,6 +59,7 @@ interface LineItemRow {
     impressions: string;
     units: string;
     status: string;
+    dv_id: string;  // ✅ ADD THIS
 }
 
 function fmtDate(v?: string) {
@@ -76,6 +79,11 @@ function resolveAdFormat(raw: string | string[] | undefined): string {
     if (!raw) return "—";
     if (Array.isArray(raw)) return raw.join(", ") || "—";
     return raw || "—";
+}
+
+function isVideoFormat(adFormat?: string): boolean {
+    if (!adFormat) return false;
+    return adFormat.toLowerCase().includes("video") || adFormat.toLowerCase().includes("youtube");
 }
 
 function getLineItemStatus(s: string, e: string): "active" | "upcoming" | "closed" {
@@ -163,8 +171,8 @@ function CampaignGroupCell({ record }: { record: LineItemRow }) {
                 fontFamily: "monospace",
                 fontSize: 12,
                 fontWeight: 700,
-                color: isEven ? C.blue : C.purple,
-                background: isEven ? C.blueLight : C.purpleLight,
+                color: C.blue,
+                background: C.blueLight,
                 padding: "3px 8px",
                 borderRadius: 6,
                 border: `1px solid ${isEven ? C.blueMid : C.purpleMid}`,
@@ -173,6 +181,37 @@ function CampaignGroupCell({ record }: { record: LineItemRow }) {
             }}>
                 {record.campaign_id}
             </span>
+        </div>
+    );
+}
+
+// ── CAMPAIGN DOWNLOAD CELL (one download button per campaign group, merged like CampaignGroupCell) ───
+function CampaignDownloadCell({ record, onDownload }: { record: LineItemRow; onDownload: (campaignId: string) => void }) {
+    return (
+        <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: "4px 0",
+            paddingLeft: 10,
+        }}>
+            <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={() => onDownload(record.campaign_id)}
+                style={{
+                    height: 28,
+                    borderRadius: 6,
+                    border: `1px solid ${C.blueMid}`,
+                    background: C.blueLight,
+                    color: C.purple,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    alignSelf: "flex-start",
+                }}
+            >
+                Download
+            </Button>
         </div>
     );
 }
@@ -187,10 +226,11 @@ function AddReportModal({
     open: boolean;
     record: LineItemRow | null;
     onClose: () => void;
-    onSubmit: (values: { date: string; impressions: number; clicks: number; ctr: number }) => void;
+    onSubmit: (values: { date: string; impressions: number; clicks: number; ctr: number; viewable_impression: number; measurable_impression: number; video_start: number; video_end: number; revenue: number; media_cost: number; vcr?: number; viewability?: number; }) => void;
     disabledDates: string[]; // NEW — array of "YYYY-MM-DD" already used for this line item
 }) {
     const [form] = Form.useForm();
+    const isVideo = isVideoFormat(record?.ad_format); // ✅ NEW
 
     useEffect(() => {
         if (open) form.resetFields();
@@ -203,7 +243,16 @@ function AddReportModal({
                 impressions: values.impressions,
                 clicks: values.clicks,
                 ctr: values.ctr,
+                viewable_impression: values.viewable_impression,
+                measurable_impression: values.measurable_impression,
+                video_start: values.video_start,
+                video_end: values.video_end,
+                revenue: values.revenue,
+                media_cost: values.media_cost,
+                // ✅ NEW — only include when video format
+                ...(isVideo ? { vcr: values.vcr, viewability: values.viewability } : {}),
             });
+
             form.resetFields();
         });
     };
@@ -226,7 +275,7 @@ function AddReportModal({
                         Add Daily Entry
                     </div>
                     {record && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                             <span style={{
                                 fontFamily: "monospace",
                                 fontSize: 11,
@@ -253,7 +302,7 @@ function AddReportModal({
             cancelText="Cancel"
             destroyOnClose
             centered
-            width={460}
+            width={700}
             styles={{
                 header: { borderBottom: `1px solid ${C.border}`, paddingBottom: 16, marginBottom: 4 },
                 body: { background: C.bg, padding: 16, borderRadius: 8 },
@@ -282,7 +331,7 @@ function AddReportModal({
                 },
             }}
         >
-            <Form form={form} layout="vertical" style={{ marginTop: 16 }} requiredMark="optional">
+            <Form form={form} layout="vertical" style={{ marginTop: 1 }} requiredMark="optional">
                 <Form.Item
                     label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Date</span>}
                     name="date"
@@ -364,6 +413,195 @@ function AddReportModal({
                         }}
                     />
                 </Form.Item>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Viewable Impressions</span>}
+                        name="viewable_impression"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 2000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Measurable Impression</span>}
+                        name="measurable_impression"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 1000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Video Start</span>}
+                        name="video_start"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 1000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Video End</span>}
+                        name="video_end"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 1000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Revenue (Adv Currency)</span>}
+                        name="revenue"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 5000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Media Cost (Advertiser Currency)</span>}
+                        name="media_cost"
+                        rules={[
+                            { required: true, message: "Required" },
+                            { pattern: /^[0-9]+$/, message: "Numbers only" },
+                        ]}
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Input
+                            placeholder="e.g. 5000"
+                            inputMode="numeric"
+                            style={{
+                                height: 40,
+                                borderRadius: 8,
+                                border: `1px solid ${C.border}`,
+                                fontFamily: "monospace",
+                                fontSize: 13,
+                            }}
+                        />
+                    </Form.Item>
+                </div>
+
+                {/* ✅ NEW — only shown when ad format is video */}
+                {isVideo && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Video Completion Rate (VCR)</span>}
+                            name="vcr"
+                            rules={[
+                                { required: true, message: "Required" },
+                                { pattern: /^[0-9]+(\.[0-9]{1,2})?$/, message: "Enter a valid number" },
+                            ]}
+                            style={{ marginBottom: 16 }}
+                        >
+                            <Input
+                                placeholder="e.g. 65.5"
+                                inputMode="decimal"
+                                suffix={<span style={{ color: C.slate400, fontSize: 12, fontWeight: 600 }}>%</span>}
+                                style={{
+                                    height: 40,
+                                    borderRadius: 8,
+                                    border: `1px solid ${C.border}`,
+                                    fontFamily: "monospace",
+                                    fontSize: 13,
+                                }}
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: C.slate700, letterSpacing: "0.02em" }}>Viewability</span>}
+                            name="viewability"
+                            rules={[
+                                { required: true, message: "Required" },
+                                { pattern: /^[0-9]+(\.[0-9]{1,2})?$/, message: "Enter a valid number" },
+                            ]}
+                            style={{ marginBottom: 16 }}
+                        >
+                            <Input
+                                placeholder="e.g. 72.3"
+                                inputMode="decimal"
+                                suffix={<span style={{ color: C.slate400, fontSize: 12, fontWeight: 600 }}>%</span>}
+                                style={{
+                                    height: 40,
+                                    borderRadius: 8,
+                                    border: `1px solid ${C.border}`,
+                                    fontFamily: "monospace",
+                                    fontSize: 13,
+                                }}
+                            />
+                        </Form.Item>
+                    </div>
+                )}
             </Form>
         </Modal>
     );
@@ -382,6 +620,15 @@ export default function Daily_Reports() {
     const [selectedRecord, setSelectedRecord] = useState<LineItemRow | null>(null);
     const [usedDatesByLineItem, setUsedDatesByLineItem] = useState<Record<string, string[]>>({}); // NEW
 
+    const [bulkModalOpen, setBulkModalOpen] = useState(false);
+    const [bulkUploading, setBulkUploading] = useState(false);
+    const [bulkSelectedFile, setBulkSelectedFile] = useState<File | null>(null); // NEW — staged file
+    const [bulkResult, setBulkResult] = useState<null | {
+        inserted: number; skipped: number; errors: number;
+        details: { inserted: any[]; skipped: any[]; errors: any[] };
+    }>(null);
+    const bulkFileRef = useRef<HTMLInputElement>(null);
+
     const openAddModal = (record: LineItemRow) => {
         setSelectedRecord(record);
         setAddModalOpen(true);
@@ -392,7 +639,9 @@ export default function Daily_Reports() {
         setSelectedRecord(null);
     };
 
-    const handleAddSubmit = async (values: { date: string; impressions: number; clicks: number; ctr: number }) => {
+    const handleAddSubmit = async (values: {
+        date: string; impressions: number; clicks: number; ctr: number; viewable_impression: number; measurable_impression: number; video_start: number; video_end: number; revenue: number; media_cost: number; vcr?: number; viewability?: number;
+    }) => {
         if (!selectedRecord) return;
 
         try {
@@ -410,6 +659,16 @@ export default function Daily_Reports() {
                         impressions: values.impressions,
                         clicks: values.clicks,
                         ctr: values.ctr,
+                        // ✅ ADD THESE
+                        viewable_impression: values.viewable_impression,
+                        measurable_impression: values.measurable_impression,
+                        video_start: values.video_start,
+                        video_end: values.video_end,
+                        revenue: values.revenue,
+                        media_cost: values.media_cost,
+                        // ✅ NEW — only present when video format was active
+                        ...(values.vcr !== undefined ? { vcr: values.vcr } : {}),
+                        ...(values.viewability !== undefined ? { viewability: values.viewability } : {}),
                     }),
                 }
             );
@@ -436,6 +695,54 @@ export default function Daily_Reports() {
             showToast("Failed to add entry. Check your connection.", "error");
         }
     };
+
+    const handleDownloadCampaignExcel = (campaignId: string) => {
+        window.open(`${BASE_URL}/download_daily_report_excel/${campaignId}/`, "_blank");
+    };
+
+
+    // Step 1: just stage the file, NO network call here
+    const handleBulkFileSelect = (file: File) => {
+        setBulkResult(null);
+        setBulkSelectedFile(file);
+    };
+
+    // Step 2: only this triggers the actual upload, called from the Upload button
+    const handleBulkUploadConfirm = async () => {
+        if (!bulkSelectedFile) return;
+
+        setBulkUploading(true);
+        setBulkResult(null);
+
+        const formData = new FormData();
+        formData.append("file", bulkSelectedFile);
+
+        try {
+            const res = await fetch(`${BASE_URL}/bulk_upload_daily_entries/`, {
+                method: "POST",
+                headers: { "ngrok-skip-browser-warning": "1" },
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data.error || "Bulk upload failed.", "error");
+            } else {
+                setBulkResult(data);
+                if (data.inserted > 0) fetchData(); // refresh table
+            }
+        } catch {
+            showToast("Bulk upload failed. Check your connection.", "error");
+        } finally {
+            setBulkUploading(false);
+        }
+    };
+
+    const clearBulkSelection = () => {
+        setBulkSelectedFile(null);
+        setBulkResult(null);
+        if (bulkFileRef.current) bulkFileRef.current.value = "";
+    };
+
     const showToast = (msg: string, type: "success" | "error" = "success") =>
         setToast({ message: msg, type });
 
@@ -472,6 +779,7 @@ export default function Daily_Reports() {
                             impressions: li.impressions || "",
                             units: li.units || "",
                             status: getLineItemStatus(li.start_date || "", li.end_date || ""),
+                            dv_id: li.dv_id || "",  // ✅ ADD THIS
                         });
                     });
                 });
@@ -566,6 +874,24 @@ export default function Daily_Reports() {
             ),
         },
         {
+            title: "DV ID",
+            dataIndex: "dv_id",
+            key: "dv_id",
+            width: 150,
+            render: (v: string) => v ? (
+                <span style={{
+                    fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                    color: "#4F46E5", background: "#EEF2FF",
+                    padding: "3px 8px", borderRadius: 6,
+                    border: "1px solid #C7D2FE", display: "inline-block"
+                }}>
+                    {v}
+                </span>
+            ) : (
+                <span style={{ color: C.slate400, fontSize: 12 }}>—</span>
+            ),
+        },
+        {
             title: "Line Item Name",
             dataIndex: "line_item_name",
             key: "line_item_name",
@@ -623,7 +949,7 @@ export default function Daily_Reports() {
         {
             title: "Actions",
             key: "actions",
-            width: 150,
+            width: 100,
             fixed: "right",
             render: (_: any, record: LineItemRow) => (
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -638,16 +964,41 @@ export default function Daily_Reports() {
                 </div>
             ),
         },
+        {
+            title: "Download",
+            key: "download",
+            width: 130,
+            fixed: "right",
+            onCell: (record) => ({ rowSpan: record._campaignRowSpan }), // NEW: merge across the campaign group
+            render: (_: any, record: LineItemRow) =>
+                record._campaignRowSpan > 0 ? (
+                    <CampaignDownloadCell record={record} onDownload={handleDownloadCampaignExcel} />
+                ) : null,
+        },
     ];
 
     return (
         <>
             {/* Header */}
-            <div style={{ marginBottom: 20 }}>
-                <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate, margin: 0 }}>Daily Reports</h1>
-                <p style={{ fontSize: 11, color: C.slate500, marginTop: 4, letterSpacing: "0.04em", fontWeight: 500 }}>
-                    ALL LINE ITEMS ACROSS CAMPAIGNS
-                </p>
+            <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 16, }}>
+                <div>
+                    <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate, margin: 0 }}>Daily Reports</h1>
+                    <p style={{ fontSize: 11, color: C.slate500, marginTop: 4, letterSpacing: "0.04em", fontWeight: 500 }}>
+                        ALL LINE ITEMS ACROSS CAMPAIGNS
+                    </p>
+                </div>
+                <Button
+                    icon={<span style={{ fontSize: 15 }}>📤</span>}
+                    onClick={() => setBulkModalOpen(true)}
+                    style={{
+                        height: 38, borderRadius: 8,
+                        border: `1px solid ${C.greenMid}`,
+                        background: C.blue, color: C.white,
+                        fontWeight: 600, fontSize: 13,
+                    }}
+                >
+                    Bulk Upload
+                </Button>
             </div>
 
             {/* Stat Cards */}
@@ -691,7 +1042,7 @@ export default function Daily_Reports() {
                     dataSource={filtered}
                     rowKey="_key"
                     loading={loading}
-                    scroll={{ x: 1400 }}
+                    scroll={{ x: 1530 }}
                     pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: ["20", "50", "100"], showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} line items`, style: { padding: "12px 16px" } }}
                     style={{ fontSize: 13 }}
                     rowClassName={(record) => {
@@ -711,6 +1062,138 @@ export default function Daily_Reports() {
                 onSubmit={handleAddSubmit}
                 disabledDates={selectedRecord ? (usedDatesByLineItem[selectedRecord.line_item_id] || []) : []}
             />
+
+            {/* Bulk Upload Modal */}
+
+            {/* Bulk Upload Modal */}
+            <Modal
+                title={<span style={{ fontSize: 16, fontWeight: 700, color: C.slate }}>📤 Bulk Upload Daily Entries</span>}
+                open={bulkModalOpen}
+                onCancel={() => {
+                    setBulkModalOpen(false);
+                    clearBulkSelection();
+                }}
+                footer={null}
+                centered
+                width={560}
+                destroyOnClose
+            >
+                {/* Instructions */}
+                <div style={{ background: C.blueLight, border: `1px solid ${C.blueMid}`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.blue }}>
+                    <strong>Accepted files:</strong> .csv or .xlsx (DV360 export format)<br />
+                    <strong>Required columns:</strong> Campaign, Line Item ID, Date, Impressions, Clicks, Click Rate (CTR), Revenue (Adv Currency), Media Cost (Advertiser Currency), Start Views, Complete Views, Viewable Impressions, Measurable Impressions
+                </div>
+
+                {/* File input (hidden) — now accepts .csv too */}
+                <input
+                    ref={bulkFileRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: "none" }}
+                    onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleBulkFileSelect(file);
+                    }}
+                />
+
+                {/* Step 1: Select file — only stages it, does NOT upload */}
+                <Button
+                    icon={<span>📂</span>}
+                    onClick={() => bulkFileRef.current?.click()}
+                    disabled={bulkUploading}
+                    style={{
+                        width: "100%", height: 44, borderRadius: 8,
+                        border: `1px solid ${C.border}`, background: C.white,
+                        fontSize: 13, fontWeight: 600, color: C.slate700, marginBottom: 12,
+                    }}
+                >
+                    {bulkSelectedFile ? "Change File (.csv / .xlsx)" : "Select File (.csv / .xlsx)"}
+                </Button>
+
+                {/* Step 2: Shown only after a file is selected — Upload triggers the real request */}
+                {bulkSelectedFile && (
+                    <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        background: C.slate100, border: `1px solid ${C.border}`, borderRadius: 8,
+                        padding: "10px 14px", marginBottom: 16, gap: 10,
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                            <span style={{ fontSize: 16 }}>📄</span>
+                            <span style={{
+                                fontSize: 12, fontWeight: 600, color: C.slate700,
+                                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                            }}>
+                                {bulkSelectedFile.name}
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                            <Button
+                                size="small"
+                                onClick={clearBulkSelection}
+                                disabled={bulkUploading}
+                                style={{ height: 30, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.slate500 }}
+                            >
+                                Remove
+                            </Button>
+                            <Button
+                                size="small"
+                                type="primary"
+                                icon={<UploadOutlined />}
+                                loading={bulkUploading}
+                                onClick={handleBulkUploadConfirm}
+                                style={{ height: 30, borderRadius: 6, background: C.blue, border: "none", fontSize: 11, fontWeight: 700 }}
+                            >
+                                {bulkUploading ? "Uploading…" : "Upload"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Results */}
+                {bulkResult && (
+                    <div>
+                        {/* Summary */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                            <div style={{ textAlign: "center", padding: "10px", background: C.greenLight, borderRadius: 8, border: `1px solid ${C.greenMid}` }}>
+                                <div style={{ fontSize: 22, fontWeight: 800, color: C.green }}>{bulkResult.inserted}</div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: C.green }}>Inserted</div>
+                            </div>
+                            <div style={{ textAlign: "center", padding: "10px", background: C.amberLight, borderRadius: 8, border: `1px solid ${C.amberMid}` }}>
+                                <div style={{ fontSize: 22, fontWeight: 800, color: C.amber }}>{bulkResult.skipped}</div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: C.amber }}>Skipped</div>
+                            </div>
+                            <div style={{ textAlign: "center", padding: "10px", background: C.redLight, borderRadius: 8, border: `1px solid #FECACA` }}>
+                                <div style={{ fontSize: 22, fontWeight: 800, color: C.red }}>{bulkResult.errors}</div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: C.red }}>Errors</div>
+                            </div>
+                        </div>
+
+                        {/* Error details */}
+                        {bulkResult.details.errors.length > 0 && (
+                            <div style={{ maxHeight: 180, overflowY: "auto", background: C.redLight, borderRadius: 8, border: `1px solid #FECACA`, padding: "8px 12px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: C.red, marginBottom: 6 }}>Error Details:</div>
+                                {bulkResult.details.errors.map((e: any, i: number) => (
+                                    <div key={i} style={{ fontSize: 11, color: C.red, marginBottom: 3 }}>
+                                        Row {e.row}: {e.reason} — <span style={{ fontFamily: "monospace" }}>{e.data}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Skipped details */}
+                        {bulkResult.details.skipped.length > 0 && (
+                            <div style={{ maxHeight: 120, overflowY: "auto", background: C.amberLight, borderRadius: 8, border: `1px solid ${C.amberMid}`, padding: "8px 12px", marginTop: 8 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 6 }}>Skipped (already exist):</div>
+                                {bulkResult.details.skipped.map((s: any, i: number) => (
+                                    <div key={i} style={{ fontSize: 11, color: C.amber, marginBottom: 3 }}>
+                                        Row {s.row}: <span style={{ fontFamily: "monospace" }}>{s.data}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
 
             <style>{`
                 .ant-table-thead > tr > th {

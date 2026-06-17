@@ -147,6 +147,7 @@ interface LineItem {
     status?: string;
     creatives?: Creative[];
     third_party_creatives?: Creative[];
+    dv_id?: string;  // ← ADD THIS
 }
 
 interface Campaign {
@@ -1379,6 +1380,114 @@ function Toast({ message: msg, type, onClose }: { message: string; type: "succes
     );
 }
 
+// ── Inline DV ID Editor ───────────────────────────────────────────────────────
+function DvIdCell({ lineItemId, initialValue }: { lineItemId: string; initialValue?: string }) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(initialValue || "");
+    const [saving, setSaving] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch(`${BASE_URL}/update_line_item_dv_id/${lineItemId}/`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "ngrok-skip-browser-warning": "1",
+                },
+                body: JSON.stringify({ dv_id: value }),
+            });
+            if (res.ok) {
+                setEditing(false);
+            } else {
+                alert("Failed to save DV ID");
+            }
+        } catch {
+            alert("Network error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (editing) {
+        return (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                    ref={inputRef}
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                    onKeyDown={e => {
+                        if (e.key === "Enter") handleSave();
+                        if (e.key === "Escape") setEditing(false);
+                    }}
+                    style={{
+                        height: 28, padding: "0 8px", borderRadius: 6,
+                        border: `1px solid ${C.blueMid}`, fontSize: 12,
+                        fontFamily: "monospace", width: 120,
+                        outline: "none", background: C.blueLight,
+                    }}
+                    placeholder="Enter DV ID"
+                />
+                <Button
+                    size="small"
+                    loading={saving}
+                    onClick={handleSave}
+                    style={{
+                        height: 26, borderRadius: 6, fontSize: 11,
+                        background: C.blue, color: "#fff",
+                        border: "none", fontWeight: 600,
+                    }}
+                >
+                    {saving ? "" : "Save"}
+                </Button>
+                <Button
+                    size="small"
+                    onClick={() => { setEditing(false); setValue(initialValue || ""); }}
+                    style={{
+                        height: 26, borderRadius: 6, fontSize: 11,
+                        border: `1px solid ${C.border}`, color: C.slate500,
+                    }}
+                >
+                    ✕
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {value ? (
+                <span style={{
+                    fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                    color: C.indigo, background: C.indigoLight,
+                    padding: "2px 8px", borderRadius: 6,
+                    border: `1px solid #C7D2FE`,
+                }}>
+                    {value}
+                </span>
+            ) : (
+                <span style={{ fontSize: 11, color: C.slate400, fontStyle: "italic" }}>—</span>
+            )}
+            <Button
+                size="small"
+                icon={<EditOutlined style={{ fontSize: 10 }} />}
+                onClick={() => setEditing(true)}
+                style={{
+                    height: 22, width: 22, padding: 0,
+                    borderRadius: 5, border: `1px solid ${C.border}`,
+                    background: C.white, color: C.slate500,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+            />
+        </div>
+    );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Admin_Campaigns() {
     const navigate = useNavigate();
@@ -1542,6 +1651,18 @@ export default function Admin_Campaigns() {
 
     const lineItemColumns: ColumnsType<LineItem> = [
         { title: "Line Item ID", dataIndex: "line_item_id", key: "line_item_id", render: (v: string) => <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "2px 6px", borderRadius: 4 }}>{v}</span> },
+        // ── ADD THIS NEW COLUMN ──
+        {
+            title: "DV ID",
+            key: "dv_id",
+            width: 180,
+            render: (_: any, record: LineItem) => (
+                <DvIdCell
+                    lineItemId={record.line_item_id}
+                    initialValue={record.dv_id || ""}
+                />
+            ),
+        },
         { title: "Name", dataIndex: "line_item_name", key: "line_item_name", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },
         { title: "Start Date", dataIndex: "start_date", key: "start_date", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },
         { title: "End Date", dataIndex: "end_date", key: "end_date", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },

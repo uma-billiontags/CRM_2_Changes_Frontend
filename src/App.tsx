@@ -43,6 +43,7 @@ import Admin_Campaigns from "./components/admin/Admin_Campaigns";
 import CreativeLayout from "./components/creatives_team_dashboard/CreativeLayout";
 import CampaignLayout from "./components/campaign_team_dashboard/CampaignLayout";
 import CampaignReports from "./components/admin/CampaignReports";
+import Daily_Reports from "./components/admin/Daily_Reports";
 
 function App() {
   return (
@@ -110,6 +111,7 @@ function App() {
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="campaigns" element={<Admin_Campaigns />} />
           <Route path="campaign_reports" element={<CampaignReports />} />
+          <Route path="daily_reports" element={<Daily_Reports />} />
         </Route>
       </Routes>
     </BrowserRouter>

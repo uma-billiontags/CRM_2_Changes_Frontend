@@ -52,6 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
         countKey: "campaignTotal",
         children: [
           { label: "Campaign Reports", icon: "📄", to: "/admin/campaign_reports" },
+          { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
         ],
       },
     ],

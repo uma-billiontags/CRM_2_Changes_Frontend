@@ -1677,7 +1677,7 @@ export default function Campaign_Create() {
           units: li.units,
           ctr: li.ctr,
           viewability: li.viewability,
-          vcr: li.vcr,
+          vcr: VIDEO_FORMATS.includes(li.adFormat) ? li.vcr : '',
           kpi_notes: li.ctrNotes || '',
           adFormat: adFormatDisplay,
           unit_cost: unitCostBudget !== '' ? `${clientCurrencySymbol}${unitCostBudget}` : '',
