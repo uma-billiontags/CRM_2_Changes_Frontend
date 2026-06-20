@@ -142,8 +142,7 @@ export default function View_Campaign() {
     <>
       <div>
         {/* Header */}
-        <div style={{
-          height: 64,
+        <div style={{ 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           position: 'sticky', top: 0, zIndex: 50,
         }}>
@@ -185,7 +184,7 @@ export default function View_Campaign() {
         )}
 
         {!loading && !error && campaign && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop:20}}>
 
             {/* ── Campaign Summary ── */}
             <div style={{ background: WHITE, borderRadius: 12, border: `1px solid ${SLATE_300}`, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>

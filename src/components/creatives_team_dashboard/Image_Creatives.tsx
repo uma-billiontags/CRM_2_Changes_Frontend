@@ -619,7 +619,7 @@ export default function Image_Creatives() {
   const previewExt = getExt(previewUrl) || 'file';
 
   return (
-    <>c
+    <>
       {/* Header */}
       <div style={{
         display: 'flex',

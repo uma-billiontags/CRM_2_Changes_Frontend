@@ -373,8 +373,6 @@ export default function Bulk_Campaigns_Details() {
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<BulkCampaignRow | null>(null);
 
-    const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
-
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
 
@@ -394,24 +392,6 @@ export default function Bulk_Campaigns_Details() {
     const openDetail = (record: BulkCampaignRow) => {
         setSelectedRecord(record);
         setDetailOpen(true);
-    };
-
-    const handleMarkProcessed = async (record: BulkCampaignRow) => {
-        setUpdatingStatusId(record.id);
-        try {
-            const res = await fetch(`${BASE_URL}/update_bulk_campaign_status/${record.id}/`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "1" },
-                body: JSON.stringify({ status: "processed" }),
-            });
-            if (!res.ok) throw new Error();
-            setRows(prev => prev.map(r => r.id === record.id ? { ...r, status: "processed" } : r));
-            showToast(`Marked "${record.campaign_name}" as processed.`);
-        } catch {
-            showToast("Failed to update status.", "error");
-        } finally {
-            setUpdatingStatusId(null);
-        }
     };
 
     // ── Filter ──────────────────────────────────────────────────────────
@@ -508,17 +488,11 @@ export default function Bulk_Campaigns_Details() {
             width: 130,
             render: (v: string) => <span style={{ fontSize: 11.5, color: C.slate500 }}>{fmtDate(v)}</span>,
         },
-        {
-            title: "Status",
-            dataIndex: "status",
-            key: "status",
-            width: 120,
-            render: (v: string) => <StatusBadge status={v} />,
-        },
+    
         {
             title: "Actions",
             key: "actions",
-            width: 200,
+            width: 140,
             fixed: "right",
             render: (_: any, r: BulkCampaignRow) => (
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -530,17 +504,6 @@ export default function Bulk_Campaigns_Details() {
                     >
                         View
                     </Button>
-                    {r.status === "pending" && (
-                        <Button
-                            size="small"
-                            loading={updatingStatusId === r.id}
-                            icon={<CheckCircleOutlined />}
-                            onClick={() => handleMarkProcessed(r)}
-                            style={{ height: 28, borderRadius: 6, border: `1px solid ${C.greenMid}`, background: C.greenLight, color: C.green, fontSize: 11, fontWeight: 600 }}
-                        >
-                            Mark Processed
-                        </Button>
-                    )}
                 </div>
             ),
         },

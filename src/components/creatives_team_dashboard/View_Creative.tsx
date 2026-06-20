@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Spin, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import Sidebar from '../shared/Sidebar';
 
 const { Text } = Typography;
 
@@ -490,8 +489,6 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
 export default function View_Creative() {
     const { campaign_id } = useParams<{ campaign_id: string }>();
     const navigate = useNavigate();
-    const [collapsed, setCollapsed] = useState(false);
-    const sideWidth = collapsed ? 64 : 240;
 
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [loading, setLoading] = useState(true);
@@ -521,15 +518,12 @@ export default function View_Creative() {
     }, 0) ?? 0;
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+        <>
 
-            <div style={{ marginLeft: sideWidth, flex: 1, display: 'flex', flexDirection: 'column', transition: 'margin-left 0.25s', minWidth: 0 }}>
+            <div>
 
                 {/* ── Top header bar ── */}
-                <header style={{
-                    background: WHITE, borderBottom: `1px solid ${SLATE_300}`,
-                    padding: '0 28px', height: 64,
+                <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     position: 'sticky', top: 0, zIndex: 50,
                 }}>
@@ -548,14 +542,10 @@ export default function View_Creative() {
                             </Text>
                         </div>
                     </div>
-                    <div style={{
-                        width: 36, height: 36, borderRadius: '50%', background: PURPLE,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: WHITE, fontSize: 13, fontWeight: 700,
-                    }}>CT</div>
-                </header>
 
-                <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+                </div>
+
+                <div style={{ flex: 1, paddingTop: 20, overflowY: 'auto' }}>
                     {loading && (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
                             <Spin size="large" />
@@ -656,8 +646,8 @@ export default function View_Creative() {
 
                         </div>
                     )}
-                </main>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

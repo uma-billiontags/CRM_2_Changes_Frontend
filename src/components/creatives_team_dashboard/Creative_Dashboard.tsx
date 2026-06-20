@@ -1,7 +1,7 @@
 // Creative_Dashboard.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Tag, Badge, Input, Button, Typography } from 'antd';
+import { Table, Tag, Input, Button, Typography } from 'antd';
 import { SearchOutlined, ReloadOutlined, EyeOutlined, MessageOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import CreativesCell from './CreativesCell';
@@ -61,11 +61,6 @@ interface Campaign {
   approval_status?: string;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  live: 'green', active: 'blue', paused: 'orange',
-  pending: 'gold', draft: 'default', completed: 'purple', cancelled: 'red',
-};
-
 export default function Creative_Dashboard() {
   const navigate = useNavigate();
 
@@ -114,7 +109,7 @@ export default function Creative_Dashboard() {
   const columns: ColumnsType<Campaign> = [
     {
       title: 'Campaign ID', dataIndex: 'campaign_id', key: 'campaign_id',
-      width: 160, fixed: 'left',
+      width: 120, fixed: 'left',
       render: (id: string) => (
         <span style={{
           fontSize: 12, fontWeight: 700, color: BLUE,
@@ -144,15 +139,6 @@ export default function Creative_Dashboard() {
         : <Text style={{ color: SLATE_500 }}>—</Text>,
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 110,
-      render: (s: string) => (
-        <Badge
-          color={STATUS_COLOR[s ?? 'pending'] ?? 'default'}
-          text={<span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{s ?? 'pending'}</span>}
-        />
-      ),
-    },
-    {
       title: 'Line Items', key: 'line_items_count', width: 100,
       render: (_: any, r: Campaign) => (
         <Tag color="blue" style={{ fontSize: 11 }}>
@@ -161,7 +147,7 @@ export default function Creative_Dashboard() {
       ),
     },
     {
-      title: 'Actions', key: 'actions', width: 100, fixed: 'right',
+      title: 'Actions', key: 'actions', width: 150, fixed: 'right',
       render: (_: any, r: Campaign) => (
         <div style={{ display: 'flex', gap: 6 }}>
           <Button
@@ -240,15 +226,6 @@ export default function Creative_Dashboard() {
           </div>
           : <Text style={{ color: SLATE_500, fontSize: 12 }}>—</Text>;
       },
-    },
-    {
-      title: 'Status', dataIndex: 'status', width: 100,
-      render: (v: string) => (
-        <Badge
-          color={STATUS_COLOR[v ?? 'pending'] ?? 'default'}
-          text={<span style={{ fontSize: 11, textTransform: 'uppercase' }}>{v ?? 'pending'}</span>}
-        />
-      ),
     },
     {
       title: 'Creatives', key: 'creatives', width: 220,

@@ -379,15 +379,6 @@ export default function UserCampaignsTable({
                       title: 'Impressions', dataIndex: 'impressions', key: 'impressions',
                       render: (v: string) => <Text style={{ fontSize: 12 }}>{v ? Number(v).toLocaleString('en-IN') : '—'}</Text>,
                     },
-                    {
-                      title: 'Status', dataIndex: 'status', key: 'status',
-                      render: (v: string) => (
-                        <Badge
-                          color={STATUS_COLOR[v ?? 'pending'] ?? 'default'}
-                          text={<span style={{ fontSize: 11, textTransform: 'uppercase' }}>{v ?? 'pending'}</span>}
-                        />
-                      ),
-                    },
                   ]}
                   style={{ background: '#F8FAFC', borderRadius: 8 }}
                 />

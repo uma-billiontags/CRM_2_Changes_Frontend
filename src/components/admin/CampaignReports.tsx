@@ -671,7 +671,7 @@
                 title: "Campaign ID",
                 dataIndex: "campaign_id",
                 key: "campaign_id",
-                width: 150,
+                width: 140,
                 render: (v: string, record) => (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <span style={{
@@ -687,7 +687,7 @@
                 title: "Type",
                 dataIndex: "report_type",
                 key: "report_type",
-                width: 130,
+                width: 190,
                 render: (v: 'cpm' | 'cpc') => (
                     <span style={{
                         fontSize: 11, fontWeight: 700, padding: "3px 10px",

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    Table, Tag, Badge, Button, Input, Select, Modal, Form,
+    Table, Tag, Button, Input, Select, Modal, Form,
     DatePicker, message, Divider, Tabs
 } from "antd";
 import {
@@ -42,16 +42,6 @@ const C = {
     purpleMid: "#DDD6FE",
     indigo: "#4F46E5",
     indigoLight: "#EEF2FF",
-};
-
-const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; dot: string }> = {
-    live: { bg: C.greenLight, border: "#BBF7D0", color: C.green, dot: C.green },
-    active: { bg: C.blueLight, border: C.blueMid, color: C.blue, dot: C.blue },
-    paused: { bg: C.amberLight, border: "#FDE68A", color: C.amber, dot: C.amber },
-    pending: { bg: C.amberLight, border: "#FDE68A", color: C.amber, dot: C.amber },
-    draft: { bg: C.slate100, border: C.border, color: C.slate500, dot: C.slate400 },
-    completed: { bg: C.purpleLight, border: C.purpleMid, color: C.purple, dot: C.purple },
-    cancelled: { bg: C.redLight, border: "#FECACA", color: C.red, dot: C.red },
 };
 
 const AD_FORMAT_OPTIONS = [
@@ -310,18 +300,6 @@ async function readVideoMeta(file: File): Promise<{ dimensions: string; aspect_r
         video.onerror = () => { resolve({ dimensions: "—", aspect_ratio: "—", file_size: `${(file.size / (1024 * 1024)).toFixed(2)} MB` }); URL.revokeObjectURL(url); };
         video.src = url;
     });
-}
-
-// ── StatusBadge ───────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status?: string }) {
-    const s = STATUS_STYLE[status ?? "pending"] ?? STATUS_STYLE.pending;
-    return (
-        <Badge color={s.dot} text={
-            <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: s.color }}>
-                {status ?? "pending"}
-            </span>
-        } />
-    );
 }
 
 // ── StatCard ──────────────────────────────────────────────────────────────────
@@ -1567,7 +1545,7 @@ export default function All_Campaigns() {
 
     const columns: ColumnsType<Campaign> = [
         {
-            title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 180, fixed: "left",
+            title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 140, fixed: "left",
             render: (id: string | null) => id ? (
                 <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>{id}</span>
             ) : (
@@ -1602,7 +1580,6 @@ export default function All_Campaigns() {
                 );
             },
         },
-        { title: "Status", dataIndex: "status", key: "status", width: 120, render: (v: string) => <StatusBadge status={v} /> },
         {
             title: "Line Items", key: "line_items", width: 100,
             render: (_: any, record: Campaign) => (
@@ -1611,7 +1588,7 @@ export default function All_Campaigns() {
         },
         { title: "Created", dataIndex: "created_at", key: "created_at", width: 130, render: (v: string) => v ? <span style={{ fontSize: 12, color: C.slate500 }}>{fmtDate(v)}</span> : <span style={{ color: C.slate500 }}>—</span> },
         {
-            title: "Actions", key: "actions", width: 220, fixed: "right",
+            title: "Actions", key: "actions", width: 320, fixed: "right",
             render: (_: any, record: Campaign) => (
                 <div style={{ display: "flex", gap: 6 }}>
                     <Button size="small" icon={<EyeOutlined />}
@@ -1666,7 +1643,6 @@ export default function All_Campaigns() {
             },
         },
         { title: "Impressions", dataIndex: "impressions", key: "impressions", render: (v: string) => <span style={{ fontSize: 12 }}>{v ? Number(v).toLocaleString("en-IN") : "—"}</span> },
-        { title: "Status", dataIndex: "status", key: "status", render: (v: string) => <StatusBadge status={v} /> },
     ];
 
     return (

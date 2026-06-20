@@ -272,9 +272,9 @@ function CreativeIdEditor({ value, onSave }: CreativeIdEditorProps) {
             placeholder="Enter creative ID…"
             style={{
               height: 22, fontSize: 10, fontFamily: 'monospace',
-              padding: '0 6px', borderRadius: 4,
+              padding: '4px 8px', borderRadius: 4,
               border: '1.5px solid #6366f1',
-              outline: 'none', width: 110, color: '#1e293b',
+              outline: 'none', width: 140, color: '#1e293b',
             }}
           />
           <button
@@ -309,9 +309,9 @@ function CreativeIdEditor({ value, onSave }: CreativeIdEditorProps) {
             fontSize: 9.5, fontFamily: 'monospace', fontWeight: 600,
             color: value ? '#4f46e5' : '#94a3b8',
             background: value ? '#eef2ff' : '#f8fafc',
-            padding: '2px 8px', borderRadius: 3,
+            padding: '4px 8px', borderRadius: 3,
             border: `1px solid ${value ? '#c7d2fe' : '#e2e8f0'}`,
-            minWidth: 60, display: 'inline-block',
+            minWidth: 140, display: 'inline-block',
           }}>
             {value || 'Creative ID'}
           </span>
