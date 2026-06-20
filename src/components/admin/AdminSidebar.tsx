@@ -58,6 +58,12 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Bulk Campaign Details", icon: "📋", to: "/admin/bulk_campaigns_details" },
     ],
   },
+   {
+    group: "MESSAGES",
+    items: [
+      { label: "Messages", icon: "🏢", to: "/admin/admin_messages"},
+    ],
+  },
   {
     group: "SETTINGS",
     items: [

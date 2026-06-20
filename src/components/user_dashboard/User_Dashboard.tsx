@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChevronRight } from 'lucide-react';
 import UserCampaignsTable, { type Campaign, isActiveCampaign } from '../shared/UserCampaignsTable';
+import Client_General_Chat from './Client_General_Chat';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -211,6 +212,7 @@ export default function User_Dashboard() {
         </div>
         <UserCampaignsTable campaigns={campaigns} loading={loadingCampaigns} pageSize={5} />
       </Card>
+      <Client_General_Chat />
     </>
   );
 }

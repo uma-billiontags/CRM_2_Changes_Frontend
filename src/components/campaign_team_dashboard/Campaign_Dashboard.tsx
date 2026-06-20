@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Table, Tag, Badge, Button, Input, Select } from "antd";
 import { SearchOutlined, ReloadOutlined, EyeOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import TeamMember_General_Chat from "../creatives_team_dashboard/TeamMember_General_Chat";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -856,6 +857,7 @@ export default function Campaign_Dashboard() {
                 }
                 .ant-table-row-expand-icon-cell { background: #F1F5F9; }
             `}</style>
+            <TeamMember_General_Chat />
         </>
     );
 }

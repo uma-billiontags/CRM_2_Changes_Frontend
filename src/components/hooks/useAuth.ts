@@ -8,6 +8,7 @@ export const useAuth = () => {
       role: localStorage.getItem('user_role')?.toLowerCase(),
       email: localStorage.getItem('user_email'),
       client_id: localStorage.getItem('client_id'),
+      username: localStorage.getItem('user_name'),
     };
   }, []);
 

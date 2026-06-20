@@ -51,6 +51,7 @@ import Admin_Campaigns from "./components/admin/Admin_Campaigns";
 import CampaignReports from "./components/admin/CampaignReports";
 import Daily_Reports from "./components/admin/Daily_Reports";
 import Bulk_Campaigns_Details from "./components/admin/Bulk_Campaign_Details";
+import Admin_Messages_Sidebar from "./components/admin/Admin_Messages_Sidebar";
 
 function App() {
   return (
@@ -126,6 +127,7 @@ function App() {
           <Route path="campaign_reports" element={<CampaignReports />} />
           <Route path="daily_reports" element={<Daily_Reports />} />
           <Route path="bulk_campaigns_details" element={<Bulk_Campaigns_Details />} />
+          <Route path="admin_messages" element={<Admin_Messages_Sidebar />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -5,6 +5,7 @@ import { Table, Tag, Badge, Input, Button, Typography } from 'antd';
 import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import CreativesCell from './CreativesCell';
+import TeamMember_General_Chat from './TeamMember_General_Chat';
 
 const { Text } = Typography;
 
@@ -338,6 +339,7 @@ export default function Creative_Dashboard() {
           style={{ fontSize: 13 }}
         />
       </div>
+      <TeamMember_General_Chat />
     </>
   );
 }
