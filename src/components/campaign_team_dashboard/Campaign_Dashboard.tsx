@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Tag, Badge, Button, Input, Select } from "antd";
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CopyOutlined, CheckOutlined, MessageOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import TeamMember_General_Chat from "../creatives_team_dashboard/TeamMember_General_Chat";
+import Creative_Team_Chat from '../creatives_team_dashboard/Creative_Team_Chat';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -341,6 +342,8 @@ export default function Campaign_Dashboard() {
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
     const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    const [chatCampaign, setChatCampaign] = useState<Campaign | null>(null);
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
@@ -705,6 +708,21 @@ export default function Campaign_Dashboard() {
                     >
                         View
                     </Button>
+                    <Button
+                        size="small"
+                        icon={<MessageOutlined />}
+                        onClick={() =>
+                            setChatCampaign(prev => (prev?.campaign_id === record.campaign_id ? null : record))
+                        }
+                        style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: chatCampaign?.campaign_id === record.campaign_id ? "#fff" : C.purple,
+                            background: chatCampaign?.campaign_id === record.campaign_id ? C.purple : C.purpleLight,
+                            border: `1px solid ${C.purpleMid}`, borderRadius: 6,
+                        }}
+                    >
+                        Chat
+                    </Button>
                 </div>
             ),
         },
@@ -858,6 +876,13 @@ export default function Campaign_Dashboard() {
                 .ant-table-row-expand-icon-cell { background: #F1F5F9; }
             `}</style>
             <TeamMember_General_Chat />
+            {chatCampaign && (
+                <Creative_Team_Chat
+                    campaign={chatCampaign}
+                    teamType="campaign_team"
+                    onClose={() => setChatCampaign(null)}
+                />
+            )}
         </>
     );
 }

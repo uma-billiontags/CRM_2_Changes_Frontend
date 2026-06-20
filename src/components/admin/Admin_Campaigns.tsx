@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Table, Tag, Badge, Button, Input, Select, Modal, Form,
-    DatePicker, message, Divider, Tabs
+    DatePicker, message, Divider, Tabs, Dropdown
 } from "antd";
 import {
     SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
@@ -14,6 +14,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import Admin_Campaign_Chat from "./Admin_Campaign_Chat"; // Adjust path if needed
+import Creative_Team_Chat from "../creatives_team_dashboard/Creative_Team_Chat";
 
 const { Option } = Select;
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -1500,6 +1501,32 @@ export default function Admin_Campaigns() {
     const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
 
     const [chatCampaign, setChatCampaign] = useState<Campaign | null>(null);
+    const [chatAudience, setChatAudience] = useState<"client" | "creative" | "campaign_team" | null>(null);
+
+    const closeChat = () => {
+        setChatCampaign(null);
+        setChatAudience(null);
+    };
+
+    const audienceOptions = [
+        { key: "client" as const, label: "Client", icon: "💬", bg: C.blueLight },
+        { key: "creative" as const, label: "Creative Team", icon: "🎨", bg: C.purpleLight },
+        { key: "campaign_team" as const, label: "Campaign Team", icon: "📋", bg: C.indigoLight },
+    ];
+
+    const chatMenuItems = audienceOptions.map(opt => ({
+        key: opt.key,
+        label: (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 2px" }}>
+                <span style={{
+                    width: 22, height: 22, borderRadius: 6, background: opt.bg,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0,
+                }}>{opt.icon}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>{opt.label}</span>
+            </div>
+        ),
+    }));
+
 
     const fetchCampaigns = useCallback(() => {
         setLoading(true);
@@ -1618,22 +1645,35 @@ export default function Admin_Campaigns() {
                         Edit
                     </Button>
                     {/* New Chat Button */}
-                    <Button
-                        size="small"
-                        icon={<MessageOutlined />}
-                        onClick={() => setChatCampaign((prev) => (prev?.id === record.id ? null : record))}
-                        style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: chatCampaign?.id === record.id ? "#fff" : "#7C3AED",
-                            background: chatCampaign?.id === record.id ? "#7C3AED" : "#EDE9FE",
-                            border: "1px solid #C4B5FD",
-                            borderRadius: 6,
-                            transition: "all 0.2s",
+                    {/* Chat selector */}
+                    <Dropdown
+                        menu={{
+                            items: chatMenuItems,
+                            onClick: ({ key }) => {
+                                setChatCampaign(record);
+                                setChatAudience(key as "client" | "creative" | "campaign_team");
+                            },
                         }}
+                        trigger={["click"]}
+                        placement="bottomRight"
+                        disabled={!record.campaign_id}
                     >
-                        Chat
-                    </Button>
+                        <Button
+                            size="small"
+                            icon={<MessageOutlined />}
+                            disabled={!record.campaign_id}
+                            style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: chatCampaign?.id === record.id ? "#fff" : "#7C3AED",
+                                background: chatCampaign?.id === record.id ? "#7C3AED" : "#EDE9FE",
+                                border: "1px solid #C4B5FD",
+                                borderRadius: 6,
+                            }}
+                        >
+                            Chat
+                        </Button>
+                    </Dropdown>
                     {record.approval_status !== "approved" ? (
                         <Button size="small" onClick={() => handleApproveCampaign(record)}
                             style={{ fontSize: 11, fontWeight: 600, height: 26, color: C.green, background: C.greenLight, border: `1px solid #86efac`, borderRadius: 6, display: "flex", alignItems: "center", gap: 4 }}>
@@ -1757,11 +1797,21 @@ export default function Admin_Campaigns() {
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             {/* Chat Popup */}
-            {chatCampaign && (
+            {chatCampaign && chatAudience === "client" && (
                 <Admin_Campaign_Chat
                     campaign={chatCampaign}
-                    onClose={() => setChatCampaign(null)}
-                />)}
+                    onClose={closeChat}
+                />
+            )}
+
+            {chatCampaign && chatCampaign.campaign_id && (chatAudience === "creative" || chatAudience === "campaign_team") && (
+                <Creative_Team_Chat
+                    campaign={{ campaign_id: chatCampaign.campaign_id, campaign_name: chatCampaign.campaign_name }}
+                    teamType={chatAudience}
+                    role="admin"
+                    onClose={closeChat}
+                />
+            )}
 
             <style>{`
                 .all-campaigns-row:hover td { background: #F8FAFC !important; }

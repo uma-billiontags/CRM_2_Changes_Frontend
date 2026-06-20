@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Tag, Badge, Input, Button, Typography } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, MessageOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import CreativesCell from './CreativesCell';
 import TeamMember_General_Chat from './TeamMember_General_Chat';
+import Creative_Team_Chat from './Creative_Team_Chat';
 
 const { Text } = Typography;
 
@@ -72,6 +73,8 @@ export default function Creative_Dashboard() {
   const [filtered, setFiltered] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  const [chatCampaign, setChatCampaign] = useState<Campaign | null>(null);
 
   const fetchCampaigns = () => {
     setLoading(true);
@@ -160,14 +163,33 @@ export default function Creative_Dashboard() {
     {
       title: 'Actions', key: 'actions', width: 100, fixed: 'right',
       render: (_: any, r: Campaign) => (
-        <Button
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => navigate(`/creative/${r.campaign_id}`)}
-          style={{ fontSize: 11, fontWeight: 600, color: BLUE, background: BLUE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
-        >
-          View
-        </Button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => navigate(`/creative/${r.campaign_id}`)}
+            style={{ fontSize: 11, fontWeight: 600, color: BLUE, background: BLUE_LIGHT, border: `1px solid ${PURPLE_MID}`, borderRadius: 6 }}
+          >
+            View
+          </Button>
+          <Button
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={() =>
+              setChatCampaign(prev => (prev?.campaign_id === r.campaign_id ? null : r))
+            }
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: chatCampaign?.campaign_id === r.campaign_id ? "#fff" : PURPLE,
+              background: chatCampaign?.campaign_id === r.campaign_id ? PURPLE : PURPLE_LIGHT,
+              border: `1px solid ${PURPLE_MID}`,
+              borderRadius: 6,
+            }}
+          >
+            Chat
+          </Button>
+        </div>
       ),
     },
   ];
@@ -340,6 +362,13 @@ export default function Creative_Dashboard() {
         />
       </div>
       <TeamMember_General_Chat />
+      {chatCampaign && (
+        <Creative_Team_Chat
+          campaign={chatCampaign}
+          teamType="creative"
+          onClose={() => setChatCampaign(null)}
+        />
+      )}
     </>
   );
 }
