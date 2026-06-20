@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams  } from 'react-router-dom';
 import {
-  Form, Input, Select, Button, DatePicker, Divider, message
+  Form, Input, Select, Button, DatePicker, Divider, message, Upload
 } from 'antd';
 import {
   ArrowRightOutlined, CheckOutlined,
   PlusOutlined,
   CloseOutlined, InfoCircleOutlined,
   EnvironmentOutlined, DeleteOutlined, FileImageOutlined, VideoCameraOutlined,
-  SaveOutlined
+  SaveOutlined, UploadOutlined
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import '../styles/Campaign_Create.css';
 import type { LineItem, GeoLocation, LineItemCardProps, CreativeData } from '../types/campaign.form.types';
+// Inside Campaign_Create.tsx or separate file
+import * as XLSX from 'xlsx';
 
 dayjs.extend(isBetween);
 
@@ -1259,6 +1261,30 @@ function LineItemCard({
   );
 }
 
+// Helper to convert Excel serial date to YYYY-MM-DD
+function excelDateToString(serial: number | string): string {
+  if (!serial) return '';
+  const utc_days = Math.floor(Number(serial) - 25569);
+  const date = new Date(utc_days * 86400 * 1000);
+  return date.toISOString().split('T')[0];
+}
+
+// Parse Geo string like "country: India" or more complex
+function parseGeoTargeting(geoStr?: string): any[] {
+  if (!geoStr) return [];
+  const locations: any[] = [];
+  const parts = geoStr.split('|').map(p => p.trim());
+
+  parts.forEach(part => {
+    const loc: any = {};
+    if (part.includes('country:')) loc.country = part.split('country:')[1]?.trim();
+    else if (part.toLowerCase().includes('india')) loc.country = 'India';
+    // Add more parsing logic as needed
+    if (Object.keys(loc).length > 0) locations.push(loc);
+  });
+  return locations;
+}
+
 // ── Step 3 — Line Items (renamed from Step 4, Step 3 Objectives removed) ──
 interface Step3LineItemsProps {
   campaignStartDate: string;
@@ -1292,6 +1318,120 @@ function Step3LineItems({
     });
   }
 
+  const [bulkUploadedIds, setBulkUploadedIds] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
+  const handleBulkUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+        if (jsonData.length === 0) {
+          message.warning("Excel file is empty");
+          return;
+        }
+
+        const newLineItems: LineItem[] = [];
+
+        // Helper: normalize ad format string to match AD_FORMAT_OPTIONS values
+        const normalizeAdFormat = (raw: string): string => {
+          if (!raw) return '';
+          const lower = raw.trim().toLowerCase();
+          const match = AD_FORMAT_OPTIONS.find(
+            opt => opt.value.toLowerCase() === lower || opt.label.toLowerCase() === lower
+          );
+          return match ? match.value : raw.trim();
+        };
+
+        jsonData.forEach((row, idx) => {
+          const newLi = emptyLineItem(1, lineItemOffset);
+
+          newLi.lineItemName = row['Line Item Name'] || `Bulk Line Item ${idx + 1}`;
+          newLi.ethnicity = row['Ethnicity'] || '';
+          newLi.startDate = excelDateToString(row['Start Date']);
+          newLi.endDate = excelDateToString(row['End Date']);
+          newLi.adFormat = normalizeAdFormat(row['Ad Format'] || '');
+          // Auto-set sub-format defaults when ad format is known
+          if (newLi.adFormat && AD_FORMAT_DEFAULT_SUBS[newLi.adFormat]) {
+            newLi.adSubFormat = AD_FORMAT_DEFAULT_SUBS[newLi.adFormat];
+          }
+          newLi.impressions = row['Impressions']?.toString() || '';
+          newLi.units = row['Units'] || '';
+          newLi.age = row['Age'] ? row['Age'].split(',').map((a: string) => a.trim()) : [];
+          newLi.gender = row['Gender'] ? row['Gender'].split(',').map((g: string) => g.trim()) : [];
+          newLi.geoLocations = parseGeoTargeting(row['Geo Targeting']);
+          newLi.platforms = row['Platform'] ? row['Platform'].split(',').map((p: string) => p.trim()) : [];
+          newLi.freqCap = row['Frequency Cap']?.toString() || '';
+          newLi.brandSafety = row['Brand Safety Level'] || '';
+
+          newLineItems.push(newLi);
+        });
+
+        // Smart merge: if the FIRST existing line item is blank, fill it instead of appending
+        setLineItems(prev => {
+          const firstIsEmpty =
+            prev.length === 1 &&
+            !prev[0].lineItemName.trim() &&
+            !prev[0].startDate &&
+            !prev[0].endDate &&
+            !prev[0].adFormat;
+
+          const merged: LineItem[] = firstIsEmpty
+            ? [...newLineItems]          // replace the single blank card
+            : [...prev, ...newLineItems]; // append after existing filled cards
+
+          // Re-assign IDs sequentially after merge
+          return merged.map((li, idx) => ({
+            ...li,
+            id: generateLineItemId(idx + 1, lineItemOffset),
+          }));
+        });
+
+        // Track bulk-uploaded IDs for Save/Cancel actions
+        // We derive these after the merge using the same ID generation logic
+        const baseIndex = (() => {
+          const firstIsEmpty =
+            lineItems.length === 1 &&
+            !lineItems[0].lineItemName.trim() &&
+            !lineItems[0].startDate &&
+            !lineItems[0].endDate &&
+            !lineItems[0].adFormat;
+          return firstIsEmpty ? 0 : lineItems.length;
+        })();
+
+        const bulkIds = newLineItems.map((_, idx) =>
+          generateLineItemId(baseIndex + idx + 1, lineItemOffset)
+        );
+        setBulkUploadedIds(new Set(bulkIds));
+        setShowBulkActions(true);
+
+        message.success(`${newLineItems.length} line item${newLineItems.length > 1 ? 's' : ''} loaded from Excel. Review and click Save.`);
+
+      } catch (err) {
+        message.error("Failed to parse Excel file. Please check the format.");
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  const handleSaveBulk = () => {
+    setBulkUploadedIds(new Set());
+    setShowBulkActions(false);
+    message.success("Bulk uploaded line items saved to form.");
+  };
+
+  const handleCancelBulk = () => {
+    // Remove only bulk uploaded items
+    setLineItems(prev => prev.filter(li => !bulkUploadedIds.has(li.id)));
+    setBulkUploadedIds(new Set());
+    setShowBulkActions(false);
+    message.info("Bulk uploaded line items removed.");
+  };
+
   return (
     <div className="cc-form-section">
       {(!campaignStartDate || !campaignEndDate) && (
@@ -1300,6 +1440,31 @@ function Step3LineItems({
           No campaign dates set. Go back to Step 2 to set them.
         </div>
       )}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <Upload
+          beforeUpload={(file) => {
+            handleBulkUpload(file);
+            return false; // Prevent auto upload
+          }}
+          accept=".xlsx,.xls"
+          showUploadList={false}
+        >
+          <Button icon={<UploadOutlined />} type="primary">
+            Bulk Upload Line Items
+          </Button>
+        </Upload>
+
+        {showBulkActions && (
+          <>
+            <Button type="primary" onClick={handleSaveBulk}>
+              Save Bulk Items
+            </Button>
+            <Button danger onClick={handleCancelBulk}>
+              Cancel Bulk Upload
+            </Button>
+          </>
+        )}
+      </div>
       {lineItems.map((item, idx) => (
         <LineItemCard
           key={item.id}
@@ -1502,18 +1667,21 @@ export default function Campaign_Create() {
     () => new Set<string>(restoredData?.confirmedLineItemIds ?? [])
   );
 
-  const superadminMode = !!(locationState?.superadminMode) || !!(locationState?.adminMode);
+  const [searchParams] = useSearchParams();
+  const isAdminModeParam = searchParams.get('adminMode') === 'true';
+  const isSuperadminModeParam = searchParams.get('superadminMode') === 'true';
 
+  const superadminMode = !!(locationState?.superadminMode) || !!(locationState?.adminMode) || isAdminModeParam || isSuperadminModeParam;
   // Persist sidebar mode when component mounts
   useEffect(() => {
-    if (locationState?.superadminMode) {
+    if (locationState?.superadminMode || isSuperadminModeParam) {
       sessionStorage.setItem('sidebar_mode', 'superadmin');
-    } else if (locationState?.adminMode) {
+    } else if (locationState?.adminMode || isAdminModeParam) {
       sessionStorage.setItem('sidebar_mode', 'admin');
     } else {
       sessionStorage.setItem('sidebar_mode', 'user');
     }
-}, [locationState?.superadminMode, locationState?.adminMode]);
+  }, [locationState?.superadminMode, locationState?.adminMode, isAdminModeParam, isSuperadminModeParam]);
 
   // Step 1
   const [client, setClient] = useState<string>(restoredData?.client ?? '');
@@ -1687,7 +1855,7 @@ export default function Campaign_Create() {
           gender: Array.isArray(li.gender) ? li.gender.join(', ') : '',
           geo_targeting: JSON.stringify(
             (Array.isArray(li.geoLocations) ? li.geoLocations : []).map((loc: GeoLocation) => ({
-              country: loc.country || '', state: loc.state || '',
+              country: loc.country || '', state: loc.state || '', address: loc.address || '',
               city: loc.city || '', zipcode: loc.zipcode || '', range: loc.range || '',
             }))
           ),
@@ -1760,14 +1928,14 @@ export default function Campaign_Create() {
 
   const handleCancel = () => {
     clearDraft();
-    if (locationState?.superadminMode) {
+    if (locationState?.superadminMode || isSuperadminModeParam) {
       navigate('/superadmin/campaigns');
-    } else if (locationState?.adminMode) {
+    } else if (locationState?.adminMode || isAdminModeParam) {
       navigate('/admin/campaigns');
     } else {
       navigate('/user_dashboard');
     }
-};
+  };
   const defaultDraftName = campaignName.trim() || `Draft ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
 
   return (
@@ -1827,6 +1995,7 @@ export default function Campaign_Create() {
           <div className="cc-card-header">
             <div className="cc-card-step-badge">{activeStep}</div>
             <div>
+            
               <div className="cc-card-title">{stepTitles[activeStep].title}</div>
               <div className="cc-card-sub">{stepTitles[activeStep].sub}</div>
             </div>

@@ -300,7 +300,7 @@ export default function User_Drafts() {
           {/* Right Side */}
           <Button
             type="primary"
-            onClick={() => navigate('/campaign_create')}
+            onClick={() => navigate('/campaign_choice')}
             style={{
               borderRadius: 9,
               background: BLUE,

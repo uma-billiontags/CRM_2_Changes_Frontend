@@ -55,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
           { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
         ],
       },
+      { label: "Bulk Campaign Details", icon: "📋", to: "/admin/bulk_campaigns_details" },
     ],
   },
   {

@@ -26,6 +26,7 @@ interface NavItem {
   to: string;
   accent?: string;
   countKey?: keyof Counts;
+  children?: { label: string; icon: string; to: string }[];
 }
 
 interface NavGroup {
@@ -52,7 +53,14 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: "CAMPAIGNS",
     items: [
-      { label: "All Campaigns", icon: "📊", to: "/superadmin/campaigns", countKey: "campaignTotal" },
+      {
+        label: "All Campaigns", icon: "📊", to: "/superadmin/campaigns", countKey: "campaignTotal",
+        children: [
+          { label: "Campaign Reports", icon: "📄", to: "/superadmin/campaign_reports" },
+          { label: "Daily Reports", icon: "📄", to: "/superadmin/daily_reports" },
+        ],
+      },
+      { label: "Bulk Campaign Details", icon: "📋", to: "/superadmin/bulk_campaigns_details" },
     ],
   },
   {
@@ -130,41 +138,79 @@ export default function SuperAdminSidebar({ counts }: SuperAdminSidebarProps) {
                 location.pathname === item.to ||
                 (item.to !== "/superadmin/overview" && location.pathname.startsWith(item.to));
               const count = item.countKey !== undefined ? counts[item.countKey] : undefined;
+              const hasChildren = item.children && item.children.length > 0;
 
               return (
-                <Link key={item.to} to={item.to} style={{ textDecoration: "none" }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 10px", borderRadius: 8, cursor: "pointer",
-                    marginBottom: 2,
-                    background: active ? SC.sidebarActive : "transparent",
-                    color: active ? SC.white : SC.sidebarText,
-                    fontSize: 13, fontWeight: active ? 600 : 400,
-                    transition: "all 0.15s",
-                  }}
-                    onMouseEnter={(e) => {
-                      if (!active) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.06)";
+                <div key={item.to}>
+                  {/* Main item */}
+                  <Link to={item.to} style={{ textDecoration: "none" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                      marginBottom: 2,
+                      background: active ? SC.sidebarActive : "transparent",
+                      color: active ? SC.white : SC.sidebarText,
+                      fontSize: 13, fontWeight: active ? 600 : 400,
+                      transition: "all 0.15s",
                     }}
-                    onMouseLeave={(e) => {
-                      if (!active) (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                    }}
-                  >
-                    <span style={{
-                      flexShrink: 0, width: 18, height: 18,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, lineHeight: "1",
-                    }}>{item.icon}</span>
-                    <span style={{ flex: 1 }}>{item.label}</span>
-                    {count !== undefined && (
+                      onMouseEnter={(e) => {
+                        if (!active) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                      }}
+                    >
                       <span style={{
-                        fontSize: 10, fontWeight: 700,
-                        padding: "2px 7px", borderRadius: 10,
-                        background: item.accent ? `${item.accent}25` : "rgba(255,255,255,0.08)",
-                        color: item.accent ?? "rgba(255,255,255,0.5)",
-                      }}>{count}</span>
-                    )}
-                  </div>
-                </Link>
+                        flexShrink: 0, width: 18, height: 18,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, lineHeight: "1",
+                      }}>{item.icon}</span>
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      {count !== undefined && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 10,
+                          background: item.accent ? `${item.accent}25` : "rgba(255,255,255,0.08)",
+                          color: item.accent ?? "rgba(255,255,255,0.5)",
+                        }}>{count}</span>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* Sub-items — always visible, no toggle */}
+                  {hasChildren && (
+                    <div style={{ paddingLeft: 18, marginBottom: 4 }}>
+                      {item.children!.map((child) => {
+                        const childActive = location.pathname === child.to;
+                        return (
+                          <Link key={child.to} to={child.to} style={{ textDecoration: "none" }}>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "7px 10px", borderRadius: 6,
+                              marginBottom: 2,
+                              color: childActive ? SC.white : "rgba(255,255,255,0.35)",
+                              fontSize: 12, fontWeight: childActive ? 600 : 400,
+                              background: childActive ? "rgba(37,99,235,0.6)" : "transparent",
+                              borderLeft: "2px solid rgba(255,255,255,0.08)",
+                              cursor: "pointer",
+                              transition: "all 0.15s",
+                            }}
+                              onMouseEnter={(e) => {
+                                if (!childActive) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.05)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!childActive) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                              }}
+                            >
+                              <span style={{ fontSize: 13 }}>{child.icon}</span>
+                              {child.label}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

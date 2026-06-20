@@ -246,10 +246,15 @@ export default function UserLayout() {
 
     // ── Sidebar mode detection ──
     const isCampaignCreatePage = location.pathname === '/campaign_create';
+const params = new URLSearchParams(location.search);
+const adminModeFromQuery = params.get('adminMode') === 'true';
+const superadminModeFromQuery = params.get('superadminMode') === 'true';
 
-    const sidebarMode = isCampaignCreatePage
-        ? (sessionStorage.getItem('sidebar_mode') ?? 'user')
-        : 'user';
+const sidebarMode = isCampaignCreatePage
+    ? (superadminModeFromQuery ? 'superadmin'
+        : adminModeFromQuery ? 'admin'
+        : (sessionStorage.getItem('sidebar_mode') ?? 'user'))
+    : 'user';
 
     const clientName = localStorage.getItem('client_name') ?? '';
     const avatarInitials = clientName ? clientName.charAt(0).toUpperCase() : 'U';

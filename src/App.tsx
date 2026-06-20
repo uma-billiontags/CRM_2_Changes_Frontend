@@ -15,6 +15,9 @@ import Edit_Campaign from "./components/user_dashboard/Edit_Campaign";
 import User_Drafts from "./components/user_dashboard/User_Drafts";
 import User_IO from "./components/user_dashboard/User_IO";
 import User_Invoice from "./components/user_dashboard/User_Invoice";
+import User_Reports from "./components/user_dashboard/User_Reports";
+import Campaign_Choice from "./components/user_dashboard/Campaign_Choice";
+import Bulk_Campaign_Create from "./components/user_dashboard/Bulk_Campaign_Create";
 
 // ── Creatives ─────────────────────────────────────────────────────────────────
 import Creative_Dashboard from "./components/creatives_team_dashboard/Creative_Dashboard";
@@ -22,11 +25,13 @@ import Image_Creatives from "./components/creatives_team_dashboard/Image_Creativ
 import Video_Creatives from "./components/creatives_team_dashboard/Video_Creatives";
 import View_Creative from "./components/creatives_team_dashboard/View_Creative";
 import Third_Party_Creative from "./components/creatives_team_dashboard/Third_Party_Creative";
+import CreativeLayout from "./components/creatives_team_dashboard/CreativeLayout";
 
 // ── Campaign Team ─────────────────────────────────────────────────────────────
 import Campaign_Dashboard from "./components/campaign_team_dashboard/Campaign_Dashboard";
 import View_Campaign_Team from "./components/campaign_team_dashboard/View_Campaign_Team";
 import Reports from "./components/campaign_team_dashboard/Reports";
+import CampaignLayout from "./components/campaign_team_dashboard/CampaignLayout";
 
 // ── Super Admin ───────────────────────────────────────────────────────────────
 import SuperAdminLayout from "./components/super_admin/SuperAdminLayout";
@@ -35,15 +40,17 @@ import { AllClientsPage, ApprovedPage, PendingPage, RejectedPage } from "./compo
 import { AdminUsersPage, AuditLogsPage, SystemSettingsPage } from "./components/super_admin/SettingsPages";
 import TeamAccess from "./components/super_admin/TeamAccess";
 import All_Campaigns from "./components/super_admin/All_Campaigns";
+import Superadmin_Daily_Reports from "./components/super_admin/Daily_Reports"
+import Superadmin_Bulk_Campaigns_Details from "./components/super_admin/Bulk_Campaign_Details"
+import Superadmin_CampaignReports from "./components/super_admin/CampaignReports";
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminOverview from "./components/admin/AdminOverview";
 import Admin_Campaigns from "./components/admin/Admin_Campaigns";
-import CreativeLayout from "./components/creatives_team_dashboard/CreativeLayout";
-import CampaignLayout from "./components/campaign_team_dashboard/CampaignLayout";
 import CampaignReports from "./components/admin/CampaignReports";
 import Daily_Reports from "./components/admin/Daily_Reports";
+import Bulk_Campaigns_Details from "./components/admin/Bulk_Campaign_Details";
 
 function App() {
   return (
@@ -66,6 +73,9 @@ function App() {
           <Route path="/user_drafts" element={<User_Drafts />} />
           <Route path="/user_io" element={<User_IO />} />
           <Route path="/user_invoices" element={<User_Invoice />} />
+          <Route path="user_reports" element={<User_Reports />} />
+          <Route path="campaign_choice" element={<Campaign_Choice />} />
+          <Route path="bulk_campaign_create" element={<Bulk_Campaign_Create />} />
         </Route>
 
         {/* Creatives team (has its own layout inside each page, leave as-is) */}
@@ -97,6 +107,9 @@ function App() {
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="team" element={<TeamAccess />} />
           <Route path="campaigns" element={<All_Campaigns />} />
+          <Route path="campaign_reports" element={<Superadmin_CampaignReports />} />
+          <Route path="daily_reports" element={<Superadmin_Daily_Reports />} />
+          <Route path="bulk_campaigns_details" element={<Superadmin_Bulk_Campaigns_Details />} />
         </Route>
 
         {/* Admin */}
@@ -112,6 +125,7 @@ function App() {
           <Route path="campaigns" element={<Admin_Campaigns />} />
           <Route path="campaign_reports" element={<CampaignReports />} />
           <Route path="daily_reports" element={<Daily_Reports />} />
+          <Route path="bulk_campaigns_details" element={<Bulk_Campaigns_Details />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -508,7 +508,7 @@ export default function Bulk_Campaign_Create() {
               fontWeight: 600, fontSize: 13,
             }}
           >
-            {submitting ? 'Submitting…' : 'Submit Request'}
+            {submitting ? 'Saving' : 'Save'}
           </Button>
         </div>
       </div>

@@ -14,7 +14,7 @@ const CAMPAIGN_NAV = [
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, to: '/user_dashboard' },
       { label: 'My Campaigns', icon: Megaphone, to: '/user_campaigns' },
-      { label: 'Create Campaign', icon: Plus, to: '/campaign_create' },
+      { label: 'Create Campaign', icon: Plus, to: '/campaign_choice' },
       { label: 'My Drafts', icon: Layers, to: '/user_drafts' },
       { label: 'Insertion Orders', icon: FileText, to: '/user_io' },
       { label: 'Invoices', icon: DollarOutlined, to: '/user_invoices' },
