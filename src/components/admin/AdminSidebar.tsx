@@ -63,7 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: "REPORTS",
     items: [
       {
-        label: "Campaign Reports", icon: "📄", to: "/admn/campaign_reports"
+        label: "Campaign Reports", icon: "📄", to: "/admin/campaign_reports"
       },
       { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
     ],

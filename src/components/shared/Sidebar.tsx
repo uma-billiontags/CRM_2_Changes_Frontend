@@ -23,7 +23,7 @@ const CAMPAIGN_NAV = [
   {
     g: 'MONITOR',
     items: [
-      { label: 'Status', icon: Radio, to: '/user_live' },
+      { label: 'Status', icon: Radio, to: '/user_status' },
     ],
   },
   {

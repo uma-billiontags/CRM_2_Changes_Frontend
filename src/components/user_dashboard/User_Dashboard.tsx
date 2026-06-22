@@ -1,8 +1,8 @@
-// User_Dashboard.tsx  — NO Sidebar import, NO Firebase, NO notification state
+// User_Dashboard.tsx — NO Sidebar import, NO Firebase, NO notification state
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ChevronRight } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip as PieTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as AreaTooltip } from 'recharts';
 import UserCampaignsTable, { type Campaign, isActiveCampaign } from '../shared/UserCampaignsTable';
 import Client_General_Chat from './Client_General_Chat';
 
@@ -16,23 +16,13 @@ const GREEN = '#16A34A';
 const GREEN_LIGHT = '#DCFCE7';
 const AMBER = '#D97706';
 const AMBER_LIGHT = '#FEF3C7';
+const RED = '#DC2626';
 const SLATE = '#0F172A';
-const SLATE_700 = '#334155';
+// const SLATE_700 = '#334155';
 const SLATE_500 = '#64748B';
 const SLATE_300 = '#CBD5E1';
 const SLATE_100 = '#F1F5F9';
 const WHITE = '#FFFFFF';
-
-const weekData = [
-  { day: 'Mon', impressions: 120, clicks: 8200 },
-  { day: 'Tue', impressions: 145, clicks: 12400 },
-  { day: 'Wed', impressions: 132, clicks: 9100 },
-  { day: 'Thu', impressions: 168, clicks: 14200 },
-  { day: 'Fri', impressions: 155, clicks: 11800 },
-  { day: 'Sat', impressions: 178, clicks: 16200 },
-  { day: 'Sun', impressions: 210, clicks: 19800 },
-];
-
 
 // ── KpiCard ───────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, icon, accentLight }: {
@@ -65,6 +55,97 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
+// ── My Status Donut ──────────────────────────────────────────────────────────
+function MyStatusDonut({ live, upcoming, paused, completed }: { live: number; upcoming: number; paused: number; completed: number }) {
+  const data = [
+    { name: 'Live', value: live, color: GREEN },
+    { name: 'Upcoming', value: upcoming, color: AMBER },
+    { name: 'Paused', value: paused, color: SLATE_500 },
+    { name: 'Completed', value: completed, color: RED },
+  ];
+  const total = live + upcoming + paused + completed;
+
+  return (
+    <Card style={{ padding: 22, position: 'relative' }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: SLATE, marginBottom: 4, letterSpacing: '-0.3px' }}>My Line Item Status</h3>
+      <p style={{ fontSize: 11, color: SLATE_500, marginBottom: 16, letterSpacing: '0.06em', fontWeight: 600 }}>ACROSS ALL MY CAMPAIGNS</p>
+      {total === 0 ? (
+        <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: SLATE_500 }}>No line items yet</div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" innerRadius={50} outerRadius={75} paddingAngle={2}>
+                {data.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.color} stroke="none" />
+                ))}
+              </Pie>
+              <PieTooltip
+                formatter={(value, name) => {
+                  const num = typeof value === 'number' ? value : Number(value) || 0;
+                  return [`${num} (${Math.round((num / total) * 100)}%)`, String(name)];
+                }}
+                contentStyle={{ fontSize: 12, borderRadius: 10, border: `1px solid ${SLATE_300}` }}
+              />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 600 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ position: 'absolute', top: '38%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: SLATE }}>{total}</div>
+            <div style={{ fontSize: 10, color: SLATE_500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── My Campaigns Over Time ───────────────────────────────────────────────────
+function buildMyCampaignTimeSeries(campaigns: Campaign[]) {
+  const counts: Record<string, number> = {};
+  campaigns.forEach(c => {
+    const d = new Date((c as any).created_at);
+    const key = d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const sorted = Object.entries(counts)
+    .map(([label, count]) => ({ label, count, dateObj: new Date(label) }))
+    .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+  let cumulative = 0;
+  return sorted.map(({ label, count }) => {
+    cumulative += count;
+    return { label, count, cumulative };
+  });
+}
+
+function MyCampaignsOverTime({ campaigns }: { campaigns: Campaign[] }) {
+  const data = buildMyCampaignTimeSeries(campaigns);
+  return (
+    <Card style={{ padding: 22 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: SLATE, marginBottom: 4, letterSpacing: '-0.3px' }}>My Campaigns Over Time</h3>
+      <p style={{ fontSize: 11, color: SLATE_500, marginBottom: 16, letterSpacing: '0.06em', fontWeight: 600 }}>CUMULATIVE GROWTH</p>
+      {data.length === 0 ? (
+        <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: SLATE_500 }}>No campaigns yet</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={data} margin={{ top: 5, right: 0, left: -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id="myCampGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={BLUE} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={BLUE} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={SLATE_100} vertical={false} />
+            <XAxis dataKey="label" stroke={SLATE_300} fontSize={11} tickLine={false} axisLine={false} tick={{ fill: SLATE_500 }} />
+            <YAxis stroke={SLATE_300} fontSize={11} tickLine={false} axisLine={false} tick={{ fill: SLATE_500 }} allowDecimals={false} />
+            <AreaTooltip contentStyle={{ background: WHITE, border: `1px solid ${SLATE_300}`, borderRadius: 10, fontSize: 12, color: SLATE, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+            <Area type="monotone" dataKey="cumulative" stroke={BLUE} fill="url(#myCampGrad)" strokeWidth={2} name="Total campaigns" />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
+    </Card>
+  );
+}
 
 export default function User_Dashboard() {
   const navigate = useNavigate();
@@ -88,27 +169,29 @@ export default function User_Dashboard() {
   const approvedCount = campaigns.filter(c => c.approval_status === 'approved').length;
   const pendingCount = campaigns.filter(c => c.approval_status === 'pending').length;
 
+  // ── Derive line-item status counts across this client's campaigns ──
+  const allLineItems: { status?: string }[] = [];
+  campaigns.forEach((c: any) => {
+    (c.line_items || []).forEach((li: any) => allLineItems.push(li));
+  });
+  const liveLI = allLineItems.filter(li => li.status === 'live').length;
+  const upcomingLI = allLineItems.filter(li => li.status === 'upcoming').length;
+  const pausedLI = allLineItems.filter(li => li.status === 'paused').length;
+  const completedLI = allLineItems.filter(li => li.status === 'completed').length;
+
   const kpis = [
-    { label: 'Active Campaigns', value: activeCount, icon: '📣', accent: BLUE, accentLight: BLUE_LIGHT },
     { label: 'Total Campaigns', value: campaigns.length, icon: '📊', accent: '#7C3AED', accentLight: '#EDE9FE' },
-    { label: 'Total Clicks', value: '168K', icon: '🖱️', accent: GREEN, accentLight: GREEN_LIGHT },
-    { label: 'Avg CTR', value: '2.1%', icon: '📈', accent: AMBER, accentLight: AMBER_LIGHT },
+    { label: 'Active Campaigns', value: activeCount, icon: '📣', accent: BLUE, accentLight: BLUE_LIGHT },
+    { label: 'Approved', value: approvedCount, icon: '✓', accent: GREEN, accentLight: GREEN_LIGHT },
+    { label: 'Pending', value: pendingCount, icon: '⏳', accent: AMBER, accentLight: AMBER_LIGHT },
   ];
 
-  const quickActions = [
-    { label: 'New Campaign', icon: '✦', to: '/campaign_create', color: BLUE, bg: BLUE_LIGHT },
-    { label: 'Brief Capture', icon: '◉', to: '/user_brief', color: '#7C3AED', bg: '#EDE9FE' },
-    { label: 'Live Status', icon: '◈', to: '/user_live', color: GREEN, bg: GREEN_LIGHT },
-    { label: 'Change History', icon: '◷', to: '/user_history', color: AMBER, bg: AMBER_LIGHT },
-  ];
-
-  // ── Just return the content — no sidebar, no topbar ──────────────────────
   return (
     <>
-      {/* Page title — replaces the generic Topbar title */}
+      {/* Page title */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 18, fontWeight: 700, color: SLATE }}>Dashboard</h1>
-        <p style={{ fontSize: 11, color: SLATE_500, marginTop: 1, letterSpacing: "0.04em", fontWeight: 500, }}>WELCOME BACK, {clientName.toUpperCase()}</p>
+        <p style={{ fontSize: 11, color: SLATE_500, marginTop: 1, letterSpacing: '0.04em', fontWeight: 500 }}>WELCOME BACK, {clientName.toUpperCase()}</p>
       </div>
 
       {/* KPI Row */}
@@ -116,77 +199,13 @@ export default function User_Dashboard() {
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
 
-      {/* Chart + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 20 }}>
-        <Card style={{ padding: 22 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: SLATE, letterSpacing: '-0.3px' }}>Performance This Week</h3>
-              <p style={{ fontSize: 11, color: SLATE_500, marginTop: 3, letterSpacing: '0.06em', fontWeight: 600 }}>IMPRESSIONS &amp; CLICKS TREND</p>
-            </div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-              borderRadius: 20, background: GREEN_LIGHT, border: '1px solid #BBF7D0',
-              fontSize: 10, fontWeight: 700, color: GREEN, letterSpacing: '0.08em',
-            }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: GREEN, animation: 'pulse 1.5s infinite' }} />
-              LIVE
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={weekData} margin={{ top: 5, right: 0, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="impGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={BLUE} stopOpacity={0.18} />
-                  <stop offset="100%" stopColor={BLUE} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="clkGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={GREEN} stopOpacity={0.15} />
-                  <stop offset="100%" stopColor={GREEN} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={SLATE_100} vertical={false} />
-              <XAxis dataKey="day" stroke={SLATE_300} fontSize={11} tickLine={false} axisLine={false} tick={{ fill: SLATE_500 }} />
-              <YAxis stroke={SLATE_300} fontSize={11} tickLine={false} axisLine={false} tick={{ fill: SLATE_500 }} />
-              <Tooltip contentStyle={{ background: WHITE, border: `1px solid ${SLATE_300}`, borderRadius: 10, fontSize: 12, color: SLATE, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
-              <Area type="monotone" dataKey="impressions" stroke={BLUE} fill="url(#impGrad)" strokeWidth={2} name="Impressions (K)" />
-              <Area type="monotone" dataKey="clicks" stroke={GREEN} fill="url(#clkGrad)" strokeWidth={2} name="Clicks" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card style={{ padding: 22 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: SLATE, marginBottom: 4, letterSpacing: '-0.3px' }}>Quick Actions</h3>
-          <p style={{ fontSize: 11, color: SLATE_500, marginBottom: 16, letterSpacing: '0.06em', fontWeight: 600 }}>LAUNCH A WORKFLOW</p>
-          {quickActions.map(a => (
-            <div
-              key={a.label}
-              onClick={() => navigate(a.to)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 12px', borderRadius: 10,
-                cursor: 'pointer', marginBottom: 8,
-                border: `1px solid ${SLATE_300}`,
-                background: WHITE, transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = a.color + '66';
-                (e.currentTarget as HTMLDivElement).style.background = a.bg;
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = SLATE_300;
-                (e.currentTarget as HTMLDivElement).style.background = WHITE;
-              }}
-            >
-              <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: a.color }}>{a.icon}</div>
-              <span style={{ fontSize: 13, fontWeight: 500, color: SLATE_700 }}>{a.label}</span>
-              <ChevronRight size={14} style={{ marginLeft: 'auto', color: SLATE_300 }} />
-            </div>
-          ))}
-        </Card>
+      {/* Charts + Quick Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <MyStatusDonut live={liveLI} upcoming={upcomingLI} paused={pausedLI} completed={completedLI} />
+        <MyCampaignsOverTime campaigns={campaigns} />
       </div>
 
-      {/* ── Campaigns Table ── */}
+      {/* Campaigns Table */}
       <Card style={{ overflow: 'hidden' }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',

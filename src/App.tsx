@@ -52,6 +52,7 @@ import CampaignReports from "./components/admin/CampaignReports";
 import Daily_Reports from "./components/admin/Daily_Reports";
 import Bulk_Campaigns_Details from "./components/admin/Bulk_Campaign_Details";
 import Admin_Messages_Sidebar from "./components/admin/Admin_Messages_Sidebar";
+import User_Staus from "./components/user_dashboard/User_Status";
 
 function App() {
   return (
@@ -77,6 +78,7 @@ function App() {
           <Route path="user_reports" element={<User_Reports />} />
           <Route path="campaign_choice" element={<Campaign_Choice />} />
           <Route path="bulk_campaign_create" element={<Bulk_Campaign_Create />} />
+          <Route path="user_status" element={<User_Staus />} />
         </Route>
 
         {/* Creatives team (has its own layout inside each page, leave as-is) */}
