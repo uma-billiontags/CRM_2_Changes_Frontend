@@ -40,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: "CLIENTS",
     items: [
       { label: "All Clients", icon: "🏢", to: "/admin/clients", countKey: "total" },
+      { label: "Pending Approval", icon: "⏳", to: "/superadmin/pending", countKey: "pending", accent: "#D97706" },
     ],
   },
   {
@@ -50,18 +51,27 @@ const NAV_GROUPS: NavGroup[] = [
         icon: "📊",
         to: "/admin/campaigns",
         countKey: "campaignTotal",
-        children: [
-          { label: "Campaign Reports", icon: "📄", to: "/admin/campaign_reports" },
-          { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
-        ],
+        // children: [
+        //   { label: "Campaign Reports", icon: "📄", to: "/admin/campaign_reports" },
+        //   { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
+        // ],
       },
       { label: "Bulk Campaign Details", icon: "📋", to: "/admin/bulk_campaigns_details" },
     ],
   },
-   {
+  {
+    group: "REPORTS",
+    items: [
+      {
+        label: "Campaign Reports", icon: "📄", to: "/admn/campaign_reports"
+      },
+      { label: "Daily Reports", icon: "📄", to: "/admin/daily_reports" },
+    ],
+  },
+  {
     group: "MESSAGES",
     items: [
-      { label: "Messages", icon: "🏢", to: "/admin/admin_messages"},
+      { label: "Messages", icon: "🏢", to: "/admin/admin_messages" },
     ],
   },
   {

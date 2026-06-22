@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Megaphone, Plus, Layers,
-  FileText, Settings, LogOut, Wallet, Radio,
+  FileText, Settings, LogOut, Radio,
 } from 'lucide-react';
 import { DollarOutlined } from '@ant-design/icons/es/icons/index';
 
@@ -23,15 +23,13 @@ const CAMPAIGN_NAV = [
   {
     g: 'MONITOR',
     items: [
-      { label: 'Live Status', icon: Radio, to: '/user_live' },
-      { label: 'Approvals', icon: FileText, to: '/user_approvals' },
+      { label: 'Status', icon: Radio, to: '/user_live' },
     ],
   },
   {
     g: 'INSIGHTS',
     items: [
       { label: 'Reports', icon: FileText, to: '/user_reports' },
-      { label: 'Billing', icon: Wallet, to: '/user_billing' },
     ],
   },
 ];

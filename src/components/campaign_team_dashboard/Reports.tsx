@@ -117,7 +117,7 @@ export default function Reports() {
             title: "Campaign ID",
             dataIndex: "campaign_id",
             key: "campaign_id",
-            width: 160,
+            width: 140,
             render: (v: string, record) => (
                 <span style={{
                     fontFamily: "monospace", fontSize: 12, fontWeight: 700,
@@ -131,7 +131,7 @@ export default function Reports() {
             title: "Type",
             dataIndex: "report_type",
             key: "report_type",
-            width: 140,
+            width: 200,
             render: (v: 'cpm' | 'cpc') => (
                 <span style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px",

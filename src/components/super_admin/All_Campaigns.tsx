@@ -132,9 +132,10 @@ interface LineItem {
     unit_cost?: string;
     unit_value?: string;
     ethnicity?: string[];
-    status?: string;
     creatives?: Creative[];
     third_party_creatives?: Creative[];
+    dv_id?: string;
+    status?: 'live' | 'upcoming' | 'completed' | 'paused';
 }
 
 interface Campaign {
@@ -156,7 +157,6 @@ interface Campaign {
     start_date?: string;
     end_date?: string;
     created_at: string;
-    status?: string;
     age?: string;
     gender?: string;
     platforms?: string;
@@ -1355,6 +1355,167 @@ function Toast({ message: msg, type, onClose }: { message: string; type: "succes
     );
 }
 
+// ── Inline DV ID Editor ───────────────────────────────────────────────────────
+function DvIdCell({ lineItemId, initialValue }: { lineItemId: string; initialValue?: string }) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(initialValue || "");
+    const [saving, setSaving] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch(`${BASE_URL}/update_line_item_dv_id/${lineItemId}/`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "ngrok-skip-browser-warning": "1",
+                },
+                body: JSON.stringify({ dv_id: value }),
+            });
+            if (res.ok) {
+                setEditing(false);
+            } else {
+                alert("Failed to save DV ID");
+            }
+        } catch {
+            alert("Network error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (editing) {
+        return (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                    ref={inputRef}
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                    onKeyDown={e => {
+                        if (e.key === "Enter") handleSave();
+                        if (e.key === "Escape") setEditing(false);
+                    }}
+                    style={{
+                        height: 28, padding: "0 8px", borderRadius: 6,
+                        border: `1px solid ${C.blueMid}`, fontSize: 12,
+                        fontFamily: "monospace", width: 120,
+                        outline: "none", background: C.blueLight,
+                    }}
+                    placeholder="Enter DV ID"
+                />
+                <Button
+                    size="small"
+                    loading={saving}
+                    onClick={handleSave}
+                    style={{
+                        height: 26, borderRadius: 6, fontSize: 11,
+                        background: C.blue, color: "#fff",
+                        border: "none", fontWeight: 600,
+                    }}
+                >
+                    {saving ? "" : "Save"}
+                </Button>
+                <Button
+                    size="small"
+                    onClick={() => { setEditing(false); setValue(initialValue || ""); }}
+                    style={{
+                        height: 26, borderRadius: 6, fontSize: 11,
+                        border: `1px solid ${C.border}`, color: C.slate500,
+                    }}
+                >
+                    ✕
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {value ? (
+                <span style={{
+                    fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                    color: C.indigo, background: C.indigoLight,
+                    padding: "2px 8px", borderRadius: 6,
+                    border: `1px solid #C7D2FE`,
+                }}>
+                    {value}
+                </span>
+            ) : (
+                <span style={{ fontSize: 11, color: C.slate400, fontStyle: "italic" }}>—</span>
+            )}
+            <Button
+                size="small"
+                icon={<EditOutlined style={{ fontSize: 10 }} />}
+                onClick={() => setEditing(true)}
+                style={{
+                    height: 22, width: 22, padding: 0,
+                    borderRadius: 5, border: `1px solid ${C.border}`,
+                    background: C.white, color: C.slate500,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+            />
+        </div>
+    );
+}
+
+function LineItemStatusCell({ lineItemId, initialStatus }: { lineItemId: string; initialStatus?: string }) {
+    const [status, setStatus] = useState(initialStatus || 'upcoming');
+    const [saving, setSaving] = useState(false);
+
+    const statusConfig: Record<string, { color: string; bg: string; border: string; label: string }> = {
+        live: { color: '#16A34A', bg: '#F0FDF4', border: '#86efac', label: '🟢 Live' },
+        upcoming: { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: '🟡 Upcoming' },
+        completed: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: '🔴 Completed' },
+        paused: { color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', label: '⏸ Paused' },
+    };
+
+    const handleChange = async (newStatus: string) => {
+        setSaving(true);
+        try {
+            const res = await fetch(`${BASE_URL}/update_line_item_status/${lineItemId}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (res.ok) {
+                setStatus(newStatus);
+            } else {
+                alert('Failed to update status');
+            }
+        } catch {
+            alert('Network error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Select
+            value={status}
+            onChange={handleChange}
+            loading={saving}
+            size="small"
+            style={{ width: 130 }}
+            styles={{ popup: { root: { minWidth: 130 } } }}
+        >
+            {Object.entries(statusConfig).map(([key, cfg]) => (
+                <Option key={key} value={key}>
+                    <span style={{
+                        fontSize: 11, fontWeight: 700, color: cfg.color,
+                        background: cfg.bg, padding: '1px 7px',
+                    }}>
+                        {cfg.label}
+                    </span>
+                </Option>
+            ))}
+        </Select>
+    );
+}
 // ── Delete Confirm Modal ──────────────────────────────────────────────────────
 function DeleteModal({
     campaign, onConfirm, onClose, deleting,
@@ -1567,15 +1728,15 @@ export default function All_Campaigns() {
             render: (_: any, record: Campaign) => {
                 const isActive = isActiveCampaign(record);
                 const isClosed = isClosedCampaign(record);
-                const style = isActive
-                    ? { bg: C.greenLight, border: "#BBF7D0", color: C.green, label: "Active" }
+                const cfg = isActive
+                    ? { bg: C.greenLight, border: '#BBF7D0', color: C.green, dot: C.green, label: 'Active' }
                     : isClosed
-                        ? { bg: C.redLight, border: "#FECACA", color: C.red, label: "Closed" }
-                        : { bg: C.amberLight, border: "#FDE68A", color: C.amber, label: "Upcoming" };
+                        ? { bg: C.redLight, border: '#FECACA', color: C.red, dot: C.red, label: 'Closed' }
+                        : { bg: C.amberLight, border: '#FDE68A', color: C.amber, dot: C.amber, label: 'Upcoming' };
                 return (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: style.bg, border: `1px solid ${style.border}`, fontSize: 10, fontWeight: 700, color: style.color, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: style.color }} />
-                        {style.label}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: 10, fontWeight: 700, color: cfg.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot }} />
+                        {cfg.label}
                     </span>
                 );
             },
@@ -1632,6 +1793,28 @@ export default function All_Campaigns() {
 
     const lineItemColumns: ColumnsType<LineItem> = [
         { title: "Line Item ID", dataIndex: "line_item_id", key: "line_item_id", render: (v: string) => <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "2px 6px", borderRadius: 4 }}>{v}</span> },
+        {
+            title: "DV ID",
+            key: "dv_id",
+            width: 180,
+            render: (_: any, record: LineItem) => (
+                <DvIdCell
+                    lineItemId={record.line_item_id}
+                    initialValue={record.dv_id || ""}
+                />
+            ),
+        },
+        {
+            title: 'Status',
+            key: 'status',
+            width: 150,
+            render: (_: any, record: LineItem) => (
+                <LineItemStatusCell
+                    lineItemId={record.line_item_id}
+                    initialStatus={record.status || 'upcoming'}
+                />
+            ),
+        },
         { title: "Name", dataIndex: "line_item_name", key: "line_item_name", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },
         { title: "Start Date", dataIndex: "start_date", key: "start_date", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },
         { title: "End Date", dataIndex: "end_date", key: "end_date", render: (v: string) => <span style={{ fontSize: 12 }}>{v || "—"}</span> },

@@ -272,14 +272,16 @@ export default function UserCampaignsTable({
           >
             View
           </Button>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => navigate(`/update_campaign/${record.campaign_id}`)}
-            style={{ fontSize: 11, fontWeight: 600, color: SLATE, background: WHITE, border: `1px solid ${SLATE_300}`, borderRadius: 6 }}
-          >
-            Edit
-          </Button>
+          {record.approval_status !== 'approved' && (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/update_campaign/${record.campaign_id}`)}
+              style={{ fontSize: 11, fontWeight: 600, color: SLATE, background: WHITE, border: `1px solid ${SLATE_300}`, borderRadius: 6 }}
+            >
+              Edit
+            </Button>
+          )}
           {/* Chat Button - FIXED */}
           <Button
             size="small"

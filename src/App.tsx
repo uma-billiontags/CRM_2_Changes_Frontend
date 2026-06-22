@@ -36,7 +36,7 @@ import CampaignLayout from "./components/campaign_team_dashboard/CampaignLayout"
 // ── Super Admin ───────────────────────────────────────────────────────────────
 import SuperAdminLayout from "./components/super_admin/SuperAdminLayout";
 import SuperAdminOverview from "./components/super_admin/SuperAdminOverview";
-import { AllClientsPage, ApprovedPage, PendingPage, RejectedPage } from "./components/super_admin/ClientListPages";
+import { AllClientsPage, PendingPage,  } from "./components/super_admin/ClientListPages";
 import { AdminUsersPage, AuditLogsPage, SystemSettingsPage } from "./components/super_admin/SettingsPages";
 import TeamAccess from "./components/super_admin/TeamAccess";
 import All_Campaigns from "./components/super_admin/All_Campaigns";
@@ -101,8 +101,6 @@ function App() {
           <Route path="overview" element={<SuperAdminOverview />} />
           <Route path="clients" element={<AllClientsPage />} />
           <Route path="pending" element={<PendingPage />} />
-          <Route path="approved" element={<ApprovedPage />} />
-          <Route path="rejected" element={<RejectedPage />} />
           <Route path="system-settings" element={<SystemSettingsPage />} />
           <Route path="admin-users" element={<AdminUsersPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
@@ -119,8 +117,6 @@ function App() {
           <Route path="overview" element={<AdminOverview />} />
           <Route path="clients" element={<AllClientsPage />} />
           <Route path="pending" element={<PendingPage />} />
-          <Route path="approved" element={<ApprovedPage />} />
-          <Route path="rejected" element={<RejectedPage />} />
           <Route path="system-settings" element={<SystemSettingsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="campaigns" element={<Admin_Campaigns />} />

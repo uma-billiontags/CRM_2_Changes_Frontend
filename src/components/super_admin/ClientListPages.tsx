@@ -31,35 +31,3 @@ export function PendingPage() {
     />
   );
 }
-
-// ── Approved ──────────────────────────────────────────────────────────────────
-
-export function ApprovedPage() {
-  const { clients, handleApprove, handleReject } = useOutletContext<SuperAdminOutletContext>();
-  return (
-    <ClientTablePage
-      clients={clients}
-      filterStatus="approved"
-      onApprove={handleApprove}
-      onReject={handleReject}
-      title="Approved Clients"
-      subtitle="Active and approved clients on the platform"
-    />
-  );
-}
-
-// ── Rejected ──────────────────────────────────────────────────────────────────
-
-export function RejectedPage() {
-  const { clients, handleApprove, handleReject } = useOutletContext<SuperAdminOutletContext>();
-  return (
-    <ClientTablePage
-      clients={clients}
-      filterStatus="rejected"
-      onApprove={handleApprove}
-      onReject={handleReject}
-      title="Rejected Clients"
-      subtitle="Clients that did not pass the review process"
-    />
-  );
-}

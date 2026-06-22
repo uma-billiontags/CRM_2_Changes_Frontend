@@ -138,6 +138,7 @@ interface LineItem {
     creatives?: Creative[];
     third_party_creatives?: Creative[];
     dv_id?: string;  // ← ADD THIS
+    status?: 'live' | 'upcoming' | 'completed' | 'paused';
 }
 
 interface Campaign {
@@ -1465,6 +1466,60 @@ function DvIdCell({ lineItemId, initialValue }: { lineItemId: string; initialVal
     );
 }
 
+function LineItemStatusCell({ lineItemId, initialStatus }: { lineItemId: string; initialStatus?: string }) {
+    const [status, setStatus] = useState(initialStatus || 'upcoming');
+    const [saving, setSaving] = useState(false);
+
+    const statusConfig: Record<string, { color: string; bg: string; border: string; label: string }> = {
+        live: { color: '#16A34A', bg: '#F0FDF4', border: '#86efac', label: '🟢 Live' },
+        upcoming: { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: '🟡 Upcoming' },
+        completed: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: '🔴 Completed' },
+        paused: { color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', label: '⏸ Paused' },
+    };
+
+    const handleChange = async (newStatus: string) => {
+        setSaving(true);
+        try {
+            const res = await fetch(`${BASE_URL}/update_line_item_status/${lineItemId}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (res.ok) {
+                setStatus(newStatus);
+            } else {
+                alert('Failed to update status');
+            }
+        } catch {
+            alert('Network error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Select
+            value={status}
+            onChange={handleChange}
+            loading={saving}
+            size="small"
+            style={{ width: 130 }}
+            styles={{ popup: { root: { minWidth: 130 } } }}
+        >
+            {Object.entries(statusConfig).map(([key, cfg]) => (
+                <Option key={key} value={key}>
+                    <span style={{
+                        fontSize: 11, fontWeight: 700, color: cfg.color,
+                        background: cfg.bg, padding: '1px 7px',
+                    }}>
+                        {cfg.label}
+                    </span>
+                </Option>
+            ))}
+        </Select>
+    );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Admin_Campaigns() {
     const navigate = useNavigate();
@@ -1584,15 +1639,15 @@ export default function Admin_Campaigns() {
             render: (_: any, record: Campaign) => {
                 const isActive = isActiveCampaign(record);
                 const isClosed = isClosedCampaign(record);
-                const style = isActive
-                    ? { bg: C.greenLight, border: "#BBF7D0", color: C.green, label: "Active" }
+                const cfg = isActive
+                    ? { bg: C.greenLight, border: '#BBF7D0', color: C.green, dot: C.green, label: 'Active' }
                     : isClosed
-                        ? { bg: C.redLight, border: "#FECACA", color: C.red, label: "Closed" }
-                        : { bg: C.amberLight, border: "#FDE68A", color: C.amber, label: "Upcoming" };
+                        ? { bg: C.redLight, border: '#FECACA', color: C.red, dot: C.red, label: 'Closed' }
+                        : { bg: C.amberLight, border: '#FDE68A', color: C.amber, dot: C.amber, label: 'Upcoming' };
                 return (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: style.bg, border: `1px solid ${style.border}`, fontSize: 10, fontWeight: 700, color: style.color, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: style.color }} />
-                        {style.label}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: 10, fontWeight: 700, color: cfg.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot }} />
+                        {cfg.label}
                     </span>
                 );
             },
@@ -1675,6 +1730,17 @@ export default function Admin_Campaigns() {
                 <DvIdCell
                     lineItemId={record.line_item_id}
                     initialValue={record.dv_id || ""}
+                />
+            ),
+        },
+        {
+            title: 'Status',
+            key: 'status',
+            width: 150,
+            render: (_: any, record: LineItem) => (
+                <LineItemStatusCell
+                    lineItemId={record.line_item_id}
+                    initialStatus={record.status || 'upcoming'}
                 />
             ),
         },

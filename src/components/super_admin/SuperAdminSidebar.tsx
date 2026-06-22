@@ -46,8 +46,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "All Clients", icon: "🏢", to: "/superadmin/clients", countKey: "total" },
       { label: "Pending Approval", icon: "⏳", to: "/superadmin/pending", countKey: "pending", accent: "#D97706" },
-      { label: "Approved", icon: "✅", to: "/superadmin/approved", countKey: "approved", accent: "#16A34A" },
-      { label: "Rejected", icon: "❌", to: "/superadmin/rejected", countKey: "rejected", accent: "#DC2626" },
     ],
   },
   {
@@ -55,12 +53,27 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         label: "All Campaigns", icon: "📊", to: "/superadmin/campaigns", countKey: "campaignTotal",
-        children: [
-          { label: "Campaign Reports", icon: "📄", to: "/superadmin/campaign_reports" },
-          { label: "Daily Reports", icon: "📄", to: "/superadmin/daily_reports" },
-        ],
+        // children: [
+        //   { label: "Campaign Reports", icon: "📄", to: "/superadmin/campaign_reports" },
+        //   { label: "Daily Reports", icon: "📄", to: "/superadmin/daily_reports" },
+        // ],
       },
       { label: "Bulk Campaign Details", icon: "📋", to: "/superadmin/bulk_campaigns_details" },
+    ],
+  },
+  {
+    group: "REPORTS",
+    items: [
+      {
+        label: "Campaign Reports", icon: "📄", to: "/superadmin/campaign_reports"
+      },
+      { label: "Daily Reports", icon: "📄", to: "/superadmin/daily_reports" },
+    ],
+  },
+  {
+    group: "MESSAGES",
+    items: [
+      { label: "Messages", icon: "🏢", to: "/admin/admin_messages" },
     ],
   },
   {
