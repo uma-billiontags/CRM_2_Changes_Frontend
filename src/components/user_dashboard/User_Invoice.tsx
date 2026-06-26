@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Table, Button, Input, Tag, Tooltip } from "antd";
+import { Table, Button, Input, Tag, Select, Checkbox } from "antd";
 import {
     SearchOutlined,
     ReloadOutlined,
@@ -7,37 +7,29 @@ import {
     DownloadOutlined,
     CheckCircleOutlined,
     ClockCircleOutlined,
-    DollarOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-// ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
-    bg: "#F8FAFC",
-    white: "#FFFFFF",
-    slate: "#0F172A",
-    slate700: "#334155",
-    slate500: "#64748B",
-    slate300: "#CBD5E1",
-    slate100: "#F1F5F9",
-    border: "#E2E8F0",
-    blue: "#2563EB",
-    blueLight: "#EFF6FF",
-    blueMid: "#BFDBFE",
-    green: "#16A34A",
-    greenLight: "#F0FDF4",
-    greenMid: "#86EFAC",
-    amber: "#D97706",
-    amberLight: "#FFFBEB",
-    purple: "#7C3AED",
-    purpleLight: "#F5F3FF",
-    purpleMid: "#DDD6FE",
+    bg: "#F8FAFC", white: "#FFFFFF", slate: "#0F172A",
+    slate500: "#64748B", slate300: "#CBD5E1", border: "#E2E8F0", slate100: "#F1F5F9",
+    blue: "#2563EB", blueLight: "#EFF6FF", blueMid: "#BFDBFE",
+    green: "#16A34A", greenLight: "#F0FDF4", greenMid: "#86EFAC",
+    amber: "#D97706", amberLight: "#FFFBEB",
+    purple: "#7C3AED", purpleLight: "#F5F3FF", purpleMid: "#DDD6FE",
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface InvoiceRow {
+interface MonthInvoice {
+    invoice_id: string;
+    invoice_from: string;
+    invoice_to: string;
+    pdf_generated: boolean;
+    pdf_url: string | null;
+}
+
+interface CampaignRow {
     campaign_id: string;
     campaign_name: string;
     advertiser: string;
@@ -47,260 +39,265 @@ interface InvoiceRow {
     end_date: string;
     campaign_type: string;
     line_items_count: number;
-    invoice_id: string | null;
-    pdf_generated: boolean;
-    pdf_url: string | null;
+    invoices: MonthInvoice[];
+    all_generated: boolean;
     created_at: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+interface ClientOption {
+    client_id: string;
+    name: string;
+}
+
 function fmtDate(v?: string) {
     if (!v) return "—";
     return new Date(v).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
+        day: "2-digit", month: "short", year: "numeric",
     });
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
-function Toast({
-    message,
-    type,
-    onClose,
-}: {
-    message: string;
-    type: "success" | "error";
-    onClose: () => void;
+function Toast({ message, type, onClose }: {
+    message: string; type: "success" | "error"; onClose: () => void;
 }) {
     useEffect(() => {
         const t = setTimeout(onClose, 3500);
         return () => clearTimeout(t);
     }, [onClose]);
 
-    const color = type === "success" ? C.green : "#DC2626";
     return (
-        <div
-            style={{
-                position: "fixed",
-                bottom: 24,
-                right: 24,
-                zIndex: 999,
-                background: C.white,
-                border: `1px solid ${color}55`,
-                borderRadius: 12,
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-                minWidth: 280,
-            }}
-        >
+        <div style={{
+            position: "fixed", bottom: 24, right: 24, zIndex: 999,
+            background: C.white, border: `1px solid ${type === "success" ? C.green : "#DC2626"}55`,
+            borderRadius: 12, padding: "14px 20px", display: "flex",
+            alignItems: "center", gap: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 280,
+        }}>
             <span style={{ fontSize: 18 }}>{type === "success" ? "✅" : "❌"}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>
-                {message}
-            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>{message}</span>
         </div>
     );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
-export default function User_Invoice() {
-    const [rows, setRows] = useState<InvoiceRow[]>([]);
-    const [loading, setLoading] = useState(true);
+export default function AdminInvoice() {
+    const [clients, setClients] = useState<ClientOption[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+    const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [generating, setGenerating] = useState(false);
     const [search, setSearch] = useState("");
-    const [generating, setGenerating] = useState<string | null>(null);
-    const [toast, setToast] = useState<{
-        message: string;
-        type: "success" | "error";
-    } | null>(null);
-
-    const clientId = localStorage.getItem("client_id");
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
 
-    // ── Fetch list ──────────────────────────────────────────────────────────
-    const fetchList = useCallback(() => {
+    // ── Fetch all clients for dropdown ──
+    useEffect(() => {
+        fetch(`${BASE_URL}/get_all_clients/`, {
+            headers: { "ngrok-skip-browser-warning": "1" },
+        })
+            .then(r => r.json())
+            .then(data => setClients(Array.isArray(data) ? data : []))
+            .catch(() => showToast("Failed to load clients.", "error"));
+    }, []);
+
+    // ── Fetch campaigns when client selected ──
+    const fetchCampaigns = useCallback((clientId: string) => {
         setLoading(true);
+        setCampaigns([]);
+        setSelectedCampaignIds([]);
         fetch(`${BASE_URL}/get_invoice_list_by_client/${clientId}/`, {
             headers: { "ngrok-skip-browser-warning": "1" },
         })
-            .then((r) => {
-                if (!r.ok) throw new Error();
-                return r.json();
-            })
-            .then((data) => setRows(Array.isArray(data) ? data : []))
-            .catch(() => showToast("Failed to load invoices.", "error"))
+            .then(r => r.json())
+            .then(data => setCampaigns(Array.isArray(data) ? data : []))
+            .catch(() => showToast("Failed to load campaigns.", "error"))
             .finally(() => setLoading(false));
-    }, [clientId]);
+    }, []);
 
-    useEffect(() => {
-        fetchList();
-    }, [fetchList]);
+    const handleClientChange = (clientId: string) => {
+        setSelectedClientId(clientId);
+        fetchCampaigns(clientId);
+    };
 
-    // ── Generate Invoice PDF ────────────────────────────────────────────────
-    const handleGenerate = async (campaignId: string) => {
-        setGenerating(campaignId);
-        try {
-            const res = await fetch(
-                `${BASE_URL}/generate_invoice_pdf/${campaignId}/`,
-                {
-                    method: "POST",
-                    headers: { "ngrok-skip-browser-warning": "1" },
-                }
-            );
-            if (!res.ok) throw new Error();
-            const data = await res.json();
+    // ── Toggle campaign selection ──
+    const toggleCampaign = (campaignId: string) => {
+        setSelectedCampaignIds(prev =>
+            prev.includes(campaignId)
+                ? prev.filter(id => id !== campaignId)
+                : [...prev, campaignId]
+        );
+    };
 
-            setRows((prev) =>
-                prev.map((r) =>
-                    r.campaign_id === campaignId
-                        ? {
-                              ...r,
-                              pdf_generated: true,
-                              pdf_url: data.download_url,
-                              invoice_id: data.invoice_id,
-                          }
-                        : r
-                )
-            );
-            showToast(`Invoice PDF generated for ${campaignId}!`);
-        } catch {
-            showToast("Failed to generate Invoice PDF. Try again.", "error");
-        } finally {
-            setGenerating(null);
+    const toggleSelectAll = () => {
+        const notGenerated = campaigns.filter(c => !c.all_generated).map(c => c.campaign_id);
+        if (selectedCampaignIds.length === notGenerated.length) {
+            setSelectedCampaignIds([]);
+        } else {
+            setSelectedCampaignIds(notGenerated);
         }
     };
 
-    // ── Download Invoice PDF ────────────────────────────────────────────────
-    const handleDownload = (campaignId: string, invoiceId: string) => {
+    // ── Generate invoices for selected campaigns ──
+    const handleGenerate = async () => {
+        if (selectedCampaignIds.length === 0) {
+            showToast("Please select at least one campaign.", "error");
+            return;
+        }
+        setGenerating(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const campaignId of selectedCampaignIds) {
+            try {
+                const res = await fetch(`${BASE_URL}/generate_invoice_pdf/${campaignId}/`, {
+                    method: "POST",
+                    headers: { "ngrok-skip-browser-warning": "1" },
+                });
+                if (!res.ok) throw new Error();
+                successCount++;
+            } catch {
+                failCount++;
+            }
+        }
+
+        if (successCount > 0) showToast(`${successCount} campaign(s) invoiced successfully!`);
+        if (failCount > 0) showToast(`${failCount} campaign(s) failed.`, "error");
+
+        setGenerating(false);
+        setSelectedCampaignIds([]);
+        if (selectedClientId) fetchCampaigns(selectedClientId);
+    };
+
+    const handleDownload = (invoiceId: string) => {
         const a = document.createElement("a");
-        a.href = `${BASE_URL}/download_invoice_pdf/${campaignId}/`;
+        a.href = `${BASE_URL}/download_invoice_pdf/${invoiceId}/`;
         a.download = `${invoiceId}.pdf`;
         a.click();
     };
 
-    // ── Filter ──────────────────────────────────────────────────────────────
-    const filtered = rows.filter((r) => {
+    const filtered = campaigns.filter(c => {
         if (!search.trim()) return true;
         const q = search.toLowerCase();
-        return [r.campaign_id, r.campaign_name, r.advertiser, r.client_name].some(
-            (f) => f?.toLowerCase().includes(q)
-        );
+        return [c.campaign_id, c.campaign_name, c.advertiser].some(f => f?.toLowerCase().includes(q));
     });
 
-    // ── Stats ───────────────────────────────────────────────────────────────
-    const totalCount = rows.length;
-    const generatedCount = rows.filter((r) => r.pdf_generated).length;
+    const notGeneratedCampaigns = campaigns.filter(c => !c.all_generated);
+    const totalCount = campaigns.length;
+    const generatedCount = campaigns.filter(c => c.all_generated).length;
     const pendingCount = totalCount - generatedCount;
 
-    // ── Columns ─────────────────────────────────────────────────────────────
-    const columns: ColumnsType<InvoiceRow> = [
+    // ── Expandable row: shows month-wise invoices ──
+    const expandedRowRender = (record: CampaignRow) => {
+        if (record.invoices.length === 0) {
+            return (
+                <div style={{ padding: "12px 16px", color: C.slate500, fontSize: 12 }}>
+                    No invoices generated yet. Select this campaign and click Generate.
+                </div>
+            );
+        }
+        return (
+            <div style={{ padding: "8px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.slate500, marginBottom: 8, textTransform: "uppercase" }}>
+                    Month-wise Invoices
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {record.invoices.map(inv => (
+                        <div key={inv.invoice_id} style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            background: C.bg, borderRadius: 8, padding: "8px 14px",
+                            border: `1px solid ${C.border}`,
+                        }}>
+                            <span style={{
+                                fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                                color: C.purple, background: C.purpleLight,
+                                padding: "2px 7px", borderRadius: 5, border: `1px solid ${C.purpleMid}`,
+                            }}>
+                                {inv.invoice_id}
+                            </span>
+                            <span style={{ fontSize: 12, color: C.slate }}>
+                                {fmtDate(inv.invoice_from)} → {fmtDate(inv.invoice_to)}
+                            </span>
+                            <span style={{
+                                display: "inline-flex", alignItems: "center", gap: 4,
+                                fontSize: 11, fontWeight: 700,
+                                color: inv.pdf_generated ? C.green : C.amber,
+                                background: inv.pdf_generated ? C.greenLight : C.amberLight,
+                                padding: "2px 8px", borderRadius: 12,
+                                border: `1px solid ${inv.pdf_generated ? C.greenMid : "#FDE68A"}`,
+                            }}>
+                                {inv.pdf_generated
+                                    ? <><CheckCircleOutlined style={{ fontSize: 10 }} /> Generated</>
+                                    : <><ClockCircleOutlined style={{ fontSize: 10 }} /> Pending</>
+                                }
+                            </span>
+                            {inv.pdf_generated && (
+                                <Button
+                                    size="small"
+                                    icon={<DownloadOutlined />}
+                                    onClick={() => handleDownload(inv.invoice_id)}
+                                    style={{
+                                        fontSize: 11, fontWeight: 600, height: 26,
+                                        background: C.blueLight, color: C.blue,
+                                        border: `1px solid ${C.blueMid}`, borderRadius: 6,
+                                        marginLeft: "auto",
+                                    }}
+                                >
+                                    Download
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const columns: ColumnsType<CampaignRow> = [
+        {
+            title: (
+                <Checkbox
+                    checked={selectedCampaignIds.length === notGeneratedCampaigns.length && notGeneratedCampaigns.length > 0}
+                    indeterminate={selectedCampaignIds.length > 0 && selectedCampaignIds.length < notGeneratedCampaigns.length}
+                    onChange={toggleSelectAll}
+                />
+            ),
+            key: "select",
+            width: 50,
+            render: (_: any, record: CampaignRow) =>
+                record.all_generated ? null : (
+                    <Checkbox
+                        checked={selectedCampaignIds.includes(record.campaign_id)}
+                        onChange={() => toggleCampaign(record.campaign_id)}
+                    />
+                ),
+        },
         {
             title: "Campaign ID",
             dataIndex: "campaign_id",
             key: "campaign_id",
-            width: 150,
+            width: 140,
             render: (v: string) => (
-                <span
-                    style={{
-                        fontFamily: "monospace",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: C.blue,
-                        background: C.blueLight,
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                    }}
-                >
-                    {v}
-                </span>
+                <span style={{
+                    fontFamily: "monospace", fontSize: 12, fontWeight: 700,
+                    color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6,
+                }}>{v}</span>
             ),
-        },
-        {
-            title: "Invoice #",
-            dataIndex: "invoice_id",
-            key: "invoice_id",
-            width: 130,
-            render: (v: string | null) =>
-                v ? (
-                    <span
-                        style={{
-                            fontFamily: "monospace",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: C.purple,
-                            background: C.purpleLight,
-                            padding: "3px 7px",
-                            borderRadius: 5,
-                            border: `1px solid ${C.purpleMid}`,
-                        }}
-                    >
-                        {v}
-                    </span>
-                ) : (
-                    <span style={{ color: C.slate300, fontSize: 12 }}>—</span>
-                ),
         },
         {
             title: "Campaign Name",
             dataIndex: "campaign_name",
             key: "campaign_name",
-            width: 240,
-            render: (v: string, record: InvoiceRow) => (
+            width: 220,
+            render: (v: string, record: CampaignRow) => (
                 <div>
-                    <div
-                        style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: C.slate,
-                            marginBottom: 4,
-                        }}
-                    >
-                        {v || "—"}
-                    </div>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            flexWrap: "wrap",
-                        }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.slate, marginBottom: 4 }}>{v || "—"}</div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                         {record.campaign_type && (
-                            <Tag
-                                color="blue"
-                                style={{ fontSize: 10, margin: 0, lineHeight: "18px" }}
-                            >
-                                {record.campaign_type}
-                            </Tag>
+                            <Tag color="blue" style={{ fontSize: 10, margin: 0 }}>{record.campaign_type}</Tag>
                         )}
-                        <Tag
-                            color="purple"
-                            style={{ fontSize: 10, margin: 0, lineHeight: "18px" }}
-                        >
-                            {record.line_items_count} line item
-                            {record.line_items_count !== 1 ? "s" : ""}
+                        <Tag color="purple" style={{ fontSize: 10, margin: 0 }}>
+                            {record.line_items_count} line item{record.line_items_count !== 1 ? "s" : ""}
                         </Tag>
-                        <span
-                            style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 3,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: C.green,
-                                background: C.greenLight,
-                                padding: "1px 6px",
-                                borderRadius: 4,
-                                border: "1px solid #BBF7D0",
-                            }}
-                        >
-                            <CheckCircleOutlined style={{ fontSize: 9 }} />
-                            Approved
-                        </span>
                     </div>
                 </div>
             ),
@@ -309,21 +306,11 @@ export default function User_Invoice() {
             title: "Advertiser",
             dataIndex: "advertiser",
             key: "advertiser",
-            width: 160,
-            render: (v: string, record: InvoiceRow) => (
+            width: 150,
+            render: (v: string, record: CampaignRow) => (
                 <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>
-                        {v || record.client_name || "—"}
-                    </div>
-                    <div
-                        style={{
-                            fontSize: 10,
-                            color: C.slate500,
-                            fontFamily: "monospace",
-                        }}
-                    >
-                        {record.client_id}
-                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>{v || record.client_name || "—"}</div>
+                    <div style={{ fontSize: 10, color: C.slate500, fontFamily: "monospace" }}>{record.client_id}</div>
                 </div>
             ),
         },
@@ -331,121 +318,72 @@ export default function User_Invoice() {
             title: "Start Date",
             dataIndex: "start_date",
             key: "start_date",
-            width: 120,
-            render: (v: string) => (
-                <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>
-            ),
+            width: 110,
+            render: (v: string) => <span style={{ fontSize: 12 }}>{fmtDate(v)}</span>,
         },
         {
             title: "End Date",
             dataIndex: "end_date",
             key: "end_date",
-            width: 120,
-            render: (v: string) => (
-                <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>
-            ),
+            width: 110,
+            render: (v: string) => <span style={{ fontSize: 12 }}>{fmtDate(v)}</span>,
         },
         {
-            title: "PDF Status",
-            dataIndex: "pdf_generated",
-            key: "pdf_generated",
-            width: 140,
-            render: (generated: boolean, record: InvoiceRow) =>
-                generated ? (
-                    <Tooltip title={`Invoice: ${record.invoice_id ?? "—"}`}>
-                        <span
-                            style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 5,
-                                padding: "3px 10px",
-                                borderRadius: 20,
-                                background: C.greenLight,
-                                border: `1px solid ${C.greenMid}`,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: C.green,
-                            }}
-                        >
-                            <CheckCircleOutlined style={{ fontSize: 11 }} /> Generated
-                        </span>
-                    </Tooltip>
-                ) : (
-                    <span
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 5,
-                            padding: "3px 10px",
-                            borderRadius: 20,
-                            background: C.amberLight,
-                            border: "1px solid #FDE68A",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: C.amber,
-                        }}
-                    >
-                        <ClockCircleOutlined style={{ fontSize: 11 }} /> Pending
-                    </span>
-                ),
+            title: "Invoices",
+            key: "invoices",
+            width: 120,
+            render: (_: any, record: CampaignRow) => (
+                <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.slate }}>
+                        {record.invoices.length} invoice{record.invoices.length !== 1 ? "s" : ""}
+                    </div>
+                    <div style={{ fontSize: 10, color: record.all_generated ? C.green : C.amber, fontWeight: 600 }}>
+                        {record.all_generated ? "✅ All Generated" : record.invoices.length > 0 ? "⚠️ Partial" : "⏳ Pending"}
+                    </div>
+                </div>
+            ),
         },
         {
             title: "Actions",
             key: "actions",
-            width: 210,
-            fixed: "right",
-            render: (_: any, record: InvoiceRow) => {
-                const isGenerating = generating === record.campaign_id;
-                return (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        {/* Generate / Re-generate */}
-                        <Button
-                            size="small"
-                            icon={<FilePdfOutlined />}
-                            loading={isGenerating}
-                            onClick={() => handleGenerate(record.campaign_id)}
-                            style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                height: 30,
-                                background: record.pdf_generated
-                                    ? C.purpleLight
-                                    : C.greenLight,
-                                color: record.pdf_generated ? C.purple : C.green,
-                                border: `1px solid ${
-                                    record.pdf_generated ? C.purpleMid : C.greenMid
-                                }`,
-                                borderRadius: 6,
-                            }}
-                        >
-                            {record.pdf_generated ? "Re-generate" : "Generate"}
-                        </Button>
+            width: 140,
+            fixed: "right" as const,
+            render: (_: any, record: CampaignRow) => {
+                const allGenerated = record.all_generated;
 
-                        {/* Download — only if generated */}
-                        {record.pdf_generated && (
-                            <Button
-                                size="small"
-                                icon={<DownloadOutlined />}
-                                onClick={() =>
-                                    handleDownload(
-                                        record.campaign_id,
-                                        record.invoice_id ?? record.campaign_id
-                                    )
+                return (
+                    <Button
+                        size="small"
+                        icon={<DownloadOutlined />}
+                        disabled={!allGenerated}
+                        onClick={() => {
+                            // Download all invoices with delay so browser doesn't block
+                            record.invoices.forEach((inv, index) => {
+                                if (inv.pdf_generated) {
+                                    setTimeout(() => {
+                                        const a = document.createElement("a");
+                                        a.href = `${BASE_URL}/download_invoice_pdf/${inv.invoice_id}/`;
+                                        a.download = `${inv.invoice_id}.pdf`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                    }, index * 800); // 800ms gap between each download
                                 }
-                                style={{
-                                    fontSize: 11,
-                                    fontWeight: 600,
-                                    height: 30,
-                                    background: C.blueLight,
-                                    color: C.blue,
-                                    border: `1px solid ${C.blueMid}`,
-                                    borderRadius: 6,
-                                }}
-                            >
-                                Download
-                            </Button>
-                        )}
-                    </div>
+                            });
+                        }}
+                        style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            height: 30,
+                            background: allGenerated ? C.blueLight : C.slate100,
+                            color: allGenerated ? C.blue : C.slate300,
+                            border: `1px solid ${allGenerated ? C.blueMid : C.slate300}`,
+                            borderRadius: 6,
+                            cursor: allGenerated ? "pointer" : "not-allowed",
+                        }}
+                    >
+                        Download
+                    </Button>
                 );
             },
         },
@@ -453,234 +391,135 @@ export default function User_Invoice() {
 
     return (
         <>
-            {/* Page Header */}
             <div style={{ marginBottom: 20 }}>
-                <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate }}>
-                    Invoices
-                </h1>
-                <p
-                    style={{
-                        fontSize: 11,
-                        color: C.slate500,
-                        marginTop: 1,
-                        letterSpacing: "0.04em",
-                        fontWeight: 500,
-                    }}
-                >
-                    GENERATE &amp; DOWNLOAD TAX INVOICES FOR YOUR CAMPAIGNS
+                <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate }}>Invoice Generator</h1>
+                <p style={{ fontSize: 11, color: C.slate500, marginTop: 1, fontWeight: 500, letterSpacing: "0.04em" }}>
+                    SELECT CLIENT → SELECT CAMPAIGNS → GENERATE INVOICES
                 </p>
             </div>
 
             {/* Stat Cards */}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: 14,
-                    marginBottom: 20,
-                }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
                 {[
-                    {
-                        label: "Total Invoices",
-                        value: totalCount,
-                        color: C.purple,
-                        bg: C.purpleLight,
-                        icon: "🧾",
-                    },
-                    {
-                        label: "PDF Generated",
-                        value: generatedCount,
-                        color: C.green,
-                        bg: C.greenLight,
-                        icon: "✅",
-                    },
-                    {
-                        label: "Pending",
-                        value: pendingCount,
-                        color: C.amber,
-                        bg: C.amberLight,
-                        icon: "⏳",
-                    },
-                ].map((card) => (
-                    <div
-                        key={card.label}
-                        style={{
-                            background: C.white,
-                            borderRadius: 14,
-                            padding: 20,
-                            border: `1px solid ${C.border}`,
-                            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                                marginBottom: 12,
-                            }}
-                        >
-                            <span
-                                style={{
-                                    fontSize: 11,
-                                    color: card.color,
-                                    fontWeight: 700,
-                                    letterSpacing: "0.04em",
-                                    textTransform: "uppercase",
-                                }}
-                            >
+                    { label: "Total Campaigns", value: totalCount, color: C.purple, bg: C.purpleLight, icon: "🧾" },
+                    { label: "Fully Invoiced", value: generatedCount, color: C.green, bg: C.greenLight, icon: "✅" },
+                    { label: "Pending", value: pendingCount, color: C.amber, bg: C.amberLight, icon: "⏳" },
+                ].map(card => (
+                    <div key={card.label} style={{
+                        background: C.white, borderRadius: 14, padding: 20,
+                        border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                            <span style={{ fontSize: 11, color: card.color, fontWeight: 700, textTransform: "uppercase" }}>
                                 {card.label}
                             </span>
-                            <div
-                                style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: 9,
-                                    background: card.bg,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: 16,
-                                }}
-                            >
-                                {card.icon}
-                            </div>
+                            <div style={{
+                                width: 36, height: 36, borderRadius: 9, background: card.bg,
+                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+                            }}>{card.icon}</div>
                         </div>
-                        <div
-                            style={{
-                                fontSize: 32,
-                                fontWeight: 800,
-                                color: card.color,
-                                letterSpacing: "-1px",
-                                lineHeight: 1,
-                            }}
-                        >
+                        <div style={{ fontSize: 32, fontWeight: 800, color: card.color, letterSpacing: "-1px", lineHeight: 1 }}>
                             {card.value}
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Search + Refresh */}
-            <div
-                style={{
-                    background: C.white,
-                    borderRadius: 12,
-                    padding: "14px 18px",
-                    border: `1px solid ${C.border}`,
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    flexWrap: "wrap",
-                }}
-            >
-                <Input
-                    placeholder="Search by campaign ID, name, advertiser…"
-                    prefix={<SearchOutlined style={{ color: C.slate500 }} />}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    allowClear
-                    style={{ flex: 1, minWidth: 240, height: 36 }}
-                />
-                <Button
-                    onClick={fetchList}
-                    icon={<ReloadOutlined />}
-                    style={{
-                        height: 36,
-                        borderRadius: 8,
-                        border: `1px solid ${C.border}`,
-                        background: C.white,
-                        color: C.slate500,
-                        fontSize: 12,
-                        fontWeight: 600,
-                    }}
-                >
-                    Refresh
-                </Button>
-                <span style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}>
-                    {filtered.length} of {rows.length} Invoices
-                </span>
-            </div>
-
-            {/* Info Banner */}
-            <div
-                style={{
-                    background: C.amberLight,
-                    border: "1px solid #FDE68A",
-                    borderRadius: 10,
-                    padding: "10px 16px",
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    fontSize: 12.5,
-                    color: C.amber,
-                    fontWeight: 500,
-                }}
-            >
-                <DollarOutlined style={{ fontSize: 16 }} />
-                Invoices are available only for campaigns whose end date has passed. Click{" "}
-                <strong style={{ margin: "0 3px" }}>Generate</strong> to create the
-                PDF, then <strong style={{ margin: "0 3px" }}>Download</strong> to
-                save it.
-            </div>
-
-            {/* Table */}
-            <div
-                style={{
-                    background: C.white,
-                    borderRadius: 14,
-                    border: `1px solid ${C.border}`,
-                    overflow: "hidden",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                }}
-            >
-                <Table
-                    columns={columns}
-                    dataSource={filtered}
-                    rowKey="campaign_id"
-                    loading={loading}
-                    scroll={{ x: 1350 }}
-                    pagination={{
-                        pageSize: 10,
-                        showSizeChanger: true,
-                        pageSizeOptions: ["10", "20", "50"],
-                        showTotal: (total, range) =>
-                            `${range[0]}–${range[1]} of ${total} invoices`,
-                        style: { padding: "12px 16px" },
-                    }}
-                    style={{ fontSize: 13 }}
-                    locale={{
-                        emptyText: (
-                            <div style={{ padding: "32px 0", textAlign: "center" }}>
-                                <div
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        color: C.slate,
-                                        marginBottom: 4,
-                                    }}
-                                >
-                                    No invoices yet
-                                </div>
-                                <div style={{ fontSize: 12, color: C.slate500 }}>
-                                    Invoices appear here once your campaign's end date has passed.
-                                </div>
-                            </div>
-                        ),
-                    }}
+            {/* Step 1: Select Client */}
+            <div style={{
+                background: C.white, borderRadius: 12, padding: "16px 20px",
+                border: `1px solid ${C.border}`, marginBottom: 16,
+            }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.slate, marginBottom: 10 }}>
+                    Step 1 — Select Client
+                </div>
+                <Select
+                    showSearch
+                    placeholder="Search and select a client..."
+                    style={{ width: "100%", height: 40 }}
+                    value={selectedClientId}
+                    onChange={handleClientChange}
+                    filterOption={(input, option) =>
+                        (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={clients.map(c => ({ value: c.client_id, label: `${c.name} (${c.client_id})` }))}
                 />
             </div>
 
-            {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onClose={() => setToast(null)}
-                />
+            {/* Step 2: Select Campaigns + Generate */}
+            {selectedClientId && (
+                <div style={{
+                    background: C.white, borderRadius: 12, padding: "16px 20px",
+                    border: `1px solid ${C.border}`, marginBottom: 16,
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.slate }}>
+                        Step 2 — Select Campaigns & Generate
+                    </div>
+                    <Input
+                        placeholder="Search campaigns..."
+                        prefix={<SearchOutlined style={{ color: C.slate500 }} />}
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        allowClear
+                        style={{ flex: 1, minWidth: 200, height: 36 }}
+                    />
+                    <Button
+                        onClick={() => selectedClientId && fetchCampaigns(selectedClientId)}
+                        icon={<ReloadOutlined />}
+                        style={{ height: 36, borderRadius: 8, border: `1px solid ${C.border}`, color: C.slate500, fontSize: 12 }}
+                    >
+                        Refresh
+                    </Button>
+                    <Button
+                        type="primary"
+                        icon={<FilePdfOutlined />}
+                        loading={generating}
+                        disabled={selectedCampaignIds.length === 0}
+                        onClick={handleGenerate}
+                        style={{ height: 36, borderRadius: 8, fontWeight: 700, fontSize: 13 }}
+                    >
+                        Generate Invoices {selectedCampaignIds.length > 0 ? `(${selectedCampaignIds.length})` : ""}
+                    </Button>
+                </div>
             )}
+
+            {/* Campaign Table */}
+            {selectedClientId && (
+                <div style={{
+                    background: C.white, borderRadius: 14, border: `1px solid ${C.border}`,
+                    overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}>
+                    <Table
+                        columns={columns}
+                        dataSource={filtered}
+                        rowKey="campaign_id"
+                        loading={loading}
+                        expandable={{ expandedRowRender }}
+                        scroll={{ x: 1000 }}
+                        pagination={{
+                            pageSize: 10,
+                            showSizeChanger: true,
+                            showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} campaigns`,
+                            style: { padding: "12px 16px" },
+                        }}
+                        locale={{
+                            emptyText: (
+                                <div style={{ padding: "32px 0", textAlign: "center" }}>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: C.slate, marginBottom: 4 }}>
+                                        No campaigns found
+                                    </div>
+                                    <div style={{ fontSize: 12, color: C.slate500 }}>
+                                        No approved campaigns for this client.
+                                    </div>
+                                </div>
+                            ),
+                        }}
+                    />
+                </div>
+            )}
+
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             <style>{`
                 .ant-table-thead > tr > th {
@@ -689,7 +528,6 @@ export default function User_Invoice() {
                     font-weight: 700 !important;
                     color: #64748B !important;
                     text-transform: uppercase;
-                    letter-spacing: 0.04em;
                 }
                 .ant-table-row:hover td { background: #F8FAFC !important; }
             `}</style>

@@ -1,518 +1,698 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Form, Input, Select, DatePicker, Button, message as antMessage } from 'antd';
+import { useEffect, useState, useCallback } from "react";
+import { Table, Button, Input, Tag, Tooltip } from "antd";
 import {
-  CheckOutlined, InfoCircleOutlined, CloseOutlined, PaperClipOutlined,
-  FileImageOutlined, VideoCameraOutlined, FileOutlined,
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
+    SearchOutlined,
+    ReloadOutlined,
+    FilePdfOutlined,
+    DownloadOutlined,
+    CheckCircleOutlined,
+    ClockCircleOutlined,
+    DollarOutlined,
+} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
 
-const { TextArea } = Input;
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-// ── Types ──────────────────────────────────────────────────────────────────
-interface AttachedFile {
-  id: string;
-  file: File;
+// ── Colors ────────────────────────────────────────────────────────────────────
+const C = {
+    bg: "#F8FAFC",
+    white: "#FFFFFF",
+    slate: "#0F172A",
+    slate700: "#334155",
+    slate500: "#64748B",
+    slate300: "#CBD5E1",
+    slate100: "#F1F5F9",
+    border: "#E2E8F0",
+    blue: "#2563EB",
+    blueLight: "#EFF6FF",
+    blueMid: "#BFDBFE",
+    green: "#16A34A",
+    greenLight: "#F0FDF4",
+    greenMid: "#86EFAC",
+    amber: "#D97706",
+    amberLight: "#FFFBEB",
+    purple: "#7C3AED",
+    purpleLight: "#F5F3FF",
+    purpleMid: "#DDD6FE",
+};
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface InvoiceRow {
+    campaign_id: string;
+    campaign_name: string;
+    advertiser: string;
+    client_name: string;
+    client_id: string;
+    start_date: string;
+    end_date: string;
+    campaign_type: string;
+    line_items_count: number;
+    invoice_id: string | null;
+    pdf_generated: boolean;
+    pdf_url: string | null;
+    created_at: string;
 }
 
-function genId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(v?: string) {
+    if (!v) return "—";
+    return new Date(v).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
 }
 
-const toOpts = (arr: string[]) => arr.map(s => ({ value: s, label: s }));
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({
+    message,
+    type,
+    onClose,
+}: {
+    message: string;
+    type: "success" | "error";
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        const t = setTimeout(onClose, 3500);
+        return () => clearTimeout(t);
+    }, [onClose]);
 
-function getFileIcon(file: File) {
-  if (file.type.startsWith('image/'))
-    return <FileImageOutlined style={{ fontSize: 15, color: '#1d4ed8' }} />;
-  if (file.type.startsWith('video/'))
-    return <VideoCameraOutlined style={{ fontSize: 15, color: '#7c3aed' }} />;
-  return <FileOutlined style={{ fontSize: 15, color: '#64748b' }} />;
+    const color = type === "success" ? C.green : "#DC2626";
+    return (
+        <div
+            style={{
+                position: "fixed",
+                bottom: 24,
+                right: 24,
+                zIndex: 999,
+                background: C.white,
+                border: `1px solid ${color}55`,
+                borderRadius: 12,
+                padding: "14px 20px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+                minWidth: 280,
+            }}
+        >
+            <span style={{ fontSize: 18 }}>{type === "success" ? "✅" : "❌"}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>
+                {message}
+            </span>
+        </div>
+    );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function User_Invoice() {
+    const [rows, setRows] = useState<InvoiceRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [generating, setGenerating] = useState<string | null>(null);
+    const [toast, setToast] = useState<{
+        message: string;
+        type: "success" | "error";
+    } | null>(null);
 
-const BUYING_TYPE_OPTIONS = [
-  'Programmatic (DV360)', 'Direct', 'Programmatic Guaranteed',
-  'Preferred Deal', 'Open Auction',
-];
+    const clientId = localStorage.getItem("client_id");
 
-const labelStyle: React.CSSProperties = { fontSize: 12.5, color: '#64748b', fontWeight: 500 };
-const fieldRequired = <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>;
+    const showToast = (message: string, type: "success" | "error" = "success") =>
+        setToast({ message, type });
 
-// ── Main Component ───────────────────────────────────────────────────────────
-export default function Bulk_Campaign_Create() {
-  const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
+    // ── Fetch list ──────────────────────────────────────────────────────────
+    const fetchList = useCallback(() => {
+        setLoading(true);
+        fetch(`${BASE_URL}/get_invoice_list_by_client/${clientId}/`, {
+            headers: { "ngrok-skip-browser-warning": "1" },
+        })
+            .then((r) => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
+            .then((data) => setRows(Array.isArray(data) ? data : []))
+            .catch(() => showToast("Failed to load invoices.", "error"))
+            .finally(() => setLoading(false));
+    }, [clientId]);
 
-  const clientName = localStorage.getItem('client_name') ?? '';
-  const clientId = localStorage.getItem('client_id') ?? '';
+    useEffect(() => {
+        fetchList();
+    }, [fetchList]);
 
-  // Campaign fields
-  const [advertiser, setAdvertiser] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [clientCampaignId, setClientCampaignId] = useState('');
-  const [purchaseOrderId, setPurchaseOrderId] = useState('');
-  const [campaignName, setCampaignName] = useState('');
-  const [campaignType, setCampaignType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [buyingType, setBuyingType] = useState<string[]>([]);
-  const [objective, setObjective] = useState('');
+    // ── Generate Invoice PDF ────────────────────────────────────────────────
+    const handleGenerate = async (campaignId: string) => {
+        setGenerating(campaignId);
+        try {
+            const res = await fetch(
+                `${BASE_URL}/generate_invoice_pdf/${campaignId}/`,
+                {
+                    method: "POST",
+                    headers: { "ngrok-skip-browser-warning": "1" },
+                }
+            );
+            if (!res.ok) throw new Error();
+            const data = await res.json();
 
-  // ── Single line-item paragraph + attachments (no add/remove concept) ──
-  const [lineMessage, setLineMessage] = useState('');
-  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.campaign_id === campaignId
+                        ? {
+                              ...r,
+                              pdf_generated: true,
+                              pdf_url: data.download_url,
+                              invoice_id: data.invoice_id,
+                          }
+                        : r
+                )
+            );
+            showToast(`Invoice PDF generated for ${campaignId}!`);
+        } catch {
+            showToast("Failed to generate Invoice PDF. Try again.", "error");
+        } finally {
+            setGenerating(null);
+        }
+    };
 
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const incoming = Array.from(e.target.files || []);
-    if (!incoming.length) return;
-    const newAttachments: AttachedFile[] = incoming.map(f => ({ id: genId(), file: f }));
-    setAttachments(prev => [...prev, ...newAttachments]);
-    e.target.value = '';
-  };
+    // ── Download Invoice PDF ────────────────────────────────────────────────
+    const handleDownload = (campaignId: string, invoiceId: string) => {
+        const a = document.createElement("a");
+        a.href = `${BASE_URL}/download_invoice_pdf/${campaignId}/`;
+        a.download = `${invoiceId}.pdf`;
+        a.click();
+    };
 
-  const removeAttachment = (attachId: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== attachId));
-  };
-
-  const imageCount = attachments.filter(a => a.file.type.startsWith('image/')).length;
-  const videoCount = attachments.filter(a => a.file.type.startsWith('video/')).length;
-
-  // ── Validation ──────────────────────────────────────────────────────────────
-  const validateForm = (): boolean => {
-    if (!advertiser.trim()) { antMessage.error('Advertiser (Brand) is required.'); return false; }
-    if (!campaignName.trim()) { antMessage.error('Campaign Name is required.'); return false; }
-    if (!campaignType) { antMessage.error('Campaign Type is required.'); return false; }
-    if (!startDate) { antMessage.error('Campaign Start Date is required.'); return false; }
-    if (!endDate) { antMessage.error('Campaign End Date is required.'); return false; }
-    if (!buyingType.length) { antMessage.error('Buying Type is required.'); return false; }
-    if (!objective) { antMessage.error('Campaign Objective is required.'); return false; }
-    if (!lineMessage.trim()) { antMessage.error('Please describe the line item details.'); return false; }
-    return true;
-  };
-
-  // ── Submit ──────────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-    setSubmitting(true);
-
-    const fd = new FormData();
-    fd.append('client', clientId);
-    fd.append('client_name', clientName);
-    fd.append('advertiser', advertiser);
-    fd.append('campaign_name', campaignName);
-    fd.append('campaign_type', campaignType);
-    fd.append('buying_type', buyingType.join(', '));
-    fd.append('objective', objective);
-    fd.append('start_date', startDate);
-    fd.append('end_date', endDate);
-    if (websiteUrl) fd.append('website_url', websiteUrl);
-    if (clientCampaignId) fd.append('client_campaign_id', clientCampaignId);
-    if (purchaseOrderId) fd.append('purchase_order_id', purchaseOrderId);
-    fd.append('message', lineMessage);
-    fd.append('attachment_count', String(attachments.length));
-    attachments.forEach((att, idx) => {
-      fd.append(`attachment_${idx}`, att.file, att.file.name);
+    // ── Filter ──────────────────────────────────────────────────────────────
+    const filtered = rows.filter((r) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        return [r.campaign_id, r.campaign_name, r.advertiser, r.client_name].some(
+            (f) => f?.toLowerCase().includes(q)
+        );
     });
 
-    try {
-      const res = await fetch(`${BASE_URL}/create_bulk_campaign/`, {
-        method: 'POST',
-        body: fd,
-        headers: { 'ngrok-skip-browser-warning': '1' },
-      });
-      if (res.ok) {
-        antMessage.success('Campaign request submitted successfully!');
-        navigate('/campaign_choice');
-      } else {
-        const text = await res.text();
-        antMessage.error(text || `Submission failed (status ${res.status})`);
-      }
-    } catch (err) {
-      antMessage.error(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // ── Stats ───────────────────────────────────────────────────────────────
+    const totalCount = rows.length;
+    const generatedCount = rows.filter((r) => r.pdf_generated).length;
+    const pendingCount = totalCount - generatedCount;
 
-  const totalAttachments = attachments.length;
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-  return (
-    <div style={{ maxWidth: 860, margin: '0 auto', paddingBottom: 100 }}>
-
-      {/* Page Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', margin: 0 }}>
-          Bulk Campaign Request
-        </h1>
-        <p style={{ fontSize: 11, color: '#64748B', marginTop: 4, letterSpacing: '0.04em', fontWeight: 500 }}>
-          FILL IN CAMPAIGN DETAILS — ADMIN WILL SET UP THE FULL CAMPAIGN FROM YOUR REQUEST
-        </p>
-      </div>
-
-      {/* How it works banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #eef2ff 0%, #f0fdf4 100%)',
-        border: '1px solid #c7d2fe', borderRadius: 12,
-        padding: '14px 18px', marginBottom: 24,
-        display: 'flex', alignItems: 'flex-start', gap: 12,
-      }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 8, background: '#4f46e5',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        }}>
-          <InfoCircleOutlined style={{ fontSize: 16, color: '#fff' }} />
-        </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#312e81', marginBottom: 3 }}>
-            How this works
-          </div>
-          <div style={{ fontSize: 12.5, color: '#4338ca', lineHeight: 1.65 }}>
-            Fill in your campaign details above, then write one message describing all the line
-            items you need (like an email to your campaign manager) and attach any creative files.
-            Your admin will read your message and set up the full campaign.
-          </div>
-        </div>
-      </div>
-
-      {/* ── Campaign Details ── */}
-      <div style={{
-        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
-        padding: '24px 28px', marginBottom: 20,
-        boxShadow: '0 1px 4px rgba(15,23,42,0.05)',
-      }}>
-        <div style={{
-          fontSize: 13, fontWeight: 700, color: '#4f46e5',
-          marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          📋 Campaign Details
-        </div>
-
-        <Form layout="vertical">
-
-          {/* Company name (read-only) */}
-          <Form.Item label={<span style={labelStyle}>Company Name</span>} style={{ marginBottom: 16 }}>
-            <Input
-              value={clientName || 'Loading…'}
-              disabled
-              style={{ height: 38, fontWeight: 600, background: '#f8fafc' }}
-            />
-          </Form.Item>
-
-          {/* Advertiser + Website */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item label={<span style={labelStyle}>Advertiser (Brand){fieldRequired}</span>} style={{ marginBottom: 16 }}>
-              <Input
-                placeholder="Enter advertiser name…"
-                value={advertiser}
-                onChange={e => setAdvertiser(e.target.value)}
-                style={{ height: 38 }}
-              />
-            </Form.Item>
-            <Form.Item
-              label={<span style={labelStyle}>Website URL <span style={{ fontSize: 11, color: '#94a3b8' }}>(optional)</span></span>}
-              style={{ marginBottom: 16 }}
-            >
-              <Input
-                placeholder="https://"
-                value={websiteUrl}
-                onChange={e => setWebsiteUrl(e.target.value)}
-                style={{ height: 38 }}
-              />
-            </Form.Item>
-          </div>
-
-          {/* Client Campaign ID + PO ID */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item
-              label={<span style={labelStyle}>Client Campaign ID <span style={{ fontSize: 11, color: '#94a3b8' }}>(optional)</span></span>}
-              style={{ marginBottom: 16 }}
-            >
-              <Input
-                placeholder="Enter client campaign ID…"
-                value={clientCampaignId}
-                onChange={e => setClientCampaignId(e.target.value)}
-                style={{ height: 38 }}
-              />
-            </Form.Item>
-            <Form.Item
-              label={<span style={labelStyle}>Purchase Order ID <span style={{ fontSize: 11, color: '#94a3b8' }}>(optional)</span></span>}
-              style={{ marginBottom: 16 }}
-            >
-              <Input
-                placeholder="Enter purchase order ID…"
-                value={purchaseOrderId}
-                onChange={e => setPurchaseOrderId(e.target.value)}
-                style={{ height: 38 }}
-              />
-            </Form.Item>
-          </div>
-
-          {/* Campaign Name + Type */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item label={<span style={labelStyle}>Campaign Name{fieldRequired}</span>} style={{ marginBottom: 16 }}>
-              <Input
-                placeholder="e.g. Summer Awareness 2025"
-                value={campaignName}
-                onChange={e => setCampaignName(e.target.value)}
-                style={{ height: 38 }}
-              />
-            </Form.Item>
-            <Form.Item label={<span style={labelStyle}>Campaign Type{fieldRequired}</span>} style={{ marginBottom: 16 }}>
-              <Select
-                value={campaignType || undefined}
-                onChange={setCampaignType}
-                placeholder="Select type…"
-                style={{ width: '100%', height: 38 }}
-                options={toOpts(['Brand Awareness', 'Performance', 'Retargeting', 'Prospecting', 'Lead Generation'])}
-              />
-            </Form.Item>
-          </div>
-
-          {/* Start + End Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item label={<span style={labelStyle}>Campaign Start Date{fieldRequired}</span>} style={{ marginBottom: 16 }}>
-              <DatePicker
-                style={{ width: '100%', height: 38 }}
-                value={startDate ? dayjs(startDate) : null}
-                onChange={(_, ds) => setStartDate(typeof ds === 'string' ? ds : '')}
-              />
-            </Form.Item>
-            <Form.Item label={<span style={labelStyle}>Campaign End Date{fieldRequired}</span>} style={{ marginBottom: 16 }}>
-              <DatePicker
-                style={{ width: '100%', height: 38 }}
-                value={endDate ? dayjs(endDate) : null}
-                onChange={(_, ds) => setEndDate(typeof ds === 'string' ? ds : '')}
-                disabledDate={current => startDate ? current.isBefore(dayjs(startDate), 'day') : false}
-              />
-            </Form.Item>
-          </div>
-
-          {/* Buying Type + Objective */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item label={<span style={labelStyle}>Buying Type{fieldRequired}</span>} style={{ marginBottom: 0 }}>
-              <Select
-                mode="multiple"
-                value={buyingType}
-                onChange={(vals: string[]) => setBuyingType(vals)}
-                placeholder="Select buying type…"
-                style={{ width: '100%' }}
-                maxTagCount="responsive"
-                menuItemSelectedIcon={null}
-                optionRender={(option) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox" readOnly
-                      checked={buyingType.includes(option.value as string)}
-                      style={{ accentColor: '#4f46e5', width: 14, height: 14, cursor: 'pointer' }}
-                    />
-                    <span>{option.label}</span>
-                  </div>
-                )}
-                options={BUYING_TYPE_OPTIONS.map(o => ({ value: o, label: o }))}
-              />
-            </Form.Item>
-            <Form.Item label={<span style={labelStyle}>Campaign Objective{fieldRequired}</span>} style={{ marginBottom: 0 }}>
-              <Select
-                value={objective || undefined}
-                onChange={setObjective}
-                placeholder="Select objective…"
-                style={{ width: '100%', height: 38 }}
-                options={toOpts(['Increase Brand Awareness', 'Drive Website Traffic', 'Generate Leads', 'Boost Sales', 'App Installs'])}
-              />
-            </Form.Item>
-          </div>
-
-        </Form>
-      </div>
-
-      {/* ── Line Item Details (single paragraph — no add/remove) ── */}
-      <div style={{
-        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
-        padding: '24px 28px', marginBottom: 20,
-        boxShadow: '0 1px 4px rgba(15,23,42,0.05)',
-      }}>
-        <div style={{
-          fontSize: 13, fontWeight: 700, color: '#4f46e5',
-          marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          ✉️ Line Item Details
-        </div>
-        <p style={{ fontSize: 12.5, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
-          Describe all the line items you need in one message — just like an email. Include
-          details like name, format, dates, targeting, impressions, etc. for each one.
-          Then attach your creative files (images &amp; videos) below.
-        </p>
-
-        <Form layout="vertical">
-          <Form.Item
-            label={<span style={labelStyle}>Line Item Details {fieldRequired}</span>}
-            style={{ marginBottom: 0 }}
-          >
-            <TextArea
-              placeholder={`Describe all line items like you're writing an email to your campaign manager...\n\nExample:\nHi, please set up the following line items:\n\n1) Mumbai Display 18–34\n- Ad Format: Banner (Desktop + Mobile)\n- Dates: 1 Jul 2025 to 31 Jul 2025\n- Impressions: 5,00,000 | Units: CPM\n- Age: 18–34 | Gender: Male & Female\n- Geo: India > Maharashtra > Mumbai\n- Platform: Display, Mobile\n- Frequency Cap: 3/user | Brand Safety: Standard\n\n2) Delhi Video 25–44\n- Ad Format: Video (CTV)\n- ...\n\nCreatives attached below.`}
-              value={lineMessage}
-              onChange={e => setLineMessage(e.target.value)}
-              rows={12}
-              style={{
-                fontSize: 13.5, lineHeight: 1.75,
-                resize: 'vertical', fontFamily: 'inherit',
-                borderRadius: 8, color: '#1e293b',
-              }}
-            />
-          </Form.Item>
-        </Form>
-
-        {/* Attachments area */}
-        <div style={{
-          marginTop: 14, border: '1px solid #e2e8f0',
-          borderRadius: 10, overflow: 'hidden',
-        }}>
-          {/* Attached files list */}
-          {attachments.length > 0 && (
-            <div style={{
-              borderBottom: '1px solid #f1f5f9',
-              padding: '10px 14px',
-              display: 'flex', flexWrap: 'wrap', gap: 8,
-            }}>
-              {attachments.map(att => (
-                <div key={att.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 7,
-                  padding: '5px 10px 5px 8px',
-                  background: att.file.type.startsWith('image/') ? '#eff6ff'
-                    : att.file.type.startsWith('video/') ? '#f5f3ff' : '#f8fafc',
-                  border: `1px solid ${att.file.type.startsWith('image/') ? '#bfdbfe'
-                    : att.file.type.startsWith('video/') ? '#ddd6fe' : '#e2e8f0'}`,
-                  borderRadius: 7, maxWidth: 220,
-                }}>
-                  {/* Thumbnail for images */}
-                  {att.file.type.startsWith('image/') ? (
-                    <img
-                      src={URL.createObjectURL(att.file)}
-                      alt={att.file.name}
-                      style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
-                    />
-                  ) : getFileIcon(att.file)}
-                  <div style={{ overflow: 'hidden', flex: 1 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: 500,
-                      color: att.file.type.startsWith('image/') ? '#1d4ed8'
-                        : att.file.type.startsWith('video/') ? '#6d28d9' : '#374151',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{att.file.name}</div>
-                    <div style={{ fontSize: 10.5, color: '#94a3b8' }}>{formatBytes(att.file.size)}</div>
-                  </div>
-                  <button
-                    onClick={() => removeAttachment(att.id)}
+    // ── Columns ─────────────────────────────────────────────────────────────
+    const columns: ColumnsType<InvoiceRow> = [
+        {
+            title: "Campaign ID",
+            dataIndex: "campaign_id",
+            key: "campaign_id",
+            width: 150,
+            render: (v: string) => (
+                <span
                     style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: '#94a3b8', padding: 2, flexShrink: 0,
-                      display: 'flex', alignItems: 'center',
+                        fontFamily: "monospace",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: C.blue,
+                        background: C.blueLight,
+                        padding: "3px 8px",
+                        borderRadius: 6,
                     }}
-                    title="Remove"
-                  >
-                    <CloseOutlined style={{ fontSize: 10 }} />
-                  </button>
+                >
+                    {v}
+                </span>
+            ),
+        },
+        {
+            title: "Invoice #",
+            dataIndex: "invoice_id",
+            key: "invoice_id",
+            width: 130,
+            render: (v: string | null) =>
+                v ? (
+                    <span
+                        style={{
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.purple,
+                            background: C.purpleLight,
+                            padding: "3px 7px",
+                            borderRadius: 5,
+                            border: `1px solid ${C.purpleMid}`,
+                        }}
+                    >
+                        {v}
+                    </span>
+                ) : (
+                    <span style={{ color: C.slate300, fontSize: 12 }}>—</span>
+                ),
+        },
+        {
+            title: "Campaign Name",
+            dataIndex: "campaign_name",
+            key: "campaign_name",
+            width: 240,
+            render: (v: string, record: InvoiceRow) => (
+                <div>
+                    <div
+                        style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: C.slate,
+                            marginBottom: 4,
+                        }}
+                    >
+                        {v || "—"}
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        {record.campaign_type && (
+                            <Tag
+                                color="blue"
+                                style={{ fontSize: 10, margin: 0, lineHeight: "18px" }}
+                            >
+                                {record.campaign_type}
+                            </Tag>
+                        )}
+                        <Tag
+                            color="purple"
+                            style={{ fontSize: 10, margin: 0, lineHeight: "18px" }}
+                        >
+                            {record.line_items_count} line item
+                            {record.line_items_count !== 1 ? "s" : ""}
+                        </Tag>
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 3,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: C.green,
+                                background: C.greenLight,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                border: "1px solid #BBF7D0",
+                            }}
+                        >
+                            <CheckCircleOutlined style={{ fontSize: 9 }} />
+                            Approved
+                        </span>
+                    </div>
                 </div>
-              ))}
+            ),
+        },
+        {
+            title: "Advertiser",
+            dataIndex: "advertiser",
+            key: "advertiser",
+            width: 160,
+            render: (v: string, record: InvoiceRow) => (
+                <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>
+                        {v || record.client_name || "—"}
+                    </div>
+                    <div
+                        style={{
+                            fontSize: 10,
+                            color: C.slate500,
+                            fontFamily: "monospace",
+                        }}
+                    >
+                        {record.client_id}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            title: "Start Date",
+            dataIndex: "start_date",
+            key: "start_date",
+            width: 120,
+            render: (v: string) => (
+                <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>
+            ),
+        },
+        {
+            title: "End Date",
+            dataIndex: "end_date",
+            key: "end_date",
+            width: 120,
+            render: (v: string) => (
+                <span style={{ fontSize: 12, color: C.slate }}>{fmtDate(v)}</span>
+            ),
+        },
+        {
+            title: "PDF Status",
+            dataIndex: "pdf_generated",
+            key: "pdf_generated",
+            width: 140,
+            render: (generated: boolean, record: InvoiceRow) =>
+                generated ? (
+                    <Tooltip title={`Invoice: ${record.invoice_id ?? "—"}`}>
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "3px 10px",
+                                borderRadius: 20,
+                                background: C.greenLight,
+                                border: `1px solid ${C.greenMid}`,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: C.green,
+                            }}
+                        >
+                            <CheckCircleOutlined style={{ fontSize: 11 }} /> Generated
+                        </span>
+                    </Tooltip>
+                ) : (
+                    <span
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "3px 10px",
+                            borderRadius: 20,
+                            background: C.amberLight,
+                            border: "1px solid #FDE68A",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.amber,
+                        }}
+                    >
+                        <ClockCircleOutlined style={{ fontSize: 11 }} /> Pending
+                    </span>
+                ),
+        },
+        {
+            title: "Actions",
+            key: "actions",
+            width: 210,
+            fixed: "right",
+            render: (_: any, record: InvoiceRow) => {
+                const isGenerating = generating === record.campaign_id;
+                return (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {/* Generate / Re-generate */}
+                        <Button
+                            size="small"
+                            icon={<FilePdfOutlined />}
+                            loading={isGenerating}
+                            onClick={() => handleGenerate(record.campaign_id)}
+                            style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                height: 30,
+                                background: record.pdf_generated
+                                    ? C.purpleLight
+                                    : C.greenLight,
+                                color: record.pdf_generated ? C.purple : C.green,
+                                border: `1px solid ${
+                                    record.pdf_generated ? C.purpleMid : C.greenMid
+                                }`,
+                                borderRadius: 6,
+                            }}
+                        >
+                            {record.pdf_generated ? "Re-generate" : "Generate"}
+                        </Button>
+
+                        {/* Download — only if generated */}
+                        {record.pdf_generated && (
+                            <Button
+                                size="small"
+                                icon={<DownloadOutlined />}
+                                onClick={() =>
+                                    handleDownload(
+                                        record.campaign_id,
+                                        record.invoice_id ?? record.campaign_id
+                                    )
+                                }
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    height: 30,
+                                    background: C.blueLight,
+                                    color: C.blue,
+                                    border: `1px solid ${C.blueMid}`,
+                                    borderRadius: 6,
+                                }}
+                            >
+                                Download
+                            </Button>
+                        )}
+                    </div>
+                );
+            },
+        },
+    ];
+
+    return (
+        <>
+            {/* Page Header */}
+            <div style={{ marginBottom: 20 }}>
+                <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate }}>
+                    Invoices
+                </h1>
+                <p
+                    style={{
+                        fontSize: 11,
+                        color: C.slate500,
+                        marginTop: 1,
+                        letterSpacing: "0.04em",
+                        fontWeight: 500,
+                    }}
+                >
+                    GENERATE &amp; DOWNLOAD TAX INVOICES FOR YOUR CAMPAIGNS
+                </p>
             </div>
-          )}
 
-          {/* Attach button row */}
-          <div style={{
-            padding: '10px 14px', background: '#f8fafc',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              style={{ display: 'none' }}
-              onChange={handleFiles}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                height: 34, padding: '0 14px',
-                border: '1px solid #cbd5e1', borderRadius: 7,
-                background: '#fff', color: '#475569',
-                fontWeight: 500, fontSize: 12.5, cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = '#4f46e5';
-                (e.currentTarget as HTMLButtonElement).style.color = '#4f46e5';
-                (e.currentTarget as HTMLButtonElement).style.background = '#eef2ff';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = '#cbd5e1';
-                (e.currentTarget as HTMLButtonElement).style.color = '#475569';
-                (e.currentTarget as HTMLButtonElement).style.background = '#fff';
-              }}
+            {/* Stat Cards */}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: 14,
+                    marginBottom: 20,
+                }}
             >
-              <PaperClipOutlined style={{ fontSize: 13 }} />
-              Attach Files
-            </button>
-            <span style={{ fontSize: 11.5, color: '#94a3b8' }}>
-              Images &amp; videos accepted · Multiple files allowed
-            </span>
-            {attachments.length > 0 && (
-              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#64748b', fontWeight: 500 }}>
-                {imageCount > 0 && `${imageCount} image${imageCount > 1 ? 's' : ''}`}
-                {imageCount > 0 && videoCount > 0 && ' · '}
-                {videoCount > 0 && `${videoCount} video${videoCount > 1 ? 's' : ''}`}
-              </span>
+                {[
+                    {
+                        label: "Total Invoices",
+                        value: totalCount,
+                        color: C.purple,
+                        bg: C.purpleLight,
+                        icon: "🧾",
+                    },
+                    {
+                        label: "PDF Generated",
+                        value: generatedCount,
+                        color: C.green,
+                        bg: C.greenLight,
+                        icon: "✅",
+                    },
+                    {
+                        label: "Pending",
+                        value: pendingCount,
+                        color: C.amber,
+                        bg: C.amberLight,
+                        icon: "⏳",
+                    },
+                ].map((card) => (
+                    <div
+                        key={card.label}
+                        style={{
+                            background: C.white,
+                            borderRadius: 14,
+                            padding: 20,
+                            border: `1px solid ${C.border}`,
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                marginBottom: 12,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: 11,
+                                    color: card.color,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.04em",
+                                    textTransform: "uppercase",
+                                }}
+                            >
+                                {card.label}
+                            </span>
+                            <div
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 9,
+                                    background: card.bg,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 16,
+                                }}
+                            >
+                                {card.icon}
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 32,
+                                fontWeight: 800,
+                                color: card.color,
+                                letterSpacing: "-1px",
+                                lineHeight: 1,
+                            }}
+                        >
+                            {card.value}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Search + Refresh */}
+            <div
+                style={{
+                    background: C.white,
+                    borderRadius: 12,
+                    padding: "14px 18px",
+                    border: `1px solid ${C.border}`,
+                    marginBottom: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                }}
+            >
+                <Input
+                    placeholder="Search by campaign ID, name, advertiser…"
+                    prefix={<SearchOutlined style={{ color: C.slate500 }} />}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    allowClear
+                    style={{ flex: 1, minWidth: 240, height: 36 }}
+                />
+                <Button
+                    onClick={fetchList}
+                    icon={<ReloadOutlined />}
+                    style={{
+                        height: 36,
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                        background: C.white,
+                        color: C.slate500,
+                        fontSize: 12,
+                        fontWeight: 600,
+                    }}
+                >
+                    Refresh
+                </Button>
+                <span style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}>
+                    {filtered.length} of {rows.length} Invoices
+                </span>
+            </div>
+
+            {/* Info Banner */}
+            <div
+                style={{
+                    background: C.amberLight,
+                    border: "1px solid #FDE68A",
+                    borderRadius: 10,
+                    padding: "10px 16px",
+                    marginBottom: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 12.5,
+                    color: C.amber,
+                    fontWeight: 500,
+                }}
+            >
+                <DollarOutlined style={{ fontSize: 16 }} />
+                Invoices are available only for campaigns whose end date has passed. Click{" "}
+                <strong style={{ margin: "0 3px" }}>Generate</strong> to create the
+                PDF, then <strong style={{ margin: "0 3px" }}>Download</strong> to
+                save it.
+            </div>
+
+            {/* Table */}
+            <div
+                style={{
+                    background: C.white,
+                    borderRadius: 14,
+                    border: `1px solid ${C.border}`,
+                    overflow: "hidden",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}
+            >
+                <Table
+                    columns={columns}
+                    dataSource={filtered}
+                    rowKey="campaign_id"
+                    loading={loading}
+                    scroll={{ x: 1350 }}
+                    pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        pageSizeOptions: ["10", "20", "50"],
+                        showTotal: (total, range) =>
+                            `${range[0]}–${range[1]} of ${total} invoices`,
+                        style: { padding: "12px 16px" },
+                    }}
+                    style={{ fontSize: 13 }}
+                    locale={{
+                        emptyText: (
+                            <div style={{ padding: "32px 0", textAlign: "center" }}>
+                                <div
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: C.slate,
+                                        marginBottom: 4,
+                                    }}
+                                >
+                                    No invoices yet
+                                </div>
+                                <div style={{ fontSize: 12, color: C.slate500 }}>
+                                    Invoices appear here once your campaign's end date has passed.
+                                </div>
+                            </div>
+                        ),
+                    }}
+                />
+            </div>
+
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
             )}
-          </div>
-        </div>
 
-      </div>
-
-      {/* ── Bottom Action Bar ── */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: '#fff', borderTop: '1px solid #e2e8f0',
-        padding: '14px 32px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        zIndex: 100, boxShadow: '0 -2px 12px rgba(15,23,42,0.07)',
-      }}>
-        <Button
-          onClick={() => navigate('/campaign_choice')}
-          style={{ height: 40, paddingLeft: 20, paddingRight: 20, borderRadius: 8 }}
-        >
-          ← Back
-        </Button>
-
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>
-            {totalAttachments > 0 && `${totalAttachments} file${totalAttachments > 1 ? 's' : ''} attached`}
-          </span>
-          <Button
-            type="primary"
-            icon={<CheckOutlined />}
-            loading={submitting}
-            onClick={handleSubmit}
-            style={{
-              height: 40, paddingLeft: 24, paddingRight: 24,
-              borderRadius: 8, background: '#2563eb', borderColor: '#2563eb',
-              fontWeight: 600, fontSize: 13,
-            }}
-          >
-            {submitting ? 'Submitting…' : 'Submit Request'}
-          </Button>
-        </div>
-      </div>
-
-    </div>
-  );
+            <style>{`
+                .ant-table-thead > tr > th {
+                    background: #F1F5F9 !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #64748B !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
+                .ant-table-row:hover td { background: #F8FAFC !important; }
+            `}</style>
+        </>
+    );
 }
