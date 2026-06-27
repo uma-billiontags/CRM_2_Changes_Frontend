@@ -14,7 +14,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import Admin_Campaign_Chat from "./Admin_Campaign_Chat"; // Adjust path if needed
-import Creative_Team_Chat from "../creatives_team_dashboard/Creative_Team_Chat";
+import Creative_Team_Chat from "../creatives_team_dashboard/Internal_Team_Campaign_Chat";
 
 const { Option } = Select;
 const BASE_URL = import.meta.env.VITE_BASE_URL;

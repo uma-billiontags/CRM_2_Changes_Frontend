@@ -48,7 +48,7 @@ function StatusPill({ status }: { status: string }) {
 
 function MetricCard({ label, value, icon, color, sub, pct }: { label: string; value: number | string; icon: string; color: string; sub: string; pct?: number }) {
   return (
-    <div style={{ background: C.slate100, borderRadius: 10, padding: "14px 16px" }}>
+    <div style={{ background: C.white, borderRadius: 14, padding: "20px 22px", border: `1px solid ${C.border}`, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', }}>
       <div style={{ fontSize: 11, color: C.slate500, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>{icon} {label}</div>
       <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{value}</div>
       <div style={{ fontSize: 11, color: C.slate500 }}>{sub}</div>

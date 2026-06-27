@@ -4,7 +4,7 @@ import { Table, Tag, Button, Input, Select } from "antd";
 import { SearchOutlined, ReloadOutlined, EyeOutlined, CopyOutlined, CheckOutlined, MessageOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import TeamMember_General_Chat from "../creatives_team_dashboard/TeamMember_General_Chat";
-import Creative_Team_Chat from '../creatives_team_dashboard/Creative_Team_Chat';
+import Creative_Team_Chat from '../creatives_team_dashboard/Internal_Team_Campaign_Chat';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 

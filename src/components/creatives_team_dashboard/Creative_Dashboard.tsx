@@ -6,7 +6,7 @@ import { SearchOutlined, ReloadOutlined, EyeOutlined, MessageOutlined } from '@a
 import type { ColumnsType } from 'antd/es/table';
 import CreativesCell from './CreativesCell';
 import TeamMember_General_Chat from './TeamMember_General_Chat';
-import Creative_Team_Chat from './Creative_Team_Chat';
+import Creative_Team_Chat from './Internal_Team_Campaign_Chat';
 
 const { Text } = Typography;
 

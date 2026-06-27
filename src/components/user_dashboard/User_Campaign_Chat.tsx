@@ -17,6 +17,7 @@ interface Message {
     file_url?: string;
     file_name?: string;
     file_size?: string;
+    tagged_line_item?: string | null;
 }
 
 // Staged file: selected but NOT yet uploaded
@@ -56,6 +57,20 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
     const inputRef = useRef<HTMLInputElement>(null);
     const socketRef = useRef<WebSocket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [lineItems, setLineItems] = useState<{ line_item_id: string; line_item_name: string; status: string }[]>([]);
+    const [showMentions, setShowMentions] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState("");
+    const [mentionAnchor, setMentionAnchor] = useState(0);
+    const mentionRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!campaign.campaign_id) return;
+        fetch(`${BASE_URL}/get_campaign_line_items/${campaign.campaign_id}/`)
+            .then(r => r.json())
+            .then(data => setLineItems(Array.isArray(data) ? data : []))
+            .catch(err => console.error("Failed to load line items", err));
+    }, [campaign.campaign_id]);
 
     useEffect(() => {
         requestAnimationFrame(() => setVisible(true));
@@ -182,9 +197,9 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") handleSend();
+        if (e.key === "Escape" && showMentions) { setShowMentions(false); return; }
+        if (e.key === "Enter" && !showMentions) handleSend();
     };
-
     const renderMessageContent = (msg: Message, isClient: boolean) => {
         if (msg.message_type === "image" && msg.file_url) {
             return (
@@ -252,12 +267,60 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
                 </a>
             );
         }
-        return <span>{msg.content}</span>;
+        const parts = msg.content.split(/(@LI[A-Z0-9]+)/g);
+        return (
+            <span>
+                {parts.map((part, i) =>
+                    /^@LI[A-Z0-9]+$/.test(part) ? (
+                        <span key={i} style={{
+                            fontWeight: 700,
+                            background: isClient ? "rgba(255,255,255,0.25)" : "rgba(0,87,184,0.10)",
+                            color: isClient ? "#fff" : "#0057B8",
+                            borderRadius: 4, padding: "1px 5px",
+                            fontSize: 12, fontFamily: "monospace"
+                        }}>{part}</span>
+                    ) : <span key={i}>{part}</span>
+                )}
+            </span>
+        );
     };
 
     const initials = campaign.campaign_name
         .split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
     const canSend = !!staged || !!input.trim();
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setInput(val);
+
+        const cursor = e.target.selectionStart ?? val.length;
+        const textUpToCursor = val.slice(0, cursor);
+        const atIndex = textUpToCursor.lastIndexOf("@");
+
+        if (atIndex !== -1) {
+            const query = textUpToCursor.slice(atIndex + 1);
+            if (!query.includes(" ")) {
+                setMentionQuery(query.toUpperCase());
+                setMentionAnchor(atIndex);
+                setShowMentions(true);
+                return;
+            }
+        }
+        setShowMentions(false);
+    };
+
+    const handleMentionSelect = (lineItemId: string) => {
+        const before = input.slice(0, mentionAnchor);
+        const after = input.slice(mentionAnchor + mentionQuery.length + 1);
+        setInput(`${before}@${lineItemId} ${after}`);
+        setShowMentions(false);
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const filteredLineItems = lineItems.filter(li =>
+        li.line_item_id.toUpperCase().includes(mentionQuery) ||
+        li.line_item_name.toUpperCase().includes(mentionQuery)
+    );
 
     return (
         <>
@@ -486,18 +549,74 @@ export default function User_Campaign_Chat({ campaign, onClose }: ChatCampaignPr
                         </button>
 
                         {!staged ? (
-                            <input ref={inputRef} value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Type a message…"
-                                style={{
-                                    flex: 1, height: 38, padding: "0 14px", borderRadius: 20,
-                                    border: "1px solid #E2E8F0", background: "#F8FAFC",
-                                    fontSize: 13, color: "#1E293B", outline: "none",
-                                    fontFamily: "inherit", transition: "border-color 0.15s"
-                                }}
-                                onFocus={e => (e.currentTarget.style.borderColor = C.blue)}
-                                onBlur={e => (e.currentTarget.style.borderColor = "#E2E8F0")} />
+                            <div style={{ flex: 1, position: "relative" }}>
+                                {/* @ mention dropdown */}
+                                {showMentions && filteredLineItems.length > 0 && (
+                                    <div ref={mentionRef} style={{
+                                        position: "absolute", bottom: "calc(100% + 6px)", left: 0, right: 0,
+                                        background: "#fff", border: "1px solid #E2E8F0",
+                                        borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                                        maxHeight: 180, overflowY: "auto", zIndex: 10
+                                    }}>
+                                        <div style={{
+                                            padding: "6px 10px", fontSize: 10, fontWeight: 700,
+                                            color: "#94A3B8", borderBottom: "1px solid #F1F5F9",
+                                            textTransform: "uppercase", letterSpacing: "0.05em"
+                                        }}>
+                                            Line Items — select to mention
+                                        </div>
+                                        {filteredLineItems.map(li => (
+                                            <div
+                                                key={li.line_item_id}
+                                                onMouseDown={e => { e.preventDefault(); handleMentionSelect(li.line_item_id); }}
+                                                style={{
+                                                    padding: "8px 12px", cursor: "pointer",
+                                                    display: "flex", alignItems: "center", gap: 8,
+                                                    borderBottom: "1px solid #F8FAFC",
+                                                    transition: "background 0.1s"
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = "#F1F5F9")}
+                                                onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                                            >
+                                                <span style={{
+                                                    fontSize: 11, fontWeight: 700, color: "#0057B8",
+                                                    background: "#EFF6FF", padding: "2px 7px",
+                                                    borderRadius: 5, fontFamily: "monospace", flexShrink: 0
+                                                }}>{li.line_item_id}</span>
+                                                <span style={{
+                                                    fontSize: 12, color: "#334155",
+                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                                                }}>{li.line_item_name}</span>
+                                                <span style={{
+                                                    marginLeft: "auto", fontSize: 10, color: "#94A3B8",
+                                                    background: "#F1F5F9", padding: "1px 6px",
+                                                    borderRadius: 8, flexShrink: 0
+                                                }}>{li.status}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <input
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={handleInputChange}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Type a message… (@ to mention a line item)"
+                                    style={{
+                                        width: "100%", height: 38, padding: "0 14px", borderRadius: 20,
+                                        border: "1px solid #E2E8F0", background: "#F8FAFC",
+                                        fontSize: 13, color: "#1E293B", outline: "none",
+                                        fontFamily: "inherit", transition: "border-color 0.15s",
+                                        boxSizing: "border-box"
+                                    }}
+                                    onFocus={e => (e.currentTarget.style.borderColor = C.blue)}
+                                    onBlur={e => {
+                                        e.currentTarget.style.borderColor = "#E2E8F0";
+                                        // small delay so onMouseDown on dropdown fires first
+                                        setTimeout(() => setShowMentions(false), 150);
+                                    }}
+                                />
+                            </div>
                         ) : (
                             <div style={{ flex: 1 }} />
                         )}
