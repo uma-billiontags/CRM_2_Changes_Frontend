@@ -16,7 +16,7 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 // API
-const SUBMIT_URL = "http://127.0.0.1:8000/create_client/";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 // Dropdown choices — all data lives here on the frontend
 const DEFAULT_CHOICES = {
@@ -1082,7 +1082,7 @@ export default function Onboarding() {
     setErrorMessage("");
     try {
       const { body, headers } = buildPayload();
-      const res = await fetch(SUBMIT_URL, { method: "POST", headers, body });
+      const res = await fetch(BASE_URL, { method: "POST", headers, body });
       if (res.ok) {
         setSubmitStatus("success");
       } else {
