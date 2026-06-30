@@ -104,7 +104,7 @@ export default function UserCampaignsTable({
       fixed: 'left',
       render: (id: string | null) =>
         id ? (
-          <span style={{ fontSize: 12, fontWeight: 700, color: BLUE, background: BLUE_LIGHT, padding: '3px 8px', borderRadius: 6, fontFamily: 'monospace' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: BLUE, background: BLUE_LIGHT, padding: '3px 8px', borderRadius: 6, }}>
             {id}
           </span>
         ) : (
@@ -362,7 +362,7 @@ export default function UserCampaignsTable({
                     {
                       title: 'Line Item ID', dataIndex: 'line_item_id', key: 'line_item_id',
                       render: (v: string) => (
-                        <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 6px', borderRadius: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 6px', borderRadius: 4 }}>
                           {v}
                         </span>
                       ),

@@ -1,22 +1,41 @@
 import { useState, useEffect } from "react";
-import { C, STATUS_MAP, fmt, fmtINR } from "../types/types";
-import type { Client, ClientStatus, StatusStyle, ToastType } from "../types/types";
+import { C, fmt, fmtINR } from "../types/types";
+import type { Client, ClientStatus, ToastType } from "../types/types";
 import { Button, Modal } from "antd";
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────
-
+// In SharedComponents.tsx — find StatusBadge and update:
 export function StatusBadge({ status }: { status: ClientStatus }) {
-  const s: StatusStyle = STATUS_MAP[status] ?? STATUS_MAP.pending;
+  const map = {
+    approved: { 
+      bg: "var(--accent-light)",      // was green-bg
+      color: "var(--accent)",          // was green
+      label: "Approved" 
+    },
+    pending: { 
+      bg: "var(--amber-bg)", 
+      color: "var(--amber)", 
+      label: "Pending" 
+    },
+    rejected: { 
+      bg: "var(--red-bg)", 
+      color: "var(--red)", 
+      label: "Rejected" 
+    },
+  };
+  const cfg = map[status] || map.pending;
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
+      display: "inline-flex", alignItems: "center", gap: 4,
+      fontSize: 10, fontWeight: 700,
       padding: "3px 10px", borderRadius: 20,
-      background: s.bg, border: `1px solid ${s.border}`,
-      fontSize: 11, fontWeight: 600, color: s.color,
-      letterSpacing: "0.04em", whiteSpace: "nowrap",
+      background: cfg.bg,
+      color: cfg.color,
+      border: `1px solid ${cfg.color}`,
+      textTransform: "uppercase", letterSpacing: "0.04em",
     }}>
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
-      {s.label.toUpperCase()}
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: cfg.color }} />
+      {cfg.label}
     </span>
   );
 }
@@ -34,7 +53,6 @@ export function InfoRow({ label, value, mono = false }: { label: string; value: 
       </span>
       <span style={{
         fontSize: 12.5, color: mono ? C.blue : C.slate,
-        fontFamily: mono ? "monospace" : "inherit",
         fontWeight: mono ? 700 : 500,
         maxWidth: "60%", textAlign: "right", wordBreak: "break-all",
       }}>
@@ -189,7 +207,7 @@ export function ClientDetailModal({ client, onApprove, onReject, onClose }: Clie
               {client.company_name}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
-              <span style={{ fontSize: 11, color: C.slate500, fontFamily: "monospace" }}>
+              <span style={{ fontSize: 11, color: C.slate500, }}>
                 {client.id}
               </span>
               <StatusBadge status={client.status} />

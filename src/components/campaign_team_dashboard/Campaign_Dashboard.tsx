@@ -222,7 +222,7 @@ function DeleteModal({
                 </p>
                 <p style={{ fontSize: 12, color: C.slate400, margin: "0 0 24px" }}>
                     Campaign ID:{" "}
-                    <span style={{ fontFamily: "monospace", fontWeight: 700, color: C.blue }}>
+                    <span style={{ fontWeight: 700, color: C.blue }}>
                         {campaign.campaign_id}
                     </span>
                     . This action <strong style={{ color: C.red }}>cannot be undone</strong>.
@@ -279,7 +279,6 @@ function CreativeIdCell({ id }: { id: string }) {
                 color: '#4f46e5', background: '#eef2ff',
                 padding: '2px 8px', borderRadius: 4,
                 border: '1px solid #c7d2fe',
-                fontFamily: 'monospace',
             }}>{id}</span>
             <button
                 onClick={handleCopy}
@@ -388,7 +387,7 @@ export default function Campaign_Dashboard() {
             key: "line_item_id",
             render: (v: string) => (
                 <span style={{
-                    fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                    fontSize: 11, fontWeight: 700,
                     color: C.purple, background: C.purpleLight,
                     padding: "2px 6px", borderRadius: 4,
                 }}>{v}</span>
@@ -517,7 +516,7 @@ export default function Campaign_Dashboard() {
         {
             title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 140, fixed: "left",
             render: (id: string | null) => id ? (
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6,}}>
                     {id}
                 </span>
             ) : (

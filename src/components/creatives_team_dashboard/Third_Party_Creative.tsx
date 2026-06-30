@@ -100,7 +100,7 @@ function ExtBadge({ ext }: { ext: string }) {
       color: c.color, background: c.bg,
       padding: '1px 5px', borderRadius: 3,
       border: `1px solid ${c.border}`,
-      fontFamily: 'monospace', flexShrink: 0,
+flexShrink: 0,
     }}>{ext}</span>
   );
 }
@@ -169,7 +169,7 @@ function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
             fontSize: 9, fontWeight: 800, color: '#fff',
             background: 'rgba(255,255,255,0.15)',
             padding: '2px 7px', borderRadius: 4,
-            fontFamily: 'monospace', letterSpacing: '0.05em',
+           letterSpacing: '0.05em',
           }}>{ext.toUpperCase()}</span>
           <span style={{
             fontSize: 13, fontWeight: 600, color: '#e2e8f0',
@@ -366,7 +366,7 @@ export default function Third_Party_Creative() {
           <span style={{
             fontSize: 11, fontWeight: 700, color: BLUE,
             background: BLUE_LIGHT, padding: '2px 7px',
-            borderRadius: 5, fontFamily: 'monospace',
+            borderRadius: 5, 
             display: 'inline-block', marginBottom: 3,
           }}>{r.campaignId}</span>
           <div style={{
@@ -386,7 +386,7 @@ export default function Third_Party_Creative() {
       render: (_: any, r: ThirdPartyRow) => (
         <div>
           <span style={{
-            fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+fontSize: 11, fontWeight: 700,
             color: BLUE, background: BLUE_LIGHT,
             padding: '2px 6px', borderRadius: 4,
             display: 'inline-block', marginBottom: 3,
@@ -464,7 +464,7 @@ export default function Third_Party_Creative() {
                   fontSize: 9, fontWeight: 700, color: '#166534',
                   background: '#f0fdf4', padding: '1px 5px',
                   borderRadius: 3, border: '1px solid #86efac',
-                  fontFamily: 'monospace', flexShrink: 0,
+flexShrink: 0,
                 }}>{backupExt}</span>
               )}
               <Tooltip title={r.backupImageName} placement="topLeft">

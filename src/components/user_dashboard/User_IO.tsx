@@ -170,7 +170,6 @@ export default function User_IO() {
             render: (v: string) => (
                 <span
                     style={{
-                        fontFamily: "monospace",
                         fontSize: 12,
                         fontWeight: 700,
                         color: C.blue,
@@ -192,7 +191,6 @@ export default function User_IO() {
                 v ? (
                     <span
                         style={{
-                            fontFamily: "monospace",
                             fontSize: 11,
                             fontWeight: 700,
                             color: C.amber,
@@ -276,7 +274,6 @@ export default function User_IO() {
                         style={{
                             fontSize: 10,
                             color: C.slate500,
-                            fontFamily: "monospace",
                         }}
                     >
                         {record.client_id}

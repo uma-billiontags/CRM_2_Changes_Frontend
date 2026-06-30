@@ -359,7 +359,6 @@ export default function Chat({ client, onClose }: ChatProps) {
               fontSize: 13,
               color: "#1E293B",
               outline: "none",
-              fontFamily: "inherit",
               transition: "border-color 0.15s",
             }}
             onFocus={(e) =>

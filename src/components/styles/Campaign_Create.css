@@ -32,7 +32,6 @@
   display: flex;
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 .cc-main {
@@ -802,7 +801,6 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  font-family: inherit;
   transition: all 0.15s;
   display: flex;
   align-items: center;

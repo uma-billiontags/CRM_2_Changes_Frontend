@@ -45,7 +45,7 @@ import Superadmin_Daily_Reports from "./components/super_admin/Daily_Reports"
 import Superadmin_Bulk_Campaigns_Details from "./components/super_admin/Bulk_Campaign_Details"
 import Superadmin_CampaignReports from "./components/super_admin/CampaignReports";
 import Superadmin_All_Invoices from "./components/super_admin/All_Invoices";
-import Superadmin_Pacing_Details from "./components/admin/Pacing_Details";
+import Superadmin_Pacing_Details from "./components/super_admin/Pacing_Details";
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 import AdminLayout from "./components/admin/AdminLayout";
@@ -57,6 +57,7 @@ import Bulk_Campaigns_Details from "./components/admin/Bulk_Campaign_Details";
 import Admin_Messages_Sidebar from "./components/admin/Admin_Messages_Sidebar";
 import Admin_All_Invoices from "./components/admin/All_Invoices";
 import Admin_Pacing_Details from "./components/admin/Pacing_Details";
+import New_UI_Mainpage from "./components/New_UI_Mainpage";
 
 function App() {
   return (
@@ -66,6 +67,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="new_ui" element={<New_UI_Mainpage />} />
 
         {/* ── User routes — all wrapped in UserLayout ── */}
         <Route element={<UserLayout />}>

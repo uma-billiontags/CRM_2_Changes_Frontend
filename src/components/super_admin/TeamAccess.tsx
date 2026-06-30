@@ -661,7 +661,7 @@ export default function TeamAccess() {
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+    <div >
 
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>

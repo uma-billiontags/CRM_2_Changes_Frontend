@@ -334,7 +334,7 @@ export default function Client_General_Chat() {
                                 {!staged ? (
                                     <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                                         placeholder="Type a message…"
-                                        style={{ flex: 1, height: 36, padding: "0 14px", borderRadius: 20, border: "1px solid #E2E8F0", background: "#F8FAFC", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                                        style={{ flex: 1, height: 36, padding: "0 14px", borderRadius: 20, border: "1px solid #E2E8F0", background: "#F8FAFC", fontSize: 13, outline: "none", }} />
                                 ) : <div style={{ flex: 1 }} />}
                                 <Button onClick={handleSend} disabled={!canSend || uploading}
                                     style={{ width: 36, height: 36, borderRadius: "50%", background: canSend && !uploading ? C.blue : "#E2E8F0", border: "none" }}>

@@ -976,7 +976,6 @@ export default function Creative_Video_Upload() {
       style={{
         minHeight: '100vh',
         background: '#f8fafc',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
       {/* ── Header ── */}

@@ -163,7 +163,7 @@ function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
             fontSize: 9, fontWeight: 800, color: '#fff',
             background: 'rgba(255,255,255,0.15)',
             padding: '2px 7px', borderRadius: 4,
-            fontFamily: 'monospace', letterSpacing: '0.05em',
+ letterSpacing: '0.05em',
           }}>{ext.toUpperCase()}</span>
           <span style={{
             fontSize: 13, fontWeight: 600, color: '#e2e8f0',
@@ -236,7 +236,6 @@ function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?:
     <Tooltip title={value} placement="topLeft">
       <span style={{
         fontSize: 12, color: SLATE,
-        fontFamily: mono ? '"Fira Code", "Cascadia Code", monospace' : 'inherit',
         display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
         whiteSpace: 'nowrap', maxWidth: maxW, cursor: 'default',
       }}>{value}</span>
@@ -273,7 +272,6 @@ function TrackerCell({ value, type }: { value?: string; type: 'click' | 'html' }
       <Tooltip title={value} placement="topLeft">
         <span style={{
           fontSize: 12, color: SLATE,
-          fontFamily: '"Fira Code", monospace',
           overflow: 'hidden', textOverflow: 'ellipsis',
           whiteSpace: 'nowrap', maxWidth: 110, cursor: 'default',
         }}>{value}</span>
@@ -459,7 +457,7 @@ export default function Image_Creatives() {
           <span style={{
             fontSize: 11, fontWeight: 700, color: BLUE,
             background: BLUE_LIGHT, padding: '2px 6px',
-            borderRadius: 4, fontFamily: 'monospace',
+            borderRadius: 4,
             display: 'block', marginBottom: 2,
           }}>{v}</span>
           <Tooltip title={record.campaignName}>

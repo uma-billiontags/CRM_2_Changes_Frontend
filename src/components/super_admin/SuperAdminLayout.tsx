@@ -1,11 +1,11 @@
 // SuperAdminLayout.tsx
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import SuperAdminSidebar from "./SuperAdminSidebar";
 import { Toast } from "./SharedComponents";
 import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
-import { Button } from "antd";
+import { useTheme } from "../hooks/useTheme";
 
 // ── Firebase imports ────────────────────────────────────────────────────────
 import { initializeApp, getApps } from "firebase/app";
@@ -47,7 +47,8 @@ interface Notification {
 }
 
 export default function SuperAdminLayout() {
-  const navigate = useNavigate();
+const { theme, toggleTheme } = useTheme();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
@@ -342,176 +343,50 @@ export default function SuperAdminLayout() {
 
   return (
     <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: C.bg,
-        fontFamily: "'Segoe UI', system-ui, sans-serif",
-      }}
+      className="db-root"
+      data-theme={theme}
     >
-      <style>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
-        input::placeholder { color: ${C.slate300}; }
-      `}</style>
-
       <SuperAdminSidebar counts={counts} />
 
-      <div
-        style={{
-          marginLeft: 240,
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-        }}
-      >
-        <header
-          style={{
-            height: 64,
-            background: C.white,
-            borderBottom: `1px solid ${C.border}`,
-            padding: "0 28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 9,
-                background: C.blue,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 900,
-                color: C.white,
-                flexShrink: 0,
-              }}
-            >
-              SA
-            </div>
-            <div>
-              <span
-                style={{ fontSize: 14, fontWeight: 700, color: C.slate }}
-              >
-                Billion{" "}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>
-                Tags
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: C.slate500,
-                  marginLeft: 8,
-                }}
-              >
-                / Super Admin Portal
-              </span>
+      {/* ── Main ────────────────────────────────────────────── */}
+      <div className="db-main">
+        {/* Header */}
+        <header className="db-header">
+          <div className="db-header-left">
+            <div className="db-header-tabs">
+              <span className="db-tab active">Billion Tags</span>
+              <span className="db-tab">Super Admin Portal</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {counts.pending > 0 && (
-              <div
-                onClick={() => navigate("/superadmin/pending")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "5px 12px",
-                  borderRadius: 20,
-                  cursor: "pointer",
-                  background: C.amberLight,
-                  border: `1px solid #FDE68A`,
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: C.amber,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: C.amber,
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  {counts.pending} PENDING
-                </span>
-              </div>
-            )}
-
+          <div className="db-header-right">
             {/* ── Bell Icon with Dropdown ──────────────────────────────── */}
             <div ref={dropdownRef} style={{ position: "relative" }}>
-              <Button
+              <div
+                className="db-icon-btn"
+                title="Notifications"
                 onClick={() => {
                   setShowDropdown((prev) => !prev);
                   if (!showDropdown) markAllRead();
-                }}
-                style={{
-                  position: "relative",
-                  width: 36,
-                  height: 36,
-                  borderRadius: 9,
-                  border: `1px solid ${C.border}`,
-                  background: C.white,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  fontSize: 15,
                 }}
               >
                 🔔
                 {unreadCount > 0 && (
                   <span
                     style={{
-                      position: "absolute",
-                      top: -4,
-                      right: -4,
-                      minWidth: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      background: "#EF4444",
+                      position: "absolute", top: -4, right: -4,
+                      width: 14, height: 14,
+                      background: C.red, borderRadius: "50%",
+                      fontSize: 8, fontWeight: 700,
                       color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0 4px",
-                      lineHeight: 1,
-                      border: `2px solid ${C.white}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid var(--bg-header)",
                     }}
                   >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
-              </Button>
+              </div>
 
               {/* ── Dropdown Panel ───────────────────────────────────── */}
               {showDropdown && (
@@ -540,30 +415,21 @@ export default function SuperAdminLayout() {
                       borderBottom: `1px solid ${C.border}`,
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.slate,
-                      }}
-                    >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.slate }}>
                       Notifications
                     </span>
                     {notifications.length > 0 && (
-                      <Button
+                      <span
                         onClick={clearAll}
                         style={{
                           fontSize: 11,
                           color: C.blue,
-                          background: "none",
-                          border: "none",
                           cursor: "pointer",
                           fontWeight: 600,
-                          padding: 0,
                         }}
                       >
                         Clear all
-                      </Button>
+                      </span>
                     )}
                   </div>
 
@@ -578,9 +444,7 @@ export default function SuperAdminLayout() {
                           fontSize: 13,
                         }}
                       >
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>
-                          🔔
-                        </div>
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔔</div>
                         No notifications yet
                       </div>
                     ) : (
@@ -624,13 +488,7 @@ export default function SuperAdminLayout() {
                             >
                               {n.message}
                             </p>
-                            <p
-                              style={{
-                                margin: "3px 0 0",
-                                fontSize: 11,
-                                color: C.slate500,
-                              }}
-                            >
+                            <p style={{ margin: "3px 0 0", fontSize: 11, color: C.slate500 }}>
                               {n.time}
                             </p>
                           </div>
@@ -653,35 +511,26 @@ export default function SuperAdminLayout() {
                 </div>
               )}
             </div>
-            {/* ── End Bell ──────────────────────────────────────────────── */}
 
+            {/* Theme toggle */}
             <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: C.blue,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                fontWeight: 800,
-                color: "#fff",
-                cursor: "pointer",
-              }}
+              className="db-theme-toggle"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
             >
-              SA
+              {theme === "dark" ? "☀️" : "🌙"}
+            </div>
+
+            {/* User */}
+            <div className="db-header-user">
+              <div className="db-header-avatar">SA</div>
+              <span className="db-header-uname">SUPER ADMIN</span>
             </div>
           </div>
         </header>
 
         <main
-          style={{
-            flex: 1,
-            padding: 28,
-            overflowY: "auto",
-            animation: "fadeUp 0.35s ease both",
-          }}
+          className="db-content"
         >
           <Outlet context={outletContext} />
         </main>

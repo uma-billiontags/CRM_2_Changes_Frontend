@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { Table, Input, Button, Modal, Tag, Image, Empty, message } from "antd";
 import {
     SearchOutlined, ReloadOutlined, FilterOutlined, EyeOutlined,
@@ -8,32 +9,6 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-// ── Colors (kept consistent with the rest of the app) ───────────────────────
-const C = {
-    bg: "#F8FAFC",
-    white: "#FFFFFF",
-    slate: "#0F172A",
-    slate700: "#334155",
-    slate500: "#64748B",
-    slate400: "#94A3B8",
-    slate100: "#F1F5F9",
-    border: "#E2E8F0",
-    blue: "#2563EB",
-    blueLight: "#EFF6FF",
-    blueMid: "#BFDBFE",
-    green: "#16A34A",
-    greenLight: "#F0FDF4",
-    greenMid: "#86EFAC",
-    amber: "#D97706",
-    amberLight: "#FFFBEB",
-    amberMid: "#FDE68A",
-    purple: "#7C3AED",
-    purpleLight: "#F5F3FF",
-    purpleMid: "#DDD6FE",
-    red: "#DC2626",
-    redLight: "#FEF2F2",
-};
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Attachment {
@@ -86,12 +61,12 @@ function isVideo(fileType: string) {
 }
 
 function attachmentIcon(fileType: string) {
-    if (isImage(fileType)) return <FileImageOutlined style={{ color: C.blue, fontSize: 14 }} />;
-    if (isVideo(fileType)) return <VideoCameraOutlined style={{ color: C.purple, fontSize: 14 }} />;
-    return <FileOutlined style={{ color: C.slate500, fontSize: 14 }} />;
+    if (isImage(fileType)) return <FileImageOutlined style={{ color: "var(--accent)", fontSize: 14 }} />;
+    if (isVideo(fileType)) return <VideoCameraOutlined style={{ color: "var(--accent)", fontSize: 14 }} />;
+    return <FileOutlined style={{ color: "var(--text-muted)", fontSize: 14 }} />;
 }
 
-// ── Fetch-based download (works cross-origin, unlike <a download>) ───────
+// ── Fetch-based download ──────────────────────────────────────────────────
 async function downloadFile(url: string, name: string) {
     try {
         const response = await fetch(url, {
@@ -112,11 +87,9 @@ async function downloadFile(url: string, name: string) {
     }
 }
 
-// ── Sequential download for "Download All" — avoids browser popup-blocking ──
 async function downloadAllFiles(attachments: Attachment[]) {
     for (const att of attachments) {
         await downloadFile(att.file_url, att.file_name);
-        // small gap so the browser doesn't throttle/block rapid-fire downloads
         await new Promise(res => setTimeout(res, 300));
     }
 }
@@ -124,29 +97,42 @@ async function downloadAllFiles(attachments: Attachment[]) {
 // ── Toast ─────────────────────────────────────────────────────────────────
 function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
-    const color = type === "success" ? C.green : C.red;
     return (
         <div style={{
             position: "fixed", bottom: 24, right: 24, zIndex: 9999,
-            background: C.white, border: `1px solid ${color}55`, borderRadius: 12,
+            background: "var(--bg-card)",
+            border: `1px solid ${type === "success" ? "var(--green)" : "var(--red)"}`,
+            borderRadius: 12,
             padding: "14px 20px", display: "flex", alignItems: "center", gap: 10,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 280,
+            boxShadow: "var(--shadow)", minWidth: 280,
         }}>
             <span style={{ fontSize: 18 }}>{type === "success" ? "✅" : "❌"}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>{message}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{message}</span>
         </div>
     );
 }
 
 // ── Stat Card ─────────────────────────────────────────────────────────────
-function StatCard({ label, value, color, bg, icon }: { label: string; value: number; color: string; bg: string; icon: string }) {
+function StatCard({ label, value, colorVar, bgVar, icon }: {
+    label: string;
+    value: number;
+    colorVar: string;
+    bgVar: string;
+    icon: string;
+}) {
     return (
-        <div style={{ background: C.white, borderRadius: 14, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+        <div style={{
+            background: "var(--bg-card)",
+            borderRadius: "var(--radius-card)",
+            padding: 20,
+            border: "1px solid var(--border)",
+            boxShadow: "var(--shadow-card)",
+        }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <span style={{ fontSize: 11, color, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>{label}</span>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{icon}</div>
+                <span style={{ fontSize: 11, color: colorVar, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>{label}</span>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: bgVar, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{icon}</div>
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color, letterSpacing: "-1px", lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: colorVar, letterSpacing: "-1px", lineHeight: 1 }}>{value}</div>
         </div>
     );
 }
@@ -154,14 +140,15 @@ function StatCard({ label, value, color, bg, icon }: { label: string; value: num
 // ── Status Badge ──────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
     const isProcessed = status === "processed";
-    const color = isProcessed ? C.green : C.amber;
-    const bg = isProcessed ? C.greenLight : C.amberLight;
-    const border = isProcessed ? C.greenMid : C.amberMid;
     return (
         <span style={{
             display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px",
-            borderRadius: 20, background: bg, border: `1px solid ${border}`,
-            fontSize: 10, fontWeight: 700, color, letterSpacing: "0.05em", textTransform: "uppercase" as const,
+            borderRadius: 20,
+            background: isProcessed ? "var(--green-bg)" : "var(--amber-bg)",
+            border: `1px solid ${isProcessed ? "var(--green)" : "var(--amber)"}`,
+            fontSize: 10, fontWeight: 700,
+            color: isProcessed ? "var(--green)" : "var(--amber)",
+            letterSpacing: "0.05em", textTransform: "uppercase" as const,
         }}>
             {isProcessed ? <CheckCircleOutlined style={{ fontSize: 10 }} /> : <ClockCircleOutlined style={{ fontSize: 10 }} />}
             {isProcessed ? "Processed" : "Pending"}
@@ -169,10 +156,10 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-// ── Attachment thumbnail strip (used inside table cell) ──────────────────
+// ── Attachment thumbnail strip ─────────────────────────────────────────────
 function AttachmentStrip({ attachments, onViewAll }: { attachments: Attachment[]; onViewAll: () => void }) {
     if (!attachments.length) {
-        return <span style={{ fontSize: 12, color: C.slate400 }}>No files</span>;
+        return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No files</span>;
     }
     const preview = attachments.slice(0, 3);
     const remaining = attachments.length - preview.length;
@@ -186,8 +173,8 @@ function AttachmentStrip({ attachments, onViewAll }: { attachments: Attachment[]
                     title={att.file_name}
                     style={{
                         width: 32, height: 32, borderRadius: 6, overflow: "hidden",
-                        border: `1px solid ${C.border}`, display: "flex", alignItems: "center",
-                        justifyContent: "center", background: C.slate100, cursor: "pointer", flexShrink: 0,
+                        border: "1px solid var(--border)", display: "flex", alignItems: "center",
+                        justifyContent: "center", background: "var(--bg-input)", cursor: "pointer", flexShrink: 0,
                     }}
                 >
                     {isImage(att.file_type) ? (
@@ -201,8 +188,11 @@ function AttachmentStrip({ attachments, onViewAll }: { attachments: Attachment[]
                 <button
                     onClick={onViewAll}
                     style={{
-                        height: 32, padding: "0 8px", borderRadius: 6, border: `1px solid ${C.blueMid}`,
-                        background: C.blueLight, color: C.blue, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        height: 32, padding: "0 8px", borderRadius: 6,
+                        border: "1px solid var(--accent)",
+                        background: "var(--accent-light)",
+                        color: "var(--accent)",
+                        fontSize: 11, fontWeight: 700, cursor: "pointer",
                     }}
                 >
                     +{remaining}
@@ -212,7 +202,7 @@ function AttachmentStrip({ attachments, onViewAll }: { attachments: Attachment[]
     );
 }
 
-// ── Detail Modal — full request + downloadable attachments ───────────────
+// ── Detail Modal ───────────────────────────────────────────────────────────
 function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCampaignRow | null; onClose: () => void }) {
     if (!record) return null;
 
@@ -242,11 +232,12 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
             destroyOnClose
             title={
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: C.slate }}>Bulk Campaign Request</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Bulk Campaign Request</span>
                     {record.client_id && (
                         <span style={{
-                            fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.blue,
-                            background: C.blueLight, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.blueMid}`,
+                            fontSize: 11, fontWeight: 700, color: "var(--accent)",
+                            background: "var(--accent-light)", padding: "2px 8px", borderRadius: 6,
+                            border: "1px solid var(--accent)",
                         }}>
                             {record.client_id}
                         </span>
@@ -257,37 +248,39 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
             <div style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
 
                 {/* Summary table */}
-                <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
                     {rows.map((row, i) => (
                         <div
                             key={row.label}
                             style={{
                                 display: "flex", padding: "8px 14px", fontSize: 12.5,
-                                background: i % 2 === 0 ? "#fff" : C.slate100,
-                                borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : "none",
+                                background: i % 2 === 0 ? "var(--bg-card)" : "var(--bg-input)",
+                                borderBottom: i < rows.length - 1 ? "1px solid var(--border)" : "none",
                             }}
                         >
-                            <span style={{ width: 180, flexShrink: 0, color: C.slate500, fontWeight: 600 }}>{row.label}</span>
-                            <span style={{ color: C.slate700, fontWeight: 500 }}>{row.value}</span>
+                            <span style={{ width: 180, flexShrink: 0, color: "var(--text-muted)", fontWeight: 600 }}>{row.label}</span>
+                            <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{row.value}</span>
                         </div>
                     ))}
                 </div>
 
                 {/* Message */}
                 <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.purple, marginBottom: 8 }}>✉️ Line Item Details (Message)</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>✉️ Line Item Details (Message)</div>
                     <div style={{
-                        background: C.purpleLight, border: `1px solid ${C.purpleMid}`, borderRadius: 10,
-                        padding: "14px 16px", fontSize: 13, lineHeight: 1.7, color: C.slate700,
+                        background: "var(--accent-light)",
+                        border: "1px solid var(--accent)",
+                        borderRadius: 10,
+                        padding: "14px 16px", fontSize: 13, lineHeight: 1.7, color: "var(--text-primary)",
                         whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto",
                     }}>
-                        {record.message || <span style={{ color: C.slate400 }}>No message provided.</span>}
+                        {record.message || <span style={{ color: "var(--text-muted)" }}>No message provided.</span>}
                     </div>
                 </div>
 
                 {/* Attachments */}
                 <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.blue, marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--accent)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span>📎 Attachments ({record.attachments.length})</span>
                         {record.attachments.length > 0 && (
                             <Button
@@ -309,12 +302,12 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
                                 <div
                                     key={att.id}
                                     style={{
-                                        border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden",
-                                        background: "#fff", display: "flex", flexDirection: "column",
+                                        border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden",
+                                        background: "var(--bg-card)", display: "flex", flexDirection: "column",
                                     }}
                                 >
                                     <div style={{
-                                        height: 100, background: C.slate100, display: "flex",
+                                        height: 100, background: "var(--bg-input)", display: "flex",
                                         alignItems: "center", justifyContent: "center", overflow: "hidden",
                                     }}>
                                         {isImage(att.file_type) ? (
@@ -327,12 +320,12 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
                                         ) : isVideo(att.file_type) ? (
                                             <video src={att.file_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
                                         ) : (
-                                            <FileOutlined style={{ fontSize: 28, color: C.slate400 }} />
+                                            <FileOutlined style={{ fontSize: 28, color: "var(--text-muted)" }} />
                                         )}
                                     </div>
                                     <div style={{ padding: "8px 10px" }}>
                                         <div title={att.file_name} style={{
-                                            fontSize: 11, fontWeight: 600, color: C.slate700,
+                                            fontSize: 11, fontWeight: 600, color: "var(--text-primary)",
                                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                             display: "flex", alignItems: "center", gap: 5, marginBottom: 6,
                                         }}>
@@ -345,8 +338,8 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
                                             onClick={() => downloadFile(att.file_url, att.file_name)}
                                             style={{
                                                 width: "100%", height: 26, fontSize: 10.5, fontWeight: 600,
-                                                borderRadius: 6, border: `1px solid ${C.blueMid}`,
-                                                background: C.blueLight, color: C.blue,
+                                                borderRadius: 6, border: "1px solid var(--accent)",
+                                                background: "var(--accent-light)", color: "var(--accent)",
                                             }}
                                         >
                                             Download
@@ -364,6 +357,9 @@ function DetailModal({ open, record, onClose }: { open: boolean; record: BulkCam
 
 // ── Main Component ────────────────────────────────────────────────────────
 export default function Bulk_Campaigns_Details() {
+    const location = useLocation();
+    const isAdmin = location.pathname.startsWith('/admin');
+
     const [rows, setRows] = useState<BulkCampaignRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -372,6 +368,7 @@ export default function Bulk_Campaigns_Details() {
 
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<BulkCampaignRow | null>(null);
+    const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
 
     const showToast = (message: string, type: "success" | "error" = "success") =>
         setToast({ message, type });
@@ -394,6 +391,24 @@ export default function Bulk_Campaigns_Details() {
         setDetailOpen(true);
     };
 
+    const handleMarkProcessed = async (record: BulkCampaignRow) => {
+        setUpdatingStatusId(record.id);
+        try {
+            const res = await fetch(`${BASE_URL}/update_bulk_campaign_status/${record.id}/`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "1" },
+                body: JSON.stringify({ status: "processed" }),
+            });
+            if (!res.ok) throw new Error();
+            setRows(prev => prev.map(r => r.id === record.id ? { ...r, status: "processed" } : r));
+            showToast(`Marked "${record.campaign_name}" as processed.`);
+        } catch {
+            showToast("Failed to update status.", "error");
+        } finally {
+            setUpdatingStatusId(null);
+        }
+    };
+
     // ── Filter ──────────────────────────────────────────────────────────
     const filtered = rows.filter(r => {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
@@ -412,9 +427,9 @@ export default function Bulk_Campaigns_Details() {
     const totalAttachments = rows.reduce((sum, r) => sum + r.attachments.length, 0);
 
     const filterPills = [
-        { key: "all" as const, label: `All (${totalCount})`, color: C.slate500, bg: C.slate100, border: C.border },
-        { key: "pending" as const, label: `Pending (${pendingCount})`, color: C.amber, bg: C.amberLight, border: C.amberMid },
-        { key: "processed" as const, label: `Processed (${processedCount})`, color: C.green, bg: C.greenLight, border: C.greenMid },
+        { key: "all" as const, label: `All (${totalCount})`, activeColor: "var(--text-muted)", activeBg: "var(--bg-input)", activeBorder: "var(--border)" },
+        { key: "pending" as const, label: `Pending (${pendingCount})`, activeColor: "var(--amber)", activeBg: "var(--amber-bg)", activeBorder: "var(--amber)" },
+        { key: "processed" as const, label: `Processed (${processedCount})`, activeColor: "var(--green)", activeBg: "var(--green-bg)", activeBorder: "var(--green)" },
     ];
 
     // ── Columns ─────────────────────────────────────────────────────────
@@ -426,13 +441,13 @@ export default function Bulk_Campaigns_Details() {
             width: 140,
             render: (v: string | null) => v ? (
                 <span style={{
-                    fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.blue,
-                    background: C.blueLight, padding: "3px 8px", borderRadius: 6,
-                    border: `1px solid ${C.blueMid}`, display: "inline-block",
+                    fontSize: 11, fontWeight: 700, color: "var(--accent)",
+                    background: "var(--accent-light)", padding: "3px 8px", borderRadius: 6,
+                    border: "1px solid var(--accent)", display: "inline-block",
                 }}>
                     {v}
                 </span>
-            ) : <span style={{ color: C.slate400, fontSize: 12 }}>—</span>,
+            ) : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>,
         },
         {
             title: "Client / Advertiser",
@@ -440,8 +455,8 @@ export default function Bulk_Campaigns_Details() {
             width: 200,
             render: (_: any, r: BulkCampaignRow) => (
                 <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.slate }}>{r.client_name || "—"}</div>
-                    <div style={{ fontSize: 11, color: C.slate500 }}>{r.advertiser}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)" }}>{r.client_name || "—"}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.advertiser}</div>
                 </div>
             ),
         },
@@ -450,7 +465,7 @@ export default function Bulk_Campaigns_Details() {
             dataIndex: "campaign_name",
             key: "campaign_name",
             width: 190,
-            render: (v: string) => <span style={{ fontSize: 13, fontWeight: 500, color: C.slate700 }}>{v}</span>,
+            render: (v: string) => <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{v}</span>,
         },
         {
             title: "Type / Objective",
@@ -458,8 +473,8 @@ export default function Bulk_Campaigns_Details() {
             width: 180,
             render: (_: any, r: BulkCampaignRow) => (
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <Tag color="blue" style={{ fontSize: 10.5, width: "fit-content" }}>{r.campaign_type || "—"}</Tag>
-                    <span style={{ fontSize: 11, color: C.slate500 }}>{r.objective || "—"}</span>
+                    <Tag color="purple" style={{ fontSize: 10.5, width: "fit-content" }}>{r.campaign_type || "—"}</Tag>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.objective || "—"}</span>
                 </div>
             ),
         },
@@ -468,7 +483,7 @@ export default function Bulk_Campaigns_Details() {
             key: "duration",
             width: 170,
             render: (_: any, r: BulkCampaignRow) => (
-                <span style={{ fontSize: 12, color: C.slate }}>
+                <span style={{ fontSize: 12, color: "var(--text-primary)" }}>
                     {fmtDate(r.start_date)} → {fmtDate(r.end_date)}
                 </span>
             ),
@@ -486,100 +501,153 @@ export default function Bulk_Campaigns_Details() {
             dataIndex: "created_at",
             key: "created_at",
             width: 130,
-            render: (v: string) => <span style={{ fontSize: 11.5, color: C.slate500 }}>{fmtDate(v)}</span>,
+            render: (v: string) => <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{fmtDate(v)}</span>,
         },
-    
+        {
+            title: "Status",
+            dataIndex: "status",
+            key: "status",
+            width: 120,
+            render: (v: string) => <StatusBadge status={v} />,
+        },
         {
             title: "Actions",
             key: "actions",
-            width: 140,
+            width: 200,
             fixed: "right",
             render: (_: any, r: BulkCampaignRow) => (
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
                     <Button
                         size="small"
                         icon={<EyeOutlined />}
                         onClick={() => openDetail(r)}
-                        style={{ height: 28, borderRadius: 6, border: `1px solid ${C.blueMid}`, background: C.blueLight, color: C.blue, fontSize: 11, fontWeight: 600 }}
+                        style={{
+                            height: 28, borderRadius: 6,
+                            border: "1px solid var(--accent)",
+                            background: "var(--accent-light)",
+                            color: "var(--accent)",
+                            fontSize: 11, fontWeight: 600,
+                        }}
                     >
                         View
                     </Button>
+                    {r.status === "pending" && (
+                        <Button
+                            size="small"
+                            loading={updatingStatusId === r.id}
+                            icon={<CheckCircleOutlined />}
+                            onClick={() => handleMarkProcessed(r)}
+                            style={{
+                                height: 28, borderRadius: 6,
+                                border: "1px solid var(--green)",
+                                background: "var(--green-bg)",
+                                color: "var(--green)",
+                                fontSize: 11, fontWeight: 600,
+                            }}
+                        >
+                            Mark Processed
+                        </Button>
+                    )}
                 </div>
             ),
         },
     ];
 
     return (
-        <>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-                <div>
-                    <h1 style={{ fontSize: 18, fontWeight: 700, color: C.slate, margin: 0 }}>Bulk Campaign Requests</h1>
-                    <p style={{ fontSize: 11, color: C.slate500, marginTop: 4, letterSpacing: "0.04em", fontWeight: 500 }}>
+        <div>
+            {/* ── Page Header ── */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div style={{ marginBottom: 20 }}>
+                    <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>Bulk Campaign Requests</h1>
+                    <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0", fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                         CLIENT-SUBMITTED BULK REQUESTS — REVIEW DETAILS & DOWNLOAD ATTACHMENTS
                     </p>
                 </div>
-                <div>
-                    <Button
-                        onClick={() => window.open('/campaign_create?adminMode=true', '_blank', 'noopener,noreferrer')}
-                        style={{
-                            borderRadius: 9, border: "none",
-                            background: C.blue, color: "#fff",
-                            fontSize: 13, fontWeight: 700,
-                            boxShadow: `0 4px 14px ${C.green}44`,
-                        }}
-                    >
-                        <PlusOutlined /> Add New Campaign
-                    </Button>
-                </div>
+                <Button
+                    onClick={() => window.open(
+                        isAdmin ? '/campaign_create?adminMode=true' : '/campaign_create?superadminMode=true',
+                        '_blank',
+                        'noopener,noreferrer'
+                    )}
+                    style={{
+                        borderRadius: 9, border: "none",
+                        background: "var(--accent)", color: "#fff",
+                        fontSize: 13, fontWeight: 700,
+                        padding: "8px 16px", cursor: "pointer",
+                    }}
+                >
+                    <PlusOutlined /> Add New Campaign
+                </Button>
             </div>
 
-            {/* Stat Cards */}
+            {/* ── Stat Cards ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
-                <StatCard label="Total Requests" value={totalCount} color={C.blue} bg={C.blueLight} icon="📋" />
-                <StatCard label="Pending" value={pendingCount} color={C.amber} bg={C.amberLight} icon="⏳" />
-                <StatCard label="Processed" value={processedCount} color={C.green} bg={C.greenLight} icon="✅" />
-                <StatCard label="Total Files" value={totalAttachments} color={C.purple} bg={C.purpleLight} icon="📎" />
+                <StatCard label="Total Requests" value={totalCount} colorVar="var(--accent)" bgVar="var(--accent-light)" icon="📋" />
+                <StatCard label="Pending" value={pendingCount} colorVar="var(--amber)" bgVar="var(--amber-bg)" icon="⏳" />
+                <StatCard label="Processed" value={processedCount} colorVar="var(--green)" bgVar="var(--green-bg)" icon="✅" />
+                <StatCard label="Total Files" value={totalAttachments} colorVar="var(--accent)" bgVar="var(--accent-light)" icon="📎" />
             </div>
 
-            {/* Filters */}
-            <div style={{ background: C.white, borderRadius: 12, padding: "14px 18px", border: `1px solid ${C.border}`, marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {/* ── Filters ── */}
+            <div style={{
+                background: "var(--bg-card)", borderRadius: 12, padding: "14px 18px",
+                border: "1px solid var(--border)", marginBottom: 16,
+                display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                boxShadow: "var(--shadow-card)",
+            }}>
                 <Input
                     placeholder="Search by client ID, name, advertiser, campaign…"
-                    prefix={<SearchOutlined style={{ color: C.slate500 }} />}
+                    prefix={<SearchOutlined style={{ color: "var(--text-muted)" }} />}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     allowClear
-                    style={{ flex: 1, minWidth: 260, height: 36 }}
+                    style={{ flex: 1, minWidth: 260, height: 36, background: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text-primary)" }}
                 />
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <FilterOutlined style={{ color: C.slate500, fontSize: 13 }} />
-                    {filterPills.map(pill => (
-                        <button
-                            key={pill.key}
-                            onClick={() => setStatusFilter(pill.key)}
-                            style={{
-                                padding: "4px 12px", borderRadius: 20,
-                                border: `1px solid ${statusFilter === pill.key ? pill.border : C.border}`,
-                                background: statusFilter === pill.key ? pill.bg : C.white,
-                                color: statusFilter === pill.key ? pill.color : C.slate500,
-                                fontSize: 11, fontWeight: 700, cursor: "pointer", outline: "none", transition: "all 0.15s",
-                            }}
-                        >
-                            {pill.label}
-                        </button>
-                    ))}
+                    <FilterOutlined style={{ color: "var(--text-muted)", fontSize: 13 }} />
+                    {filterPills.map(pill => {
+                        const isActive = statusFilter === pill.key;
+                        return (
+                            <button
+                                key={pill.key}
+                                onClick={() => setStatusFilter(pill.key)}
+                                style={{
+                                    padding: "4px 12px", borderRadius: 20,
+                                    border: `1px solid ${isActive ? pill.activeBorder : "var(--border)"}`,
+                                    background: isActive ? pill.activeBg : "transparent",
+                                    color: isActive ? pill.activeColor : "var(--text-muted)",
+                                    fontSize: 11, fontWeight: 700, cursor: "pointer", outline: "none", transition: "all 0.15s",
+                                }}
+                            >
+                                {pill.label}
+                            </button>
+                        );
+                    })}
                 </div>
-                <Button onClick={fetchData} icon={<ReloadOutlined />} style={{ height: 36, borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.slate500, fontSize: 12, fontWeight: 600 }}>
+                <Button
+                    onClick={fetchData}
+                    icon={<ReloadOutlined />}
+                    style={{
+                        height: 36, borderRadius: 8,
+                        border: "1px solid var(--border)",
+                        background: "var(--bg-input)",
+                        color: "var(--text-muted)",
+                        fontSize: 12, fontWeight: 600,
+                    }}
+                >
                     Refresh
                 </Button>
-                <span style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" }}>
                     {filtered.length} of {rows.length} requests
                 </span>
             </div>
 
-            {/* Table */}
-            <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            {/* ── Table ── */}
+            <div style={{
+                background: "var(--bg-card)", borderRadius: 14,
+                border: "1px solid var(--border)", overflow: "hidden",
+                boxShadow: "var(--shadow-card)",
+            }}>
                 <Table
                     columns={columns}
                     dataSource={filtered}
@@ -587,6 +655,7 @@ export default function Bulk_Campaigns_Details() {
                     loading={loading}
                     scroll={{ x: 1450 }}
                     onRow={(record) => ({ onClick: () => openDetail(record), style: { cursor: "pointer" } })}
+                    rowClassName={() => "client-table-row"}
                     pagination={{
                         pageSize: 20, showSizeChanger: true, pageSizeOptions: ["20", "50", "100"],
                         showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} requests`,
@@ -599,18 +668,6 @@ export default function Bulk_Campaigns_Details() {
             <DetailModal open={detailOpen} record={selectedRecord} onClose={() => setDetailOpen(false)} />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-            <style>{`
-                .ant-table-thead > tr > th {
-                    background: #F1F5F9 !important;
-                    font-size: 11px !important;
-                    font-weight: 700 !important;
-                    color: #64748B !important;
-                    text-transform: uppercase;
-                    letter-spacing: 0.04em;
-                }
-                .ant-table-row:hover td { background: #F8FAFC !important; }
-            `}</style>
-        </>
+        </div>
     );
 }

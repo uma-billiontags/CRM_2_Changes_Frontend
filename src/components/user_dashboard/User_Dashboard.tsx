@@ -223,7 +223,7 @@ export default function User_Dashboard() {
               padding: '6px 14px', fontSize: 12, fontWeight: 600,
               color: BLUE, background: BLUE_LIGHT,
               border: `1px solid ${BLUE_MID}`, borderRadius: 8,
-              cursor: 'pointer', fontFamily: 'inherit',
+              cursor: 'pointer',
             }}
           >
             View All

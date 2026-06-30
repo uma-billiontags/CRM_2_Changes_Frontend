@@ -179,7 +179,6 @@ export default function User_Invoices() {
                         }}>
                             {/* Invoice ID */}
                             <span style={{
-                                fontFamily: "monospace", fontSize: 12, fontWeight: 700,
                                 color: C.purple, background: C.purpleLight,
                                 padding: "3px 9px", borderRadius: 6,
                                 border: `1px solid ${C.purpleMid}`,
@@ -253,7 +252,7 @@ export default function User_Invoices() {
             width: 140,
             render: (v: string) => (
                 <span style={{
-                    fontFamily: "monospace", fontSize: 12, fontWeight: 700,
+                   fontSize: 12, fontWeight: 700,
                     color: C.blue, background: C.blueLight,
                     padding: "3px 8px", borderRadius: 6,
                 }}>{v}</span>
@@ -300,7 +299,7 @@ export default function User_Invoices() {
                     <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>
                         {v || record.client_name || "—"}
                     </div>
-                    <div style={{ fontSize: 10, color: C.slate500, fontFamily: "monospace" }}>
+                    <div style={{ fontSize: 10, color: C.slate500, }}>
                         {record.client_id}
                     </div>
                 </div>

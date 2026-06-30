@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
+   dashboard.css  —  Value Analytics Dashboard
    Dark + Light theme tokens + shared component styles
 ═══════════════════════════════════════════════════════════════ */
 
+/* @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap'); */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
 /* ── Reset ────────────────────────────────────────────────────── */
@@ -52,8 +54,7 @@ body {
   /* Text */
   --text-primary: #FFFFFF;
   --text-secondary: #9895B5;
-  --text-muted: #64748B;
-  --text-black: #0F0E17;
+  --text-muted: #5E5B80;
   --text-on-accent: #FFFFFF;
 
   /* Border */
@@ -95,20 +96,20 @@ body {
   --header-height: 56px;
 
   /* Semantic chart color aliases (used directly in TSX via var()) */
-  --color-accent: var(--chart-1);
-  --color-pink: var(--chart-2);
-  --color-teal: var(--chart-3);
-  --color-amber: var(--chart-4);
-  --color-purple: var(--chart-5);
-  --color-green: var(--green);
-  --color-red: var(--red);
+--color-accent: var(--chart-1);
+--color-pink:   var(--chart-2);
+--color-teal:   var(--chart-3);
+--color-amber:  var(--chart-4);
+--color-purple: var(--chart-5);
+--color-green:  var(--green);
+--color-red:    var(--red);
 }
 
 /* ════════════════════════════════════════════════════════════════
    LIGHT THEME
 ════════════════════════════════════════════════════════════════ */
 [data-theme="light"] {
-  --bg-page: #FFFFFF1A;
+  --bg-page: #F0EFF8;
   --bg-sidebar: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F7F6FF;
@@ -119,7 +120,7 @@ body {
 
   --text-primary: #1A1830;
   --text-secondary: #6B6890;
-  --text-muted: #64748B;
+  --text-muted: #A09DBF;
   --text-on-accent: #FFFFFF;
 
   --border: rgba(0, 0, 0, 0.07);
@@ -151,13 +152,13 @@ body {
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
 
   /* Semantic chart color aliases (used directly in TSX via var()) */
-  --color-accent: var(--chart-1);
-  --color-pink: var(--chart-2);
-  --color-teal: var(--chart-3);
-  --color-amber: var(--chart-4);
-  --color-purple: var(--chart-5);
-  --color-green: var(--green);
-  --color-red: var(--red);
+--color-accent: var(--chart-1);
+--color-pink:   var(--chart-2);
+--color-teal:   var(--chart-3);
+--color-amber:  var(--chart-4);
+--color-purple: var(--chart-5);
+--color-green:  var(--green);
+--color-red:    var(--red);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -191,7 +192,7 @@ body {
 
 /* Logo */
 .db-logo {
-  padding: 20px 16px 5px;
+  padding: 20px 16px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -223,7 +224,7 @@ body {
 
 .db-logo-sub {
   font-size: 8px;
-  color: var(--text-primary);
+  color: var(--text-muted);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-top: 1px;
@@ -240,7 +241,7 @@ body {
 .db-nav-section {
   font-size: 8.5px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-muted);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 12px 8px 4px;
@@ -358,7 +359,7 @@ body {
 
 .db-sidebar-urole {
   font-size: 9px;
-  color: var(--text-primary);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
 }
 
@@ -566,7 +567,7 @@ body {
 .db-card-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -606,7 +607,7 @@ body {
 .db-stat-label {
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 8px;
@@ -658,7 +659,7 @@ body {
 .db-donut-label {
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 8px;
@@ -673,7 +674,7 @@ body {
 
 .db-donut-center-sub {
   font-size: 9px;
-  color: var(--text-primary);
+  color: var(--text-muted);
   text-align: center;
   margin-top: 2px;
 }
@@ -732,7 +733,7 @@ body {
 .db-table th {
   font-size: 9px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 6px 12px;
@@ -868,79 +869,4 @@ body {
 
 .db-content {
   animation: fadeUp 0.35s ease both;
-}
-
-.ant-input::placeholder {
-  color: var(--text-muted);
-  opacity: 1;
-}
-
-/* ── Ant Design Table overrides ─────────────────────────────── */
-.client-table-row:hover td {
-  background: var(--bg-card-hover) !important;
-}
-
-.ant-table-thead > tr > th {
-  background: var(--bg-input) !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  color: var(--text-muted) !important;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-right: none !important;
-  border-bottom: 1px solid var(--border) !important;
-}
-
-.ant-table-tbody > tr > td {
-  background: var(--bg-card) !important;
-  color: var(--text-primary) !important;
-  border-bottom: 1px solid var(--border) !important;
-  border-right: none !important;
-}
-
-.ant-table {
-  background: var(--bg-card) !important;
-}
-
-.ant-table-container {
-  border: none !important;
-}
-
-.ant-pagination-item a {
-  color: var(--text-primary) !important;
-}
-
-.ant-pagination-item-active {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-}
-
-.ant-pagination-item-active a {
-  color: #fff !important;
-}
-
-.ant-pagination-prev button svg,
-.ant-pagination-next button svg {
-  color: var(--text-primary) !important;
-  fill: var(--text-primary) !important;
-}
-
-/* Pagination total text */
-.ant-pagination-total-text {
-  color: var(--text-muted) !important;
-}
-
-/* Page size dropdown */
-.ant-select-selector {
-  background: var(--bg-input) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
-}
-
-.ant-select-arrow {
-  color: var(--text-muted) !important;
-}
-
-.ant-pagination-total-text {
-  color: var(--text-primary) !important;
 }

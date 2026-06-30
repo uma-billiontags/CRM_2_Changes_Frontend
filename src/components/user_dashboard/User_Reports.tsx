@@ -161,7 +161,6 @@ function CampaignGroupCell({ record }: { record: LineItemRow }) {
         }}>
             {/* Campaign ID badge */}
             <span style={{
-                fontFamily: "monospace",
                 fontSize: 12,
                 fontWeight: 700,
                 color: C.blue,
@@ -345,7 +344,7 @@ export default function User_Reports() {
             key: "line_item_id",
             width: 150,
             render: (v: string) => (
-                <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.purpleMid}`, display: "inline-block" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.purpleMid}`, display: "inline-block" }}>
                     {v}
                 </span>
             ),
@@ -357,7 +356,7 @@ export default function User_Reports() {
             width: 150,
             render: (v: string) => v ? (
                 <span style={{
-                    fontFamily: "monospace", fontSize: 11, fontWeight: 700,
+                     fontSize: 11, fontWeight: 700,
                     color: "#4F46E5", background: "#EEF2FF",
                     padding: "3px 8px", borderRadius: 6,
                     border: "1px solid #C7D2FE", display: "inline-block"
@@ -405,7 +404,7 @@ export default function User_Reports() {
             width: 140,
             render: (v: string, record: LineItemRow) => (
                 <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.slate, fontFamily: "monospace" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.slate, }}>
                         {fmtImpressions(v)}
                     </div>
                     {record.units && (

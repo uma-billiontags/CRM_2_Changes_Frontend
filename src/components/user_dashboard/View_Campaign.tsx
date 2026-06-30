@@ -165,7 +165,7 @@ export default function View_Campaign() {
             style={{
               padding: '8px 16px', border: 'none', borderRadius: 9,
               background: BLUE, color: WHITE, fontSize: 12, fontWeight: 700,
-              cursor: 'pointer', letterSpacing: '0.05em', fontFamily: 'inherit',
+              cursor: 'pointer', letterSpacing: '0.05em',
             }}
           >
             Edit Campaign
@@ -303,7 +303,7 @@ export default function View_Campaign() {
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <tbody>
                             <InfoRow label="Line Item ID" value={
-                              <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>{li.line_item_id}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>{li.line_item_id}</span>
                             } />
 
                             {/* ── Fix: ethnicity with comma separation ── */}
@@ -396,7 +396,7 @@ export default function View_Campaign() {
                                         {fileName && (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                             {ext && (
-                                              <span style={{ fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 4, border: '1px solid #fcd34d', fontFamily: 'monospace' }}>
+                                              <span style={{ fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 4, border: '1px solid #fcd34d',  }}>
                                                 {ext}
                                               </span>
                                             )}
@@ -405,7 +405,7 @@ export default function View_Campaign() {
                                         )}
                                         {tp.backup_image_name && (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '1px 6px', borderRadius: 4, border: '1px solid #6ee7b7', fontFamily: 'monospace' }}>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '1px 6px', borderRadius: 4, border: '1px solid #6ee7b7',}}>
                                               BACKUP
                                             </span>
                                             <span style={{ fontSize: 12, color: '#059669', fontWeight: 500 }}>{tp.backup_image_name}</span>

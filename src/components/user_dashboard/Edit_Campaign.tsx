@@ -225,7 +225,7 @@ function LineItemCard({ item, index, campaignStart, campaignEnd, onChange, onRem
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '3px 8px', borderRadius: 6, fontFamily: 'monospace' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '3px 8px', borderRadius: 6,}}>
             {item.id}
           </span>
           {canRemove && (
@@ -643,7 +643,7 @@ export default function Edit_Campaign() {
                 <Form layout="vertical" className="cc-form">
                   <div style={{ marginBottom: 16 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: SLATE_500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Campaign ID: </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: BLUE, fontFamily: 'monospace' }}>{campaign_id}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: BLUE,  }}>{campaign_id}</span>
                   </div>
                   <div className="cc-row-grid">
                     <Form.Item label="Client Campaign ID">
@@ -874,7 +874,7 @@ export default function Edit_Campaign() {
                         <div style={{ background: '#f8fafc', padding: '8px 14px', fontSize: 12.5, fontWeight: 600, color: SLATE, borderBottom: '0.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#4f46e5', color: WHITE, fontSize: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
                           {li.lineItemName}
-                          <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'monospace', background: '#EDE9FE', color: '#7C3AED', padding: '2px 8px', borderRadius: 4 }}>{li.id}</span>
+                          <span style={{ marginLeft: 'auto', fontSize: 11, background: '#EDE9FE', color: '#7C3AED', padding: '2px 8px', borderRadius: 4 }}>{li.id}</span>
                         </div>
                         <div className="cc-review-table">
                           {[

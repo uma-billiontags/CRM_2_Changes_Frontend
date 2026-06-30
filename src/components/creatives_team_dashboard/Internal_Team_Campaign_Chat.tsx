@@ -245,7 +245,7 @@ export default function Creative_Team_Chat({ campaign, onClose, teamType = "crea
                             background: isMember ? "rgba(255,255,255,0.25)" : "rgba(0,87,184,0.10)",
                             color: isMember ? "#fff" : "#0057B8",
                             borderRadius: 4, padding: "1px 5px",
-                            fontSize: 12, fontFamily: "monospace"
+                            fontSize: 12, 
                         }}>{part}</span>
                     ) : <span key={i}>{part}</span>
                 )}
@@ -441,7 +441,7 @@ export default function Creative_Team_Chat({ campaign, onClose, teamType = "crea
                                                 <span style={{
                                                     fontSize: 11, fontWeight: 700, color: "#0057B8",
                                                     background: "#EFF6FF", padding: "2px 7px",
-                                                    borderRadius: 5, fontFamily: "monospace", flexShrink: 0
+                                                    borderRadius: 5, flexShrink: 0
                                                 }}>{li.line_item_id}</span>
                                                 <span style={{
                                                     fontSize: 12, color: "#334155",
@@ -466,7 +466,7 @@ export default function Creative_Team_Chat({ campaign, onClose, teamType = "crea
                                         width: "100%", height: 38, padding: "0 14px", borderRadius: 20,
                                         border: "1px solid #E2E8F0", background: "#F8FAFC",
                                         fontSize: 13, color: "#1E293B", outline: "none",
-                                        fontFamily: "inherit", transition: "border-color 0.15s",
+transition: "border-color 0.15s",
                                         boxSizing: "border-box"
                                     }}
                                     onFocus={e => (e.currentTarget.style.borderColor = C.blue)}

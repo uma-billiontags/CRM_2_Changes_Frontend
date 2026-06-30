@@ -206,7 +206,7 @@ export function AdminUsersPage() {
                   onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
                 >
                   <td style={{ padding: "14px 16px" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "2px 7px", borderRadius: 5, fontFamily: "monospace" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "2px 7px", borderRadius: 5,  }}>
                       {admin.id}
                     </span>
                   </td>
@@ -342,7 +342,7 @@ export function AuditLogsPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}>{log.action}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", color: C.slate500 }}>{log.id}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: C.slate500 }}>{log.id}</span>
                   </div>
                   <div style={{ fontSize: 12, color: C.slate500, marginTop: 3 }}>
                     By <span style={{ color: C.slate700, fontWeight: 600 }}>{log.actor}</span>

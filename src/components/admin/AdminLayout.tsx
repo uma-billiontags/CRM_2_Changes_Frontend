@@ -1,11 +1,10 @@
+// SuperAdminLayout.tsx
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
-import SuperAdminSidebar from "./AdminSidebar";
+import { Outlet } from "react-router-dom";
+import AdminSidebar from "./AdminSidebar";
 import { Toast } from "../super_admin/SharedComponents";
 import { C } from "../types/types";
 import type { Client, ClientStatus, Counts, ToastType } from "../types/types";
-import { Button } from "antd";
-
 
 // ── Firebase imports ────────────────────────────────────────────────────────
 import { initializeApp, getApps } from "firebase/app";
@@ -31,9 +30,6 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 const firebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// ── Context so child pages can trigger approve/reject ─────────────────────────
-// (Pass via Outlet context — no need for Redux/Zustand for this scale)
-
 export interface AdminOutletContext {
   clients: Client[];
   counts: Counts;
@@ -49,11 +45,19 @@ interface Notification {
   read: boolean;
 }
 
-export default function AdminLayout() {
-  const navigate = useNavigate();
+export default function SuperAdminLayout() {
+  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Apply theme to root div so CSS vars cascade
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
   const [clients, setClients] = useState<Client[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-
 
   // ── Notification state ───────────────────────────────────────────────────
   const [notifications, setNotifications] = useState<Notification[]>(() => {
@@ -226,14 +230,13 @@ export default function AdminLayout() {
     setShowDropdown(false);
   };
 
-
+  // ── Fetch clients ────────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${BASE_URL}/get_all_clients/`, {
-      headers: { "ngrok-skip-browser-warning": "1" }
+      headers: { "ngrok-skip-browser-warning": "1" },
     })
-      .then(r => r.json())
-      .then(data => {
-        // Map backend fields to your Client type
+      .then((r) => r.json())
+      .then((data) => {
         const mapped = data.map((c: any) => ({
           id: c.client_id,
           reporting_id: c.reporting_id,
@@ -250,7 +253,7 @@ export default function AdminLayout() {
           vast_number: c.vast_number,
           place_of_supply: c.place_of_supply,
           is_active: c.is_active,
-          status: c.status ?? "pending",   // ← needs status column in DB
+          status: c.status ?? "pending",
           submitted_at: c.created_at,
           billing: c.billing ?? {},
           contacts: c.contacts ?? [],
@@ -259,21 +262,24 @@ export default function AdminLayout() {
         }));
         setClients(mapped);
       })
-      .catch(err => console.error("Failed to fetch clients", err));
+      .catch((err) => console.error("Failed to fetch clients", err));
   }, []);
 
+  // ── Fetch campaigns ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${BASE_URL}/get_campaigns/`, {
       headers: { "ngrok-skip-browser-warning": "1" },
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const list = Array.isArray(data)
           ? data
-          : Array.isArray(data?.campaigns) ? data.campaigns : [];
+          : Array.isArray(data?.campaigns)
+            ? data.campaigns
+            : [];
         setCampaigns(list);
       })
-      .catch(err => console.error("Failed to fetch campaigns", err));
+      .catch((err) => console.error("Failed to fetch campaigns", err));
   }, []);
 
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
@@ -283,7 +289,7 @@ export default function AdminLayout() {
     pending: clients.filter((c) => c.status === "pending").length,
     approved: clients.filter((c) => c.status === "approved").length,
     rejected: clients.filter((c) => c.status === "rejected").length,
-    campaignTotal: campaigns.length, // ← add this
+    campaignTotal: campaigns.length,
   };
 
   const showToast = (message: string, type: ToastType = "success") => {
@@ -292,14 +298,21 @@ export default function AdminLayout() {
 
   const handleApprove = async (id: string) => {
     try {
+      const teamId = localStorage.getItem('user_id');
       await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "approved" }),
+        body: JSON.stringify({ status: "approved", team_id: teamId }),
       });
       setClients((prev) =>
         prev.map((c) =>
-          c.id === id ? { ...c, status: "approved" as ClientStatus, approved_at: new Date().toISOString() } : c
+          c.id === id
+            ? {
+              ...c,
+              status: "approved" as ClientStatus,
+              approved_at: new Date().toISOString(),
+            }
+            : c
         )
       );
       showToast("Client approved successfully!", "success");
@@ -310,10 +323,12 @@ export default function AdminLayout() {
 
   const handleReject = async (id: string) => {
     try {
+      const teamId = localStorage.getItem('user_id');  // ← get from localStorage
+
       await fetch(`${BASE_URL}/update_client_status/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "rejected" }),
+        body: JSON.stringify({ status: "rejected", team_id: teamId }),  // ← include team_id in body
       });
       setClients((prev) =>
         prev.map((c) =>
@@ -325,116 +340,62 @@ export default function AdminLayout() {
       showToast("Failed to reject client.", "error");
     }
   };
+
   const outletContext: AdminOutletContext = {
-    clients, counts, handleApprove, handleReject,
+    clients,
+    counts,
+    handleApprove,
+    handleReject,
   };
 
   return (
-    <div style={{
-      display: "flex", minHeight: "100vh",
-      background: C.bg,
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-    }}>
-      <style>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
-        input::placeholder { color: ${C.slate300}; }
-      `}</style>
+    <div
+      className="db-root"
+      data-theme={theme}
+      ref={rootRef}
+    >
+      <AdminSidebar counts={counts} />
 
-      {/* Sidebar */}
-      <SuperAdminSidebar counts={counts} />
-
-      {/* Main area */}
-      <div style={{ marginLeft: 240, flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {/* Topbar */}
-        <header style={{
-          height: 64, background: C.white, borderBottom: `1px solid ${C.border}`,
-          padding: "0 28px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, zIndex: 50, flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 9, background: C.blue,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 900, color: C.white, flexShrink: 0,
-            }}>A</div>
-            <div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.slate }}>Billion </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>Tags</span>
-              <span style={{ fontSize: 11, color: C.slate500, marginLeft: 8 }}>/ Admin Portal</span>
+      {/* ── Main ────────────────────────────────────────────── */}
+      <div className="db-main">
+        {/* Header */}
+        <header className="db-header">
+          <div className="db-header-left">
+            <div className="db-header-tabs">
+              <span className="db-tab active">Billion Tags</span>
+              <span className="db-tab">Admin Portal</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {counts.pending > 0 && (
-              <div
-                onClick={() => navigate("/superadmin/pending")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "5px 12px", borderRadius: 20, cursor: "pointer",
-                  background: C.amberLight, border: `1px solid #FDE68A`,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.amber }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.08em" }}>
-                  {counts.pending} PENDING
-                </span>
-              </div>
-            )}
-
+          <div className="db-header-right">
             {/* ── Bell Icon with Dropdown ──────────────────────────────── */}
             <div ref={dropdownRef} style={{ position: "relative" }}>
-              <Button
+              <div
+                className="db-icon-btn"
+                title="Notifications"
                 onClick={() => {
                   setShowDropdown((prev) => !prev);
                   if (!showDropdown) markAllRead();
-                }}
-                style={{
-                  position: "relative",
-                  width: 36,
-                  height: 36,
-                  borderRadius: 9,
-                  border: `1px solid ${C.border}`,
-                  background: C.white,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  fontSize: 15,
                 }}
               >
                 🔔
                 {unreadCount > 0 && (
                   <span
                     style={{
-                      position: "absolute",
-                      top: -4,
-                      right: -4,
-                      minWidth: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      background: "#EF4444",
+                      position: "absolute", top: -4, right: -4,
+                      width: 14, height: 14,
+                      background: C.red, borderRadius: "50%",
+                      fontSize: 8, fontWeight: 700,
                       color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0 4px",
-                      lineHeight: 1,
-                      border: `2px solid ${C.white}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid var(--bg-header)",
                     }}
                   >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
-              </Button>
+              </div>
+
               {/* ── Dropdown Panel ───────────────────────────────────── */}
               {showDropdown && (
                 <div
@@ -462,30 +423,21 @@ export default function AdminLayout() {
                       borderBottom: `1px solid ${C.border}`,
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.slate,
-                      }}
-                    >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.slate }}>
                       Notifications
                     </span>
                     {notifications.length > 0 && (
-                      <Button
+                      <span
                         onClick={clearAll}
                         style={{
                           fontSize: 11,
                           color: C.blue,
-                          background: "none",
-                          border: "none",
                           cursor: "pointer",
                           fontWeight: 600,
-                          padding: 0,
                         }}
                       >
                         Clear all
-                      </Button>
+                      </span>
                     )}
                   </div>
 
@@ -500,9 +452,7 @@ export default function AdminLayout() {
                           fontSize: 13,
                         }}
                       >
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>
-                          🔔
-                        </div>
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔔</div>
                         No notifications yet
                       </div>
                     ) : (
@@ -546,13 +496,7 @@ export default function AdminLayout() {
                             >
                               {n.message}
                             </p>
-                            <p
-                              style={{
-                                margin: "3px 0 0",
-                                fontSize: 11,
-                                color: C.slate500,
-                              }}
-                            >
+                            <p style={{ margin: "3px 0 0", fontSize: 11, color: C.slate500 }}>
                               {n.time}
                             </p>
                           </div>
@@ -575,37 +519,38 @@ export default function AdminLayout() {
                 </div>
               )}
             </div>
-            {/* ── End Bell ──────────────────────────────────────────────── */}
 
+            {/* Theme toggle */}
             <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: C.blue,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                fontWeight: 800,
-                color: "#fff",
-                cursor: "pointer",
-              }}
+              className="db-theme-toggle"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
             >
-              A
+              {theme === "dark" ? "☀️" : "🌙"}
+            </div>
+
+            {/* User */}
+            <div className="db-header-user">
+              <div className="db-header-avatar">A</div>
+              <span className="db-header-uname">ADMIN</span>
             </div>
           </div>
         </header>
 
-        {/* Page content rendered here */}
-        <main style={{ flex: 1, padding: 28, overflowY: "auto", animation: "fadeUp 0.35s ease both" }}>
+        <main
+          className="db-content"
+        >
           <Outlet context={outletContext} />
         </main>
       </div>
 
       {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
-}
+} 

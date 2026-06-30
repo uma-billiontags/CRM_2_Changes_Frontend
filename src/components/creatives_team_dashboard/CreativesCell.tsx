@@ -123,7 +123,7 @@ function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
             fontSize: 9, fontWeight: 800, color: '#fff',
             background: 'rgba(255,255,255,0.15)',
             padding: '2px 7px', borderRadius: 4,
-            fontFamily: 'monospace', letterSpacing: '0.05em',
+ letterSpacing: '0.05em',
           }}>{ext.toUpperCase()}</span>
           <span style={{
             fontSize: 13, fontWeight: 600, color: '#e2e8f0',
@@ -271,7 +271,7 @@ function CreativeIdEditor({ value, onSave }: CreativeIdEditorProps) {
             }}
             placeholder="Enter creative ID…"
             style={{
-              height: 22, fontSize: 10, fontFamily: 'monospace',
+              height: 22, fontSize: 10, 
               padding: '4px 8px', borderRadius: 4,
               border: '1.5px solid #6366f1',
               outline: 'none', width: 140, color: '#1e293b',
@@ -306,7 +306,7 @@ function CreativeIdEditor({ value, onSave }: CreativeIdEditorProps) {
       ) : (
         <>
           <span style={{
-            fontSize: 9.5, fontFamily: 'monospace', fontWeight: 600,
+            fontSize: 9.5,  fontWeight: 600,
             color: value ? '#4f46e5' : '#94a3b8',
             background: value ? '#eef2ff' : '#f8fafc',
             padding: '4px 8px', borderRadius: 3,
@@ -409,7 +409,7 @@ function CreativeRow({
             fontSize: 9, fontWeight: 700, color: labelColor,
             background: labelBg, padding: '1px 5px',
             borderRadius: 3, border: `1px solid ${labelBorder}`,
-            flexShrink: 0, fontFamily: 'monospace',
+            flexShrink: 0,
           }}>{label}</span>
 
           <span style={{

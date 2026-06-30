@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from 'antd';
-import { useAuth } from '../hooks/useAuth';
+import { Button } from "antd";
+import { useAuth } from "../hooks/useAuth";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws');
-
-const C = { blue: "#2563EB" };
+const WS_BASE_URL = BASE_URL.replace(/^http/, "ws");
 
 interface RoomSummary {
     room_id: number;
@@ -58,15 +56,12 @@ function getFileIcon(fileName?: string): string {
 export default function Admin_Messages_Sidebar() {
     const { user } = useAuth();
 
-    // ── ADD: tab state ──
     const [listTab, setListTab] = useState<"clients" | "team">("clients");
-
     const [rooms, setRooms] = useState<RoomSummary[]>([]);
-    const [teamRooms, setTeamRooms] = useState<TeamRoomSummary[]>([]);   // ← ADD
+    const [teamRooms, setTeamRooms] = useState<TeamRoomSummary[]>([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [activeClientId, setActiveClientId] = useState<string | null>(null);
-    const [activeUserId, setActiveUserId] = useState<number | null>(null);   // ← ADD
-
+    const [activeUserId, setActiveUserId] = useState<number | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loadingMsgs, setLoadingMsgs] = useState(false);
     const [input, setInput] = useState("");
@@ -80,9 +75,9 @@ export default function Admin_Messages_Sidebar() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const activeRoom = rooms.find(r => r.client_id === activeClientId);
-    const activeTeamRoom = teamRooms.find(r => r.user_id === activeUserId);   // ← ADD
+    const activeTeamRoom = teamRooms.find(r => r.user_id === activeUserId);
 
-    // Load the client list
+    // ── Load client rooms ──
     const loadRooms = useCallback(async () => {
         setLoadingRooms(true);
         try {
@@ -96,6 +91,7 @@ export default function Admin_Messages_Sidebar() {
         }
     }, []);
 
+    // ── Load team rooms ──
     const loadTeamRooms = useCallback(async () => {
         setLoadingRooms(true);
         try {
@@ -109,15 +105,11 @@ export default function Admin_Messages_Sidebar() {
         }
     }, []);
 
-
-    // ── Load the right list when tab switches ──
     useEffect(() => {
         if (listTab === "clients") loadRooms();
         else loadTeamRooms();
     }, [listTab, loadRooms, loadTeamRooms]);
 
-
-    // Load thread history when a client is selected
     const loadHistory = useCallback(async (clientId: string) => {
         setLoadingMsgs(true);
         try {
@@ -131,7 +123,6 @@ export default function Admin_Messages_Sidebar() {
         }
     }, []);
 
-    // ── ADD: team thread history loader ──
     const loadTeamHistory = useCallback(async (userId: number) => {
         setLoadingMsgs(true);
         try {
@@ -145,15 +136,12 @@ export default function Admin_Messages_Sidebar() {
         }
     }, []);
 
-    // Connect WS for the active thread only
-    // ── KEEP existing client WS effect, but clear activeUserId when switching ──
+    // ── Client WebSocket ──
     useEffect(() => {
         if (!activeClientId) return;
         loadHistory(activeClientId);
-
         const socket = new WebSocket(`${WS_BASE_URL}/ws/general-chat/${activeClientId}/`);
         socketRef.current = socket;
-
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -164,24 +152,20 @@ export default function Admin_Messages_Sidebar() {
                 }
             } catch (e) { console.error("Admin general chat WS error", e); }
         };
-
         fetch(`${BASE_URL}/mark_general_messages_read/${activeClientId}/`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reader_type: "admin" }),
         }).then(() => loadRooms());
-
         return () => { socket.close(); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeClientId]);
 
-    // ── ADD: team member WS effect, mirrors the client one ──
+    // ── Team WebSocket ──
     useEffect(() => {
         if (!activeUserId) return;
         loadTeamHistory(activeUserId);
-
         const socket = new WebSocket(`${WS_BASE_URL}/ws/internal-chat/${activeUserId}/`);
         socketRef.current = socket;
-
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -192,12 +176,10 @@ export default function Admin_Messages_Sidebar() {
                 }
             } catch (e) { console.error("Admin internal chat WS error", e); }
         };
-
         fetch(`${BASE_URL}/mark_internal_messages_read/${activeUserId}/`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reader_type: "admin" }),
         }).then(() => loadTeamRooms());
-
         return () => { socket.close(); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeUserId]);
@@ -221,7 +203,6 @@ export default function Admin_Messages_Sidebar() {
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
-    // ── UPDATE uploadStagedFile to branch by tab ──
     const uploadStagedFile = async () => {
         const targetId = listTab === "clients" ? activeClientId : activeUserId;
         if (!staged || !targetId) return;
@@ -244,17 +225,12 @@ export default function Admin_Messages_Sidebar() {
         }
     };
 
-    // ── UPDATE handleSend to branch by tab ──
     const handleSend = () => {
         if (staged) { uploadStagedFile(); return; }
         const text = input.trim();
         const targetId = listTab === "clients" ? activeClientId : activeUserId;
         if (!text || !socketRef.current || !targetId) return;
-        socketRef.current.send(JSON.stringify({
-            content: text,
-            sender_id: user.id,
-            sender_type: "admin" as const,
-        }));
+        socketRef.current.send(JSON.stringify({ content: text, sender_id: user.id, sender_type: "admin" }));
         setInput("");
         inputRef.current?.focus();
     };
@@ -287,7 +263,11 @@ export default function Admin_Messages_Sidebar() {
             return (
                 <a href={msg.file_url} target="_blank" rel="noreferrer" download={msg.file_name}
                     style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit", padding: "4px 2px" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 8, flexShrink: 0, background: isAdmin ? "rgba(255,255,255,0.2)" : "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                    <div style={{
+                        width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                        background: isAdmin ? "rgba(255,255,255,0.2)" : "var(--bg-input)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                    }}>
                         {getFileIcon(msg.file_name)}
                     </div>
                     <div style={{ minWidth: 0 }}>
@@ -302,19 +282,32 @@ export default function Admin_Messages_Sidebar() {
 
     const canSend = !!staged || !!input.trim();
 
-    return (
-        <div style={{ display: "flex", height: "calc(100vh - 90px)", background: "#fff", borderRadius: 14, border: "1px solid #CBD5E1", overflow: "hidden" }}>
+    // ── Shared avatar color per tab ──
+    const clientAvatarBg = "var(--accent)";
+    const teamAvatarBg = "var(--accent)";
 
-            {/* ── Client/Team list (left) ── */}
-            <div style={{ width: 300, borderRight: "1px solid #E2E8F0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-                <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid #E2E8F0" }}>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Messages</h3>
-                    <p style={{ fontSize: 11, color: "#64748B", marginTop: 2, marginBottom: 12 }}>
+    return (
+        <div style={{
+            display: "flex", height: "calc(100vh - 90px)",
+            background: "var(--bg-card)", borderRadius: 14,
+            border: "1px solid var(--border)", overflow: "hidden",
+        }}>
+
+            {/* ── LEFT: conversation list ─────────────────────────────────── */}
+            <div style={{
+                width: 300, borderRight: "1px solid var(--border)",
+                display: "flex", flexDirection: "column", flexShrink: 0,
+                background: "var(--bg-card)",
+            }}>
+                {/* Header */}
+                <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--border)" }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Messages</h3>
+                    <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, marginBottom: 12 }}>
                         {listTab === "clients" ? rooms.length : teamRooms.length} conversations
                     </p>
 
-                    {/* ── ADD: Tab toggle ── */}
-                    <div style={{ display: "flex", gap: 4, background: "#F1F5F9", borderRadius: 8, padding: 3 }}>
+                    {/* Tab toggle */}
+                    <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 8, padding: 3 }}>
                         {(["clients", "team"] as const).map(tab => (
                             <button
                                 key={tab}
@@ -327,9 +320,10 @@ export default function Admin_Messages_Sidebar() {
                                 style={{
                                     flex: 1, padding: "6px 0", borderRadius: 6, border: "none",
                                     fontSize: 12, fontWeight: 700, cursor: "pointer",
-                                    background: listTab === tab ? "#fff" : "transparent",
-                                    color: listTab === tab ? C.blue : "#64748B",
-                                    boxShadow: listTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                                    background: listTab === tab ? "var(--bg-card)" : "transparent",
+                                    color: listTab === tab ? "var(--accent)" : "var(--text-muted)",
+                                    boxShadow: listTab === tab ? "var(--shadow-card)" : "none",
+                                    transition: "all 0.15s",
                                 }}
                             >
                                 {tab === "clients" ? "Clients" : "Team"}
@@ -338,38 +332,62 @@ export default function Admin_Messages_Sidebar() {
                     </div>
                 </div>
 
+                {/* List */}
                 <div style={{ flex: 1, overflowY: "auto" }}>
-                    {loadingRooms && <div style={{ padding: 20, textAlign: "center", color: "#94A3B8", fontSize: 12 }}>Loading…</div>}
+                    {loadingRooms && (
+                        <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>Loading…</div>
+                    )}
 
-                    {/* ── Clients list (unchanged) ── */}
+                    {/* Clients */}
                     {listTab === "clients" && !loadingRooms && rooms.length === 0 && (
-                        <div style={{ padding: 20, textAlign: "center", color: "#94A3B8", fontSize: 12 }}>No conversations yet</div>
+                        <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>No conversations yet</div>
                     )}
                     {listTab === "clients" && rooms.map(room => {
                         const isActive = room.client_id === activeClientId;
                         const initials = room.client_name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
                         return (
-                            <div key={room.room_id} onClick={() => setActiveClientId(room.client_id)}
+                            <div
+                                key={room.room_id}
+                                onClick={() => setActiveClientId(room.client_id)}
                                 style={{
                                     display: "flex", alignItems: "center", gap: 10, padding: "12px 18px",
-                                    cursor: "pointer", background: isActive ? "#EFF6FF" : "transparent",
-                                    borderLeft: isActive ? `3px solid ${C.blue}` : "3px solid transparent",
-                                    borderBottom: "1px solid #F1F5F9",
+                                    cursor: "pointer",
+                                    background: isActive ? "var(--accent-light)" : "transparent",
+                                    borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
+                                    borderBottom: "1px solid var(--border)",
+                                    transition: "background 0.15s",
+                                }}
+                            >
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: "50%",
+                                    background: clientAvatarBg, color: "#fff",
+                                    fontSize: 13, fontWeight: 700,
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                                 }}>
-                                <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.blue, color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                     {initials}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{room.client_name}</span>
-                                        {room.last_time && <span style={{ fontSize: 10, color: "#94A3B8", flexShrink: 0, marginLeft: 6 }}>{new Date(room.last_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {room.client_name}
+                                        </span>
+                                        {room.last_time && (
+                                            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
+                                                {new Date(room.last_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </span>
+                                        )}
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-                                        <span style={{ fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 170 }}>
+                                        <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 170 }}>
                                             {room.last_message || "No messages yet"}
                                         </span>
                                         {room.unread_count > 0 && (
-                                            <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: C.blue, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                                            <span style={{
+                                                minWidth: 18, height: 18, borderRadius: 9,
+                                                background: "var(--accent)", color: "#fff",
+                                                fontSize: 10, fontWeight: 700,
+                                                display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
+                                            }}>
                                                 {room.unread_count}
                                             </span>
                                         )}
@@ -379,36 +397,59 @@ export default function Admin_Messages_Sidebar() {
                         );
                     })}
 
-                    {/* ── ADD: Team list ── */}
+                    {/* Team */}
                     {listTab === "team" && !loadingRooms && teamRooms.length === 0 && (
-                        <div style={{ padding: 20, textAlign: "center", color: "#94A3B8", fontSize: 12 }}>No team conversations yet</div>
+                        <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>No team conversations yet</div>
                     )}
                     {listTab === "team" && teamRooms.map(room => {
                         const isActive = room.user_id === activeUserId;
                         const initials = room.member_name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
                         return (
-                            <div key={room.room_id} onClick={() => setActiveUserId(room.user_id)}
+                            <div
+                                key={room.room_id}
+                                onClick={() => setActiveUserId(room.user_id)}
                                 style={{
                                     display: "flex", alignItems: "center", gap: 10, padding: "12px 18px",
-                                    cursor: "pointer", background: isActive ? "#EFF6FF" : "transparent",
-                                    borderLeft: isActive ? `3px solid ${C.blue}` : "3px solid transparent",
-                                    borderBottom: "1px solid #F1F5F9",
+                                    cursor: "pointer",
+                                    background: isActive ? "var(--accent-light)" : "transparent",
+                                    borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
+                                    borderBottom: "1px solid var(--border)",
+                                    transition: "background 0.15s",
+                                }}
+                            >
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: "50%",
+                                    background: teamAvatarBg, color: "#fff",
+                                    fontSize: 13, fontWeight: 700,
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                                 }}>
-                                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                     {initials}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{room.member_name}</span>
-                                        {room.last_time && <span style={{ fontSize: 10, color: "#94A3B8", flexShrink: 0, marginLeft: 6 }}>{new Date(room.last_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {room.member_name}
+                                        </span>
+                                        {room.last_time && (
+                                            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
+                                                {new Date(room.last_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </span>
+                                        )}
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-                                        <span style={{ fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
+                                        <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
                                             {room.last_message || "No messages yet"}
                                         </span>
-                                        <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase" }}>{room.member_role}</span>
+                                        <span style={{ fontSize: 9, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>
+                                            {room.member_role}
+                                        </span>
                                         {room.unread_count > 0 && (
-                                            <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: "#7C3AED", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                                            <span style={{
+                                                minWidth: 18, height: 18, borderRadius: 9,
+                                                background: "var(--color-purple)", color: "#fff",
+                                                fontSize: 10, fontWeight: 700,
+                                                display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
+                                            }}>
                                                 {room.unread_count}
                                             </span>
                                         )}
@@ -420,34 +461,44 @@ export default function Admin_Messages_Sidebar() {
                 </div>
             </div>
 
-            {/* ── Thread panel (right) ── */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#F8FAFC" }}>
+            {/* ── RIGHT: thread panel ─────────────────────────────────────── */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg-page)" }}>
                 {!activeClientId && !activeUserId ? (
-                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 13 }}>
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
                         Select a conversation to start chatting
                     </div>
                 ) : (
                     <>
-                        {/* Thread header — branches by tab */}
-                        <div style={{ background: "#fff", borderBottom: "1px solid #E2E8F0", padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: listTab === "clients" ? C.blue : "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {/* Thread header */}
+                        <div style={{
+                            background: "var(--bg-card)", borderBottom: "1px solid var(--border)",
+                            padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                        }}>
+                            <div style={{
+                                width: 36, height: 36, borderRadius: "50%",
+                                background: listTab === "clients" ? clientAvatarBg : teamAvatarBg,
+                                color: "#fff", fontSize: 13, fontWeight: 700,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
                                 {listTab === "clients"
                                     ? activeRoom?.client_name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()
                                     : activeTeamRoom?.member_name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
                             </div>
                             <div>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
                                     {listTab === "clients" ? activeRoom?.client_name : activeTeamRoom?.member_name}
                                 </div>
-                                <div style={{ fontSize: 11, color: "#64748B" }}>
+                                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                                     {listTab === "clients" ? activeClientId : activeTeamRoom?.member_role}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Messages — unchanged, already generic by sender_type === "admin" */}
+                        {/* Messages */}
                         <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 10 }}>
-                            {loadingMsgs && <div style={{ textAlign: "center", color: "#94A3B8", fontSize: 12 }}>Loading messages…</div>}
+                            {loadingMsgs && (
+                                <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>Loading messages…</div>
+                            )}
                             {messages.map(msg => {
                                 const isAdmin = msg.sender_type === "admin";
                                 const isFileMsg = msg.message_type && msg.message_type !== "text";
@@ -457,53 +508,122 @@ export default function Admin_Messages_Sidebar() {
                                             maxWidth: isFileMsg ? "60%" : "55%",
                                             padding: (msg.message_type === "image" || msg.message_type === "video") ? "6px" : "10px 14px",
                                             borderRadius: isAdmin ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                                            background: isAdmin ? C.blue : "#fff",
-                                            color: isAdmin ? "#fff" : "#1E293B", fontSize: 13,
-                                            boxShadow: isAdmin ? "0 2px 8px rgba(37,99,235,0.25)" : "0 1px 4px rgba(0,0,0,0.08)",
-                                            border: isAdmin ? "none" : "1px solid #E2E8F0", overflow: "hidden",
+                                            background: isAdmin ? "var(--accent)" : "var(--bg-card)",
+                                            color: isAdmin ? "#fff" : "var(--text-primary)",
+                                            fontSize: 13,
+                                            boxShadow: isAdmin ? "0 2px 8px rgba(0,0,0,0.25)" : "var(--shadow-card)",
+                                            border: isAdmin ? "none" : "1px solid var(--border)",
+                                            overflow: "hidden",
                                         }}>
                                             {renderMessageContent(msg)}
                                         </div>
-                                        <span style={{ fontSize: 10, color: "#94A3B8", marginTop: 4 }}>
+                                        <span style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                         </span>
                                     </div>
                                 );
                             })}
-                            {uploading && <div style={{ alignSelf: "flex-end", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "#E2E8F0", fontSize: 12, color: "#64748B" }}>Uploading…</div>}
+                            {uploading && (
+                                <div style={{
+                                    alignSelf: "flex-end", padding: "10px 14px",
+                                    borderRadius: "14px 14px 4px 14px",
+                                    background: "var(--bg-input)", fontSize: 12, color: "var(--text-muted)",
+                                }}>
+                                    Uploading…
+                                </div>
+                            )}
                             <div ref={bottomRef} />
                         </div>
 
-                        {/* Input — unchanged, just uses the updated handleSend/uploadStagedFile above */}
-                        <div style={{ background: "#fff", borderTop: "1px solid #E2E8F0", flexShrink: 0 }}>
+                        {/* Input area */}
+                        <div style={{ background: "var(--bg-card)", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+                            {/* Staged file preview */}
                             {staged && (
                                 <div style={{ padding: "10px 18px 0" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F1F5F9", borderRadius: 10, padding: "8px 10px", border: "1px solid #E2E8F0" }}>
-                                        {staged.message_type === "image" && <img src={staged.previewUrl} alt="preview" style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover" }} />}
-                                        {staged.message_type === "video" && <video src={staged.previewUrl} style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", background: "#000" }} />}
-                                        {staged.message_type === "file" && <div style={{ width: 44, height: 44, borderRadius: 6, background: "#E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{getFileIcon(staged.file.name)}</div>}
+                                    <div style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        background: "var(--bg-input)", borderRadius: 10, padding: "8px 10px",
+                                        border: "1px solid var(--border)",
+                                    }}>
+                                        {staged.message_type === "image" && (
+                                            <img src={staged.previewUrl} alt="preview" style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover" }} />
+                                        )}
+                                        {staged.message_type === "video" && (
+                                            <video src={staged.previewUrl} style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", background: "#000" }} />
+                                        )}
+                                        {staged.message_type === "file" && (
+                                            <div style={{
+                                                width: 44, height: 44, borderRadius: 6,
+                                                background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                                            }}>
+                                                {getFileIcon(staged.file.name)}
+                                            </div>
+                                        )}
                                         <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{staged.file.name}</div>
-                                            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>Press Enter or Send ↑</div>
+                                            <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-primary)" }}>
+                                                {staged.file.name}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Press Enter or Send ↑</div>
                                         </div>
-                                        <button onClick={clearStaged} style={{ width: 20, height: 20, borderRadius: "50%", background: "#CBD5E1", border: "none", cursor: "pointer", fontSize: 10 }}>✕</button>
+                                        <button
+                                            onClick={clearStaged}
+                                            style={{
+                                                width: 20, height: 20, borderRadius: "50%",
+                                                background: "var(--border-strong)", border: "none",
+                                                cursor: "pointer", fontSize: 10, color: "var(--text-primary)",
+                                            }}
+                                        >✕</button>
                                     </div>
                                 </div>
                             )}
+
                             <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 8 }}>
-                                <input ref={fileInputRef} type="file" style={{ display: "none" }}
+                                <input
+                                    ref={fileInputRef} type="file" style={{ display: "none" }}
                                     accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
-                                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); if (fileInputRef.current) fileInputRef.current.value = ""; }} />
-                                <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ width: 36, height: 36, borderRadius: "50%", background: staged ? C.blue : "#F1F5F9", border: staged ? "none" : "1px solid #E2E8F0", cursor: "pointer", fontSize: 16 }}>📎</button>
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={uploading}
+                                    style={{
+                                        width: 36, height: 36, borderRadius: "50%",
+                                        background: staged ? "var(--accent)" : "var(--bg-input)",
+                                        border: staged ? "none" : "1px solid var(--border)",
+                                        cursor: "pointer", fontSize: 16,
+                                    }}
+                                >📎</button>
+
                                 {!staged ? (
-                                    <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                                    <input
+                                        ref={inputRef} value={input}
+                                        onChange={e => setInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
                                         placeholder="Type a reply…"
-                                        style={{ flex: 1, height: 38, padding: "0 14px", borderRadius: 20, border: "1px solid #E2E8F0", background: "#F8FAFC", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                                        style={{
+                                            flex: 1, height: 38, padding: "0 14px", borderRadius: 20,
+                                            border: "1px solid var(--border)",
+                                            background: "var(--bg-input)",
+                                            color: "var(--text-primary)",
+                                            fontSize: 13, outline: "none",
+                                        }}
+                                    />
                                 ) : <div style={{ flex: 1 }} />}
-                                <Button onClick={handleSend} disabled={!canSend || uploading}
-                                    style={{ width: 38, height: 38, borderRadius: "50%", background: canSend && !uploading ? C.blue : "#E2E8F0", border: "none" }}>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={canSend && !uploading ? "#fff" : "#94A3B8"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+
+                                <Button
+                                    onClick={handleSend}
+                                    disabled={!canSend || uploading}
+                                    style={{
+                                        width: 38, height: 38, borderRadius: "50%", border: "none",
+                                        background: canSend && !uploading ? "var(--accent)" : "var(--bg-input)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                    }}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                        stroke={canSend && !uploading ? "#fff" : "var(--text-muted)"}
+                                        strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
                                     </svg>
                                 </Button>
                             </div>
@@ -511,6 +631,19 @@ export default function Admin_Messages_Sidebar() {
                     </>
                 )}
             </div>
+
+            {/* Image lightbox */}
+            {imagePreview && (
+                <div
+                    onClick={() => setImagePreview(null)}
+                    style={{
+                        position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
+                        zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                >
+                    <img src={imagePreview} alt="preview" style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 12 }} />
+                </div>
+            )}
         </div>
     );
 }

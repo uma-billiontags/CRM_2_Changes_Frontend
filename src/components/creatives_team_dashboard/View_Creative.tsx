@@ -172,7 +172,7 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{
-                        fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+ fontSize: 11, fontWeight: 700,
                         color: PURPLE, background: PURPLE_LIGHT,
                         padding: '1px 6px', borderRadius: 4,
                     }}>
@@ -212,7 +212,7 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
                         {/* ── Line Item Details ── */}
                         <SectionHeader title="Line Item Details" />
                         <InfoRow label="Line Item ID" value={
-                            <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: PURPLE }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: PURPLE }}>
                                 {li.line_item_id}
                             </span>
                         } />
@@ -419,7 +419,6 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
                                                                         padding: '1px 6px',
                                                                         borderRadius: 4,
                                                                         border: '1px solid #fcd34d',
-                                                                        fontFamily: 'monospace',
                                                                         textTransform: 'uppercase',
                                                                     }}>
                                                                         {ext}
@@ -448,7 +447,6 @@ function LineItemBlock({ li, index }: { li: LineItem; index: number }) {
                                                                 padding: '1px 6px',
                                                                 borderRadius: 4,
                                                                 border: '1px solid #6ee7b7',
-                                                                fontFamily: 'monospace',
                                                                 textTransform: 'uppercase',
                                                             }}>
                                                                 {backupFileName.split('.').pop()?.toUpperCase()}

@@ -363,7 +363,7 @@ export default function Bulk_Campaign_Create() {
               rows={12}
               style={{
                 fontSize: 13.5, lineHeight: 1.75,
-                resize: 'vertical', fontFamily: 'inherit',
+                resize: 'vertical',
                 borderRadius: 8, color: '#1e293b',
               }}
             />

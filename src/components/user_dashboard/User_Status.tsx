@@ -154,7 +154,7 @@ export default function User_Status() {
     {
       title: "Campaign ID", dataIndex: "campaign_id", key: "campaign_id", width: 150,
       render: (id: string | null) => id ? (
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>{id}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.blue, background: C.blueLight, padding: "3px 8px", borderRadius: 6, }}>{id}</span>
       ) : (
         <span style={{ fontSize: 11, fontWeight: 600, color: C.amber, background: C.amberLight, padding: "3px 8px", borderRadius: 6, border: "1px dashed #FDE68A" }}>Pending</span>
       ),
@@ -170,7 +170,7 @@ export default function User_Status() {
     {
       title: "Line Item ID", dataIndex: "line_item_id", key: "line_item_id", width: 160,
       render: (v: string) => (
-        <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "2px 8px", borderRadius: 6 }}>{v}</span>
+        <span style={{  fontSize: 11, fontWeight: 700, color: C.purple, background: C.purpleLight, padding: "2px 8px", borderRadius: 6 }}>{v}</span>
       ),
     },
     {
@@ -192,7 +192,7 @@ export default function User_Status() {
   ];
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+    <div>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: C.slate, margin: 0 }}>Line Item Status</h1>
         <p style={{ fontSize: 11, color: C.slate500, margin: "4px 0 0", fontWeight: 500, letterSpacing: "0.04em" }}>

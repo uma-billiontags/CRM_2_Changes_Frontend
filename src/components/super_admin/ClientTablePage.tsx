@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { C, fmt } from "../types/types";
+import { fmt } from "../types/types";
 import { StatusBadge, ClientDetailModal } from "./SharedComponents";
 import type { Client, ClientStatus } from "../types/types";
 import { Button, Input, Modal, Table } from "antd";
@@ -135,11 +135,10 @@ export default function ClientTablePage({
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: C.blue,
-            background: C.blueLight,
+            color: "var(--accent)",
+            background: "var(--accent-light)",
             padding: "3px 8px",
             borderRadius: 5,
-            fontFamily: "monospace",
           }}
         >
           {id}
@@ -156,7 +155,7 @@ export default function ClientTablePage({
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: C.slate,
+              color: "var(--text-primary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -167,7 +166,7 @@ export default function ClientTablePage({
           <div
             style={{
               fontSize: 11,
-              color: C.slate500,
+              color: "var(--text-muted)",
               marginTop: 2,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -185,7 +184,11 @@ export default function ClientTablePage({
       key: "company_type",
       width: 130,
       render: (v: string) => (
-        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+        <span style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--text-primary)"
+        }}>{v || "—"}</span>
       ),
     },
     {
@@ -194,7 +197,11 @@ export default function ClientTablePage({
       key: "agency_type",
       width: 120,
       render: (v: string) => (
-        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+        <span style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--text-primary)"
+        }}>{v || "—"}</span>
       ),
     },
     {
@@ -203,7 +210,11 @@ export default function ClientTablePage({
       key: "city",
       width: 100,
       render: (v: string) => (
-        <span style={{ fontSize: 12, color: C.slate500 }}>{v || "—"}</span>
+        <span style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--text-primary)"
+        }}>{v || "—"}</span>
       ),
     },
     {
@@ -212,7 +223,11 @@ export default function ClientTablePage({
       key: "submitted_at",
       width: 120,
       render: (v: string) => (
-        <span style={{ fontSize: 12, color: C.slate700 }}>{fmt(v)}</span>
+        <span style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--text-primary)"
+        }}>{fmt(v)}</span>
       ),
     },
     {
@@ -230,74 +245,33 @@ export default function ClientTablePage({
       render: (_: any, c: Client) => (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {/* View */}
-          <Button
-            size="small"
-            onClick={() => setSelectedClient(c)}
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.blue,
-              background: C.blueLight,
-              border: `1px solid ${C.blueMid}`,
-              borderRadius: 6,
-            }}
-          >
-            View
-          </Button>
-          {/* ── Chat Button ───────────────────────────────────────────── */}
-          {/* <Button
-            size="small"
-            icon={<MessageOutlined />}
-            onClick={() =>
-              setChatClient((prev) =>
-                prev?.id === c.id ? null : c
-              )
-            }
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: chatClient?.id === c.id ? "#fff" : "#7C3AED",
-              background:
-                chatClient?.id === c.id ? "#7C3AED" : "#EDE9FE",
-              border: "1px solid #C4B5FD",
-              borderRadius: 6,
-              transition: "all 0.2s",
-            }}
-          >
-            Chat
-          </Button> */}
+          <Button size="small" onClick={() => setSelectedClient(c)} style={{
+            fontSize: 11, fontWeight: 600,
+            color: "var(--accent)",
+            background: "var(--accent-light)",
+            border: "1px solid var(--accent)",
+            borderRadius: 6,
+          }}>View</Button>
+
 
           {/* Pending actions */}
           {c.status === "pending" && (
             <>
-              <Button
-                size="small"
-                onClick={() => onApprove(c.id)}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: C.green,
-                  background: C.greenLight,
-                  border: "1px solid #BBF7D0",
-                  borderRadius: 6,
-                }}
-              >
-                Approve
-              </Button>
-              <Button
-                size="small"
-                onClick={() => onReject(c.id)}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: C.red,
-                  background: C.redLight,
-                  border: "1px solid #FECACA",
-                  borderRadius: 6,
-                }}
-              >
-                Reject
-              </Button>
+              <Button size="small" onClick={() => onApprove(c.id)} style={{
+                fontSize: 11, fontWeight: 600,
+                color: "var(--green)",
+                background: "var(--green-bg)",
+                border: "1px solid var(--green)",
+                borderRadius: 6,
+              }}>Approve</Button>
+
+              <Button size="small" onClick={() => onReject(c.id)} style={{
+                fontSize: 11, fontWeight: 600,
+                color: "var(--red)",
+                background: "var(--red-bg)",
+                border: "1px solid var(--red)",
+                borderRadius: 6,
+              }}>Reject</Button>
             </>
           )}
 
@@ -312,14 +286,10 @@ export default function ClientTablePage({
                 setCredMsg("");
               }}
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 6,
-                background: sentClients.has(c.id) ? C.greenLight : C.purpleLight,
-                border: sentClients.has(c.id)
-                  ? "1px solid #BBF7D0"
-                  : "1px solid #C4B5FD",
-                color: sentClients.has(c.id) ? C.green : C.purple,
+                fontSize: 11, fontWeight: 600, borderRadius: 6,
+                background: sentClients.has(c.id) ? "var(--green-bg)" : "var(--accent-light)",
+                border: sentClients.has(c.id) ? "1px solid var(--green)" : "1px solid var(--accent)",
+                color: sentClients.has(c.id) ? "var(--green)" : "var(--accent)",
               }}
             >
               {sentClients.has(c.id) ? "Sent Credential" : "Send Credential"}
@@ -331,76 +301,59 @@ export default function ClientTablePage({
   ];
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+    <div>
       {/* ── Page Header ── */}
       <div style={{ marginBottom: 20 }}>
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            color: C.slate,
-            margin: 0,
-            letterSpacing: "-0.4px",
-          }}
-        >
-          {title}
-        </h1>
-        <p
-          style={{
-            fontSize: 11,
-            color: C.slate500,
-            margin: "4px 0 0",
-            fontWeight: 500,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
+        <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>{title}</h1>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0", fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase" }}>
           {subtitle}
         </p>
       </div>
 
       {/* ── Search + Count ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-
         <Input
           placeholder="Search by company, ID, email or city…"
-          prefix={<SearchOutlined style={{ color: C.slate500 }} />}
+          prefix={<SearchOutlined style={{ color: "var(--text-muted)" }} />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           allowClear
           style={{
             flex: 1, maxWidth: 360, height: 38, padding: "0 14px",
-            background: C.white, border: `1px solid ${C.border}`,
-            borderRadius: 9, color: C.slate, fontSize: 13, outline: "none",
-          }} />
+            background: "var(--bg-input)",
+            border: "1px solid var(--border)",
+            borderRadius: 9,
+            color: "var(--text-primary)",
+            fontSize: 13, outline: "none",
+          }}
+        />
         <Button
           onClick={() => navigate('/onboarding')}
           style={{
             borderRadius: 9, border: "none",
-            background: C.blue, color: "#fff",
+            background: "var(--accent)",
+            color: "#fff",
             fontSize: 13, fontWeight: 700,
-            boxShadow: `0 4px 14px ${C.green}44`,
+            padding: "8px 16px", cursor: "pointer",
           }}
         >
-          <PlusOutlined /> Add New Client
+          <PlusOutlined />  Add New Client
         </Button>
         <span
-          style={{ fontSize: 12, color: C.slate500, marginLeft: "auto" }}
+          style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" }}
         >
           {filtered.length} client{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
 
       {/* ── Ant Design Table ── */}
-      <div
-        style={{
-          background: C.white,
-          borderRadius: 14,
-          border: `1px solid ${C.border}`,
-          overflow: "hidden",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        }}
-      >
+      <div style={{
+        background: "var(--bg-card)",
+        borderRadius: 14,
+        border: "1px solid var(--border)",
+        overflow: "hidden",
+        boxShadow: "var(--shadow-card)",
+      }}>
         <Table
           columns={columns}
           dataSource={filtered}
@@ -412,7 +365,7 @@ export default function ClientTablePage({
             pageSizeOptions: ["10", "20", "50"],
             showTotal: (total, range) =>
               `${range[0]}–${range[1]} of ${total} clients`,
-            style: { padding: "12px 16px" },
+            style: { padding: "12px 16px", color: "var(--text-primary)" },
           }}
           rowClassName={() => "client-table-row"}
           style={{ fontSize: 13 }}
@@ -451,11 +404,11 @@ export default function ClientTablePage({
         title={
           <div>
             <div
-              style={{ fontSize: 16, fontWeight: 700, color: C.slate }}
+              style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}
             >
               Send Credentials
             </div>
-            <div style={{ fontSize: 12, color: C.slate500, fontWeight: 400, marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 400, marginTop: 2 }}>
               Credentials will be emailed to the client
             </div>
           </div>
@@ -470,7 +423,7 @@ export default function ClientTablePage({
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
-                  color: C.slate500,
+                  color: "var(--text-muted)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   display: "block",
@@ -483,10 +436,10 @@ export default function ClientTablePage({
                 style={{
                   padding: "10px 14px",
                   borderRadius: 8,
-                  background: C.slate100,
-                  border: `1px solid ${C.border}`,
+                  background: "var(--bg-input)",
+                  border: `1px solid var(--border)`,
                   fontSize: 13,
-                  color: C.slate,
+                  color: "var(--texgt-muted)",
                   fontWeight: 500,
                 }}
               >
@@ -500,7 +453,7 @@ export default function ClientTablePage({
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
-                  color: C.slate500,
+                  color: "var(--text-muted)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   display: "block",
@@ -523,7 +476,7 @@ export default function ClientTablePage({
                 style={{
                   marginBottom: 14,
                   fontSize: 12,
-                  color: credMsg.startsWith("✅") ? C.green : C.red,
+                  color: credMsg.startsWith("✅") ? "var(--green)" : "var(--red)",
                   fontWeight: 500,
                 }}
               >
@@ -548,8 +501,8 @@ export default function ClientTablePage({
                 }}
                 style={{
                   borderRadius: 8,
-                  border: `1px solid ${C.border}`,
-                  color: C.slate500,
+                  border: `1px solid var(--border)`,
+                  color: "var(--text-primary)",
                   fontSize: 13,
                 }}
               >
@@ -561,7 +514,7 @@ export default function ClientTablePage({
                 loading={credSending}
                 style={{
                   borderRadius: 8,
-                  background: C.blue,
+                  background: "var(--accent)",
                   border: "none",
                   fontSize: 13,
                   fontWeight: 700,
@@ -579,18 +532,6 @@ export default function ClientTablePage({
       {chatClient && (
         <Chat client={chatClient} onClose={() => setChatClient(null)} />
       )}
-
-      <style>{`
-        .client-table-row:hover td { background: #F8FAFC !important; }
-        .ant-table-thead > tr > th {
-          background: #F1F5F9 !important;
-          font-size: 11px !important;
-          font-weight: 700 !important;
-          color: #64748B !important;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-      `}</style>
     </div>
   );
 }

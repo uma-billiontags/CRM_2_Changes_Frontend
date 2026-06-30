@@ -142,7 +142,7 @@ export default function User_Drafts() {
         <span style={{
           fontSize: 11, fontWeight: 700, color: '#7c3aed',
           background: '#ede9fe', padding: '3px 8px',
-          borderRadius: 6, fontFamily: 'monospace',
+          borderRadius: 6,
           letterSpacing: '0.01em', whiteSpace: 'nowrap',
         }}>
           {id}
@@ -414,7 +414,7 @@ export default function User_Drafts() {
                             dataIndex: 'id',
                             key: 'id',
                             render: (v: string) => (
-                              <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 6px', borderRadius: 4 }}>{v}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 6px', borderRadius: 4 }}>{v}</span>
                             ),
                           },
                           {

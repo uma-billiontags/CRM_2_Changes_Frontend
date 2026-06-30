@@ -378,7 +378,7 @@ const sidebarMode = isCampaignCreatePage
     return (
         <div style={{
             display: 'flex', minHeight: '100vh',
-            background: BG, fontFamily: "'Segoe UI', system-ui, sans-serif",
+            background: BG,
         }}>
             <style>{`
                 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

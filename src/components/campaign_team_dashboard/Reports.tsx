@@ -120,7 +120,7 @@ export default function Reports() {
             width: 140,
             render: (v: string, record) => (
                 <span style={{
-                    fontFamily: "monospace", fontSize: 12, fontWeight: 700,
+                     fontSize: 12, fontWeight: 700,
                     color: record.report_type === 'cpm' ? C.blue : C.teal,
                     background: record.report_type === 'cpm' ? C.blueLight : C.tealLight,
                     padding: "3px 8px", borderRadius: 6, display: "inline-block",
@@ -161,7 +161,7 @@ export default function Reports() {
             render: (v: string, record) => (
                 <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: C.slate }}>{v || "—"}</div>
-                    <div style={{ fontSize: 10, color: C.slate500, fontFamily: "monospace" }}>{record.client_id}</div>
+                    <div style={{ fontSize: 10, color: C.slate500,  }}>{record.client_id}</div>
                 </div>
             ),
         },

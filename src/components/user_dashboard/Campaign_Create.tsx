@@ -867,7 +867,7 @@ function LineItemCard({
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '4px 10px' }}>
             <span style={{ fontSize: 10.5, color: '#15803d', fontWeight: 500, letterSpacing: '0.05em', marginRight: 8 }}>Line Item ID:</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#14532d', fontFamily: 'monospace', letterSpacing: '0.03em' }}>{item.id}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#14532d', letterSpacing: '0.03em' }}>{item.id}</span>
           </div>
         </div>
       )}
@@ -1091,7 +1091,7 @@ function LineItemCard({
           <Form.Item label={<span style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>Unit Cost (Budget){calculatedUnitCost && <span style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 500, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>Auto-calculated</span>}</span>} style={{ marginBottom: 0 }}>
             {calculatedUnitCost ? (
               <div style={{ height: 38, padding: '0 12px', background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)', border: '1.5px solid #86efac', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d', fontFamily: 'monospace' }}>{currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#15803d',}}>{currencySymbol}{calculatedUnitCost.budget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 <span style={{ fontSize: 10.5, color: '#4ade80', fontStyle: 'italic', whiteSpace: 'nowrap' }}>= {calculatedUnitCost.formula}</span>
               </div>
             ) : (
@@ -1389,7 +1389,7 @@ function Step4Review({
                 <div style={{ background: '#f8fafc', padding: '8px 14px', fontSize: 12.5, fontWeight: 600, color: '#1e293b', borderBottom: '0.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#4f46e5', color: '#fff', fontSize: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                   {li.lineItemName || `Line Item ${i + 1}`}
-                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, fontFamily: 'monospace', background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>{li.id}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>{li.id}</span>
                 </div>
                 <div className="cc-review-table">
                   {[

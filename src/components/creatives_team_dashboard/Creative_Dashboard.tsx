@@ -114,7 +114,7 @@ export default function Creative_Dashboard() {
         <span style={{
           fontSize: 12, fontWeight: 700, color: BLUE,
           background: PURPLE_LIGHT, padding: '3px 8px',
-          borderRadius: 6, fontFamily: 'monospace',
+          borderRadius: 6,
         }}>{id}</span>
       ),
     },
@@ -185,7 +185,7 @@ export default function Creative_Dashboard() {
       title: 'Line Item ID', dataIndex: 'line_item_id', width: 140,
       render: (v: string) => (
         <span style={{
-          fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+ fontSize: 11, fontWeight: 700,
           color: PURPLE, background: PURPLE_LIGHT, padding: '2px 6px', borderRadius: 4,
         }}>{v}</span>
       ),
