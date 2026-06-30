@@ -230,7 +230,7 @@ function PreviewModal({ open, onClose, url, name, ext }: PreviewModalProps) {
 
 // ─── TruncCell ────────────────────────────────────────────────────────────────
 
-function TruncCell({ value, maxW = 160, mono = false }: { value?: string; maxW?: number; mono?: boolean }) {
+function TruncCell({ value, maxW = 160 }: { value?: string; maxW?: number; mono?: boolean }) {
   if (!value) return <span style={{ color: SLATE_300, fontSize: 12 }}>—</span>;
   return (
     <Tooltip title={value} placement="topLeft">
